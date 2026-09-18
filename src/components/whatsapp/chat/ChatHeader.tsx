@@ -60,6 +60,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { useSupportConfig } from '@/hooks/useSupportConfig';
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortao } from "@/hooks/usePortao";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -663,6 +664,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const isScheduled = !!scheduledUntil && new Date(scheduledUntil) > new Date();
   const canSchedule = effectiveStatus === "in_progress" && (isAdmin || (assignedTo && assignedTo === user?.id));
 
+  // antes: sem restrição — buscar dentro da conversa e abrir Ticket CS eram abertos a todos.
+  const podeBuscar = usePortao("atend.busca");
+  const podeCriarTicket = usePortao("tickets.criar");
+
   let computedStatusLabel: string;
   let computedStatusVariant: string;
 
@@ -907,14 +912,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
             {/* Atalho do interruptor de inatividade, que fora daqui só existe em Detalhes */}
             <ChatQuickRuleToggles conversationId={conversation.id} />
 
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowInChatSearch(true)} aria-label="Buscar nesta conversa">
-                  <FileSearch className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Buscar nesta conversa</TooltipContent>
-            </Tooltip>
+            {/* antes: sem restrição */}
+            {podeBuscar && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setShowInChatSearch(true)} aria-label="Buscar nesta conversa">
+                    <FileSearch className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Buscar nesta conversa</TooltipContent>
+              </Tooltip>
+            )}
 
             <Tooltip>
               <TooltipTrigger asChild>
@@ -954,9 +962,12 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                   <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
-                  <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
-                </DropdownMenuItem>
+                {/* antes: sem restrição */}
+                {podeCriarTicket && (
+                  <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
+                    <Ticket className="h-4 w-4 mr-2" /> Abrir Ticket CS
+                  </DropdownMenuItem>
+                )}
                 {isAdmin && churnDescartado && (
                   <DropdownMenuItem onClick={() => setChurnDismissed(false)} disabled={isSavingChurn}>
                     <AlertTriangle className="h-4 w-4 mr-2" /> Reativar risco de churn

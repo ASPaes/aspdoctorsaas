@@ -27,6 +27,7 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { CreateSupportTicketModal } from "@/components/tickets/CreateSupportTicketModal";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { usePortao } from "@/hooks/usePortao";
 import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
@@ -288,6 +289,8 @@ export default function SupportTickets() {
   const { data: profile } = useProfile(userId ?? undefined);
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin === true;
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  // antes: sem restrição — o botão "Novo ticket" aparecia para todos.
+  const podeCriarTicket = usePortao("tickets.criar");
   const [attSearchOverride, setAttSearchOverride] = useState<string | undefined>(undefined);
 
   // Ao abrir a tela, pré-seleciona o setor do usuário — só quando não existe
@@ -1228,9 +1231,12 @@ export default function SupportTickets() {
               </div>
             </PopoverContent>
           </Popover>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
-          </Button>
+          {/* antes: sem restrição */}
+          {podeCriarTicket && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" /> Novo ticket
+            </Button>
+          )}
         </div>
       </div>
 

@@ -23,6 +23,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { ShieldAlert } from "lucide-react";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
+import { usePortao } from "@/hooks/usePortao";
 import { hasOpenEscLayer } from "@/lib/escapeLayers";
 import {
   AlertDialog,
@@ -108,6 +109,9 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const { resendMessage } = useWhatsAppActions();
   const { user, profile } = useAuth();
   const isAccessActive = profile?.access_status === "active" || profile?.access_status === "ativo";
+  // antes: sem restrição — qualquer operador com acesso ativo enviava e encaminhava.
+  const podeEnviar = usePortao("atend.enviar");
+  const podeEncaminhar = usePortao("atend.encaminhar");
   const { data: allClientAlerts = [] } = useClientAlerts();
   const { getSenderLabel } = useSenderMap();
   const { timezone } = useAppTimezone();
@@ -356,15 +360,18 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
                   Apagar para todos ({selectedMessages.size})
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleBulkForward}
-                disabled={selectedMessages.size === 0}
-              >
-                <Forward className="h-4 w-4 mr-1" />
-                Encaminhar ({selectedMessages.size})
-              </Button>
+              {/* antes: sem restrição */}
+              {podeEncaminhar && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkForward}
+                  disabled={selectedMessages.size === 0}
+                >
+                  <Forward className="h-4 w-4 mr-1" />
+                  Encaminhar ({selectedMessages.size})
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={exitSelectionMode}>
                 <X className="h-4 w-4" />
               </Button>
@@ -381,6 +388,12 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             <span>
               {hardBlocks.map((b) => b.titulo).join(" · ")} — não é possível enviar mensagens neste atendimento. Desative o bloqueio no painel de avisos para liberar.
             </span>
+          </div>
+        ) : !podeEnviar ? (
+          /* antes: sem restrição — o compositor aparecia para todos */
+          <div className="border-t bg-muted/40 px-4 py-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span>Você não tem permissão para enviar mensagens neste chat.</span>
           </div>
         ) : (
           <ChatInput

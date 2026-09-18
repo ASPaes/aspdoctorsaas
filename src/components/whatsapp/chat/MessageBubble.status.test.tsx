@@ -26,6 +26,14 @@ vi.mock("../hooks/useEditMessage", () => ({
   useEditMessage: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// O portão de "Encaminhar" (`atend.encaminhar`) lê permissão do banco e exige o
+// provedor de autenticação. Estes casos são sobre a MARCA DE STATUS da bolha:
+// aqui vale a regra de hoje, que é liberado.
+vi.mock("@/hooks/usePortao", () => ({
+  usePortao: () => true,
+  useEhAdminOuGestor: () => false,
+  useEhAdmin: () => false,
+}));
 // Componentes de mídia arrastam o client real; a mensagem destes casos é texto.
 vi.mock("./MediaContent", () => ({ MediaContent: () => null }));
 vi.mock("./ContactCard", () => ({ ContactCard: () => null }));

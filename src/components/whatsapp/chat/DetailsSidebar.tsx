@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { AttendanceMessagesDialog } from "./AttendanceMessagesDialog";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortao } from "@/hooks/usePortao";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { usePermissions } from "@/hooks/usePermissions";
 import {
@@ -84,6 +85,8 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { profile } = useAuth();
 
   const isAdminOrHead = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  // antes: sem restrição — o histórico do contato abria para qualquer operador.
+  const podeVerHistorico = usePortao("atend.historico_terceiros");
 
   const [newNote, setNewNote] = useState("");
   const [editingContact, setEditingContact] = useState(false);
@@ -266,16 +269,18 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
             <OperadorResponsavelCard contactId={contact?.id ?? null} canEdit={!!isAdminOrHead} />
           )}
 
-          {/* ─── 4. Histórico do Contato ─── */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-7 text-xs gap-1.5"
-            onClick={() => setHistoryOpen(true)}
-          >
-            <History className="h-3.5 w-3.5" />
-            Histórico do Contato
-          </Button>
+          {/* ─── 4. Histórico do Contato ─── (antes: sem restrição) */}
+          {podeVerHistorico && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-7 text-xs gap-1.5"
+              onClick={() => setHistoryOpen(true)}
+            >
+              <History className="h-3.5 w-3.5" />
+              Histórico do Contato
+            </Button>
+          )}
 
           <Button
             variant="outline"

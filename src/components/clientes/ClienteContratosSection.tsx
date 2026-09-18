@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { useProfile } from "@/hooks/useProfile";
+import { usePortao } from "@/hooks/usePortao";
 import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
 
 interface Props {
@@ -104,6 +105,8 @@ export default function ClienteContratosSection({ clienteId }: Props) {
   useEffect(() => { supabase.auth.getUser().then(({ data }) => setCurrentUserId(data?.user?.id ?? null)); }, []);
   const { data: currentProfile } = useProfile(currentUserId ?? undefined);
   const isAdminOrHead = currentProfile?.role === "admin" || currentProfile?.role === "head" || currentProfile?.is_super_admin === true;
+  // antes: admin ou gestor (o próprio isAdminOrHead acima)
+  const podeCancelar = usePortao("clientes.cancelar", isAdminOrHead);
 
   const tf = (q: any) => (tid ? q.eq("tenant_id", tid) : q);
 
@@ -332,7 +335,7 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    {isAdminOrHead && c.status === "ativo" && (
+                    {podeCancelar && c.status === "ativo" && (
                       <Button
                         type="button"
                         variant="ghost"
@@ -344,7 +347,7 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                         <XCircle className="h-4 w-4" />
                       </Button>
                     )}
-                    {isAdminOrHead && c.status === "cancelado" && (
+                    {podeCancelar && c.status === "cancelado" && (
                       <Button
                         type="button"
                         variant="ghost"

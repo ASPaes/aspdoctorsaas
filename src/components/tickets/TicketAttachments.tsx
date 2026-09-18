@@ -14,6 +14,7 @@ import { filterAttachments } from "@/lib/attachmentSearch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserNames } from "@/hooks/useUserNames";
 import { AttachmentTitlesDialog } from "./AttachmentTitlesDialog";
+import { usePortao } from "@/hooks/usePortao";
 
 interface Props {
   ticketId: string;
@@ -129,6 +130,7 @@ function TicketAttachments({
   const [salvandoTitulo, setSalvandoTitulo] = useState(false);
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
+  const podeAnexos = usePortao("tickets.anexos"); // antes: sem restrição
 
   // Admin, head e super admin excluem qualquer anexo; os demais, só o que eles mesmos subiram.
   // A regra é repetida na edge function — aqui é só o que a UI mostra.
@@ -383,6 +385,10 @@ function TicketAttachments({
       setDeletingId(null);
     }
   };
+
+  // antes: sem restrição — ver e anexar era aberto a todos.
+  // A regra de excluir anexo (canDelete) fica como está.
+  if (!podeAnexos) return null;
 
   return (
     <div

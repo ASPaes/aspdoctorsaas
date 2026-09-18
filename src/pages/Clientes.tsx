@@ -42,6 +42,7 @@ import { useHiperDivergenciasVisivel, useHiperDivergenciasPendentes } from "@/ho
 import { useAbaNaUrl } from "@/hooks/useDeepLinkIntegracao";
 import { exportClientesXlsx } from "@/lib/exportClientesXlsx";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_cadastro" | "qtde_contratos_ativos" | "cancelado";
@@ -115,6 +116,19 @@ export default function Clientes() {
   // clientes dá 589 no ASP, um número verdadeiro sobre o qual ninguém age. Já
   // "13 campos" é a lista do que atacar.
   const cadastro = useCadastroIncompleto();
+
+  // Portões de permissão das abas. Entram sempre EM SÉRIE com as condições de
+  // dado que já existiam (integração Hiper ativa, campo pendente etc.).
+  const ehAdminOuGestor = useEhAdminOuGestor();
+  // antes: sem restrição
+  const podeVerMovimentos = usePortao("fin.movimentos");
+  // antes: sem restrição
+  const podeVerReajustes = usePortao("clientes.reajuste");
+  // antes: admin ou gestor (a régua continua dentro de useHiperDivergenciasVisivel)
+  const podeVerDivergenciasHiper = usePortao("clientes.divergencias_hiper", ehAdminOuGestor);
+  // antes: admin ou gestor (a régua continua dentro de useCadastroIncompleto)
+  const podeVerCadastroIncompleto = usePortao("clientes.cadastro_incompleto", ehAdminOuGestor);
+
   // A URL é digitável e a aba vem dela. Valor desconhecido, ou link para uma aba
   // que ESTE usuário não tem, deixaria o Tabs com um `value` sem par e a página
   // abriria em branco. Cai na primeira aba em vez de não desenhar nada.
@@ -123,8 +137,10 @@ export default function Clientes() {
   const aba =
     !abasValidas.includes(abaAtiva) ||
     (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true) ||
-    (abaAtiva === "divergencias-hiper" && divergenciasHiperVisivel !== true) ||
-    (abaAtiva === "cadastro-incompleto" && cadastro.visivel !== true)
+    (abaAtiva === "movimentos" && !podeVerMovimentos) ||
+    (abaAtiva === "reajustes" && !podeVerReajustes) ||
+    (abaAtiva === "divergencias-hiper" && !(divergenciasHiperVisivel === true && podeVerDivergenciasHiper)) ||
+    (abaAtiva === "cadastro-incompleto" && !(cadastro.visivel === true && podeVerCadastroIncompleto))
       ? "clientes"
       : abaAtiva;
 
@@ -812,17 +828,21 @@ export default function Clientes() {
             <Users className="h-4 w-4 mr-1" />
             Clientes
           </TabsTrigger>
-          <TabsTrigger value="movimentos">
-            <Activity className="h-4 w-4 mr-1" />
-            Movimentos MRR
-          </TabsTrigger>
-          <TabsTrigger value="reajustes">
-            <Percent className="h-4 w-4 mr-1" />
-            Reajustes
-          </TabsTrigger>
+          {podeVerMovimentos && (
+            <TabsTrigger value="movimentos">
+              <Activity className="h-4 w-4 mr-1" />
+              Movimentos MRR
+            </TabsTrigger>
+          )}
+          {podeVerReajustes && (
+            <TabsTrigger value="reajustes">
+              <Percent className="h-4 w-4 mr-1" />
+              Reajustes
+            </TabsTrigger>
+          )}
           {/* Só para empresa com Hiper ativo (ver useHiperDivergenciasVisivel).
               O número é o que faz a pendência ser vista sem ninguém abrir a aba. */}
-          {divergenciasHiperVisivel === true && (
+          {divergenciasHiperVisivel === true && podeVerDivergenciasHiper && (
             <TabsTrigger value="divergencias-hiper">
               <GitCompareArrows className="h-4 w-4 mr-1" />
               Divergências Hiper
@@ -835,7 +855,7 @@ export default function Clientes() {
           )}
           {/* Só aparece quando há campo com pendência (ver useCadastroIncompleto).
               O número são os CAMPOS, não os clientes. */}
-          {cadastro.visivel === true && (
+          {cadastro.visivel === true && podeVerCadastroIncompleto && (
             <TabsTrigger value="cadastro-incompleto">
               <ClipboardList className="h-4 w-4 mr-1" />
               Cadastro incompleto
@@ -1311,15 +1331,19 @@ export default function Clientes() {
       )}
         </TabsContent>
 
-        <TabsContent value="movimentos" className="mt-4">
-          <MovimentosMrrTab />
-        </TabsContent>
+        {podeVerMovimentos && (
+          <TabsContent value="movimentos" className="mt-4">
+            <MovimentosMrrTab />
+          </TabsContent>
+        )}
 
-        <TabsContent value="reajustes" className="mt-4">
-          <ReajustesTab tenantId={tid} />
-        </TabsContent>
+        {podeVerReajustes && (
+          <TabsContent value="reajustes" className="mt-4">
+            <ReajustesTab tenantId={tid} />
+          </TabsContent>
+        )}
 
-        {divergenciasHiperVisivel === true && (
+        {divergenciasHiperVisivel === true && podeVerDivergenciasHiper && (
           <TabsContent value="divergencias-hiper" className="mt-4">
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>
               <DivergenciasHiperTab />
@@ -1327,7 +1351,7 @@ export default function Clientes() {
           </TabsContent>
         )}
 
-        {cadastro.visivel === true && (
+        {cadastro.visivel === true && podeVerCadastroIncompleto && (
           <TabsContent value="cadastro-incompleto" className="mt-4">
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>
               <CadastroIncompletoTab />

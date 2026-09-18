@@ -27,6 +27,15 @@ vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ profile }),
 }));
 
+// QUEM enxerga os outros setores virou permissão (`atend.todos_setores`), e o
+// gancho real conversa com o banco. Estes casos medem outra coisa — ONDE o chat
+// ABRE —, então aqui vale a regra de hoje, que a permissão nasceu espelhando:
+// administrador, gestor e super admin veem todos os setores; operador, não.
+vi.mock("@/hooks/usePodeVerTodosSetores", () => ({
+  usePodeVerTodosSetores: () =>
+    profile.is_super_admin || profile.role === "admin" || profile.role === "head",
+}));
+
 vi.mock("@/hooks/useAllowedDepartments", () => ({
   useAllowedDepartments: () => ({
     data: [

@@ -22,6 +22,7 @@ import { useContactDiagnosis } from "@/components/whatsapp/hooks/useContactDiagn
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { cnpjDigitsVariants, documentoCompleto } from "@/lib/cnpjDigitsVariants";
 import type { ClienteFormValues } from "@/pages/ClienteForm";
+import { usePortao } from "@/hooks/usePortao";
 
 type ClienteDuplicado = {
   id: string;
@@ -45,6 +46,8 @@ interface Props {
 
 export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, segmentos, unidadesBase, clienteId, codigoSequencial, onNavigate }: Props) {
   const [contatosOpen, setContatosOpen] = useState(false);
+  // antes: sem restrição
+  const podeVerContatos = usePortao("clientes.contatos");
   const [cepLoading, setCepLoading] = useState(false);
   const [cnpjLoading, setCnpjLoading] = useState(false);
   const [tipoPessoa, setTipoPessoa] = useState<"juridica" | "fisica">("juridica");
@@ -796,27 +799,29 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       <Separator />
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">Contato Principal</h3>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={!clienteId}
-                  onClick={() => setContatosOpen(true)}
-                >
-                  <Users className="h-4 w-4 mr-1" />
-                  Contatos Adicionais
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {!clienteId && (
-              <TooltipContent>Salve o cliente primeiro</TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
+        {podeVerContatos && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!clienteId}
+                    onClick={() => setContatosOpen(true)}
+                  >
+                    <Users className="h-4 w-4 mr-1" />
+                    Contatos Adicionais
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              {!clienteId && (
+                <TooltipContent>Salve o cliente primeiro</TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -864,7 +869,7 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         )} />
       </div>
 
-      {clienteId && (
+      {clienteId && podeVerContatos && (
         <ContatosAdicionaisModal
           clienteId={clienteId}
           open={contatosOpen}

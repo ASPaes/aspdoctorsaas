@@ -46,6 +46,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgentAvailability } from "@/hooks/useAgentAvailability";
+import { usePortao } from "@/hooks/usePortao";
 
 interface Props {
   selectedId: string | null;
@@ -77,6 +78,9 @@ const PILL_LABELS: Record<string, string> = {
 export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  // antes: sem restrição — agenda de contatos e busca nas mensagens abertas a todos.
+  const podeContatos = usePortao("atend.contatos");
+  const podeBuscar = usePortao("atend.busca");
   const STORAGE_KEY = user?.id ? `whatsapp-chat-filters:${user.id}` : null;
 
   const loadSaved = () => {
@@ -752,14 +756,17 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/contatos")}>
-                  <Users className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Contatos</TooltipContent>
-            </Tooltip>
+            {/* antes: sem restrição */}
+            {podeContatos && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/contatos")}>
+                    <Users className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Contatos</TooltipContent>
+              </Tooltip>
+            )}
             <ConversationFiltersPopover filters={filters} onChange={setFilters} showGroupByAgent={activePill === "in_progress"} operatorFilterInactive={queueLikePills} />
             
             <Button variant="default" size="icon" className="h-7 w-7" onClick={() => setShowNewModal(true)}>
@@ -778,14 +785,17 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
               className="pl-8 h-9"
             />
           </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setShowMessageSearch(true)}>
-                <FileSearch className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Buscar nas mensagens</TooltipContent>
-          </Tooltip>
+          {/* antes: sem restrição */}
+          {podeBuscar && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => setShowMessageSearch(true)}>
+                  <FileSearch className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Buscar nas mensagens</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       </div>
 

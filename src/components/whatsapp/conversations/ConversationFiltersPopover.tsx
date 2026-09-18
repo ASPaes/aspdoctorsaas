@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useWhatsAppInstances } from "../hooks/useWhatsAppInstances";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentOptions } from "../hooks/useAgentOptions";
+import { usePortao } from "@/hooks/usePortao";
 
 export type SortBy = "recent" | "unread" | "waiting" | "oldest";
 
@@ -53,6 +54,9 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
   const { instances } = useWhatsAppInstances();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin" || profile?.role === "head" || profile?.is_super_admin;
+  // antes: sem restrição — o botão de Filtros aparecia para todos.
+  // Os 4 filtros internos que já eram só de admin/gestor seguem como estavam.
+  const podeFiltrar = usePortao("atendimento_filtros");
   const [open, setOpen] = useState(false);
   const [operadorOpen, setOperadorOpen] = useState(false);
 
@@ -90,6 +94,8 @@ export function ConversationFiltersPopover({ filters, onChange, showGroupByAgent
   const handleClear = () => {
     onChange({ sortBy: "recent", status: undefined, instanceId: undefined, assignedToMe: false, assignedToAgent: undefined, autoReplyDisabledOnly: false, rulesDisabledOnly: false, groupByAgent: false });
   };
+
+  if (!podeFiltrar) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

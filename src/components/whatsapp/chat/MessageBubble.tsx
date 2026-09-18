@@ -16,6 +16,7 @@ import { formatTime as formatTzTime } from "@/lib/formatDateWithTimezone";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { useEditMessage } from "../hooks/useEditMessage";
+import { usePortao } from "@/hooks/usePortao";
 import {
   Tooltip,
   TooltipContent,
@@ -103,6 +104,8 @@ export function MessageBubble({
   );
 
   const { timezone } = useAppTimezone();
+  // antes: sem restrição — "Encaminhar" aparecia no menu de toda mensagem.
+  const podeEncaminhar = usePortao("atend.encaminhar");
   const time = formatTzTime(msg.timestamp, timezone);
   const [showTranscription, setShowTranscription] = useState(false);
 
@@ -759,10 +762,13 @@ export function MessageBubble({
             <DropdownMenuSeparator />
           </>
         )}
-        <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
-          <Forward className="h-4 w-4 mr-2" />
-          Encaminhar
-        </DropdownMenuItem>
+        {/* antes: sem restrição */}
+        {podeEncaminhar && (
+          <DropdownMenuItem onClick={() => onForward?.(msg.id)}>
+            <Forward className="h-4 w-4 mr-2" />
+            Encaminhar
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => onEnterSelectionMode?.(msg.id)}>
           <CheckSquare className="h-4 w-4 mr-2" />
           Selecionar

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAcessoFastAccess } from "@/hooks/useAcessoFastAccess";
 import { openAcessoFast } from "@/lib/acessofast";
+import { usePortao } from "@/hooks/usePortao";
 
 interface Props {
   conversationId: string;
@@ -20,8 +21,11 @@ interface Props {
  */
 export function AcessoFastButton({ conversationId, tenantId, cnpj, nome }: Props) {
   const { canAccess } = useAcessoFastAccess();
+  // antes: sem restrição dentro do tenant liberado.
+  // O portão entra EM SÉRIE com a flag do tenant — nunca no lugar dela.
+  const podeAcessoRemoto = usePortao("atend.acesso_remoto");
 
-  if (!canAccess || !tenantId) return null;
+  if (!canAccess || !podeAcessoRemoto || !tenantId) return null;
 
   // Sem async/await aqui: o navegador só libera window.open como resposta
   // imediata ao clique. Qualquer espera antes e o popup é bloqueado.

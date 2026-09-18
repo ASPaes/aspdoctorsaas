@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { useProfile } from "@/hooks/useProfile";
+import { usePortao } from "@/hooks/usePortao";
 import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketDialog";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
@@ -159,6 +160,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   }, []);
   const { data: currentProfile } = useProfile(currentUserId ?? undefined);
   const isAdminOrHead = currentProfile?.role === "admin" || currentProfile?.role === "head" || currentProfile?.is_super_admin === true;
+
+  // Portões do RBAC. Cada um carrega a regra de HOJE daquele controle.
+  const podeCriarTicket = usePortao("tickets.criar"); // antes: sem restrição (botão "Filho")
+  const podeEditar = usePortao("tickets.editar"); // antes: sem restrição
+  const podeEncerrar = usePortao("tickets.encerrar"); // antes: sem restrição
+  const podeReabrir = usePortao("tickets.reabrir"); // antes: sem restrição
+  const podeExcluir = usePortao("tickets.excluir", isAdminOrHead); // antes: só admin/gestor
+  const podeTransferir = usePortao("tickets.transferir"); // antes: sem restrição
+  const podeMencionar = usePortao("tickets.mencoes"); // antes: sem restrição
 
   const handleSoftDelete = async () => {
     if (!ticketId) return;
@@ -977,7 +987,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Select
             value={ticket?.department_id ?? "none"}
             onValueChange={(v) => handleFieldUpdate({ department_id: v === "none" ? null : v })}
-            disabled={updating}
+            disabled={updating || !podeTransferir}
           >
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="—" />
@@ -995,7 +1005,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Select
             value={ticket?.status_id ?? ""}
             onValueChange={(v) => handleFieldUpdate({ status_id: v })}
-            disabled={updating}
+            disabled={updating || !podeEditar}
           >
             <SelectTrigger className="h-9 text-xs">
               <SelectValue>
@@ -1024,7 +1034,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <Select
             value={ticket?.responsavel_user_id ?? ""}
             onValueChange={(v) => handleFieldUpdate({ responsavel_user_id: v })}
-            disabled={updating}
+            disabled={updating || !podeTransferir}
           >
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="Não atribuído" />
@@ -1054,7 +1064,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               handleFieldUpdate({ rotulo: val });
             }
           }}
-          disabled={updating}
+          disabled={updating || !podeEditar}
         />
       </div>
 
@@ -1072,7 +1082,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               handleFieldUpdate({ ticket_dev: val });
             }
           }}
-          disabled={updating}
+          disabled={updating || !podeEditar}
         />
       </div>
 
@@ -1398,13 +1408,15 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <div className="space-y-1">
           {((ticket?.checklist as any[]) ?? []).map((item: any, i: number) => (
             <div key={i} className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-muted/50">
-              <Checkbox checked={!!item.done} onCheckedChange={() => handleToggleCheck(i)} />
+              {/* antes: sem restrição */}
+              <Checkbox checked={!!item.done} onCheckedChange={() => handleToggleCheck(i)} disabled={!podeEditar} />
               <span className={`text-sm flex-1 ${item.done ? "line-through text-muted-foreground" : ""}`}>
                 {item.text}
               </span>
               <button
                 onClick={() => handleRemoveCheckItem(i)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                disabled={!podeEditar}
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive disabled:opacity-0"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1418,8 +1430,10 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             placeholder="Novo item..."
             className="h-8 text-sm flex-1"
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddCheckItem(); } }}
+            disabled={!podeEditar}
           />
-          <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleAddCheckItem}>
+          {/* antes: sem restrição */}
+          <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleAddCheckItem} disabled={!podeEditar}>
             <Plus className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -1985,16 +1999,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 {envioEmail.verificando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
                 E-mail
               </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs gap-1.5"
-                onClick={() => setChildOpen(true)}
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Filho
-              </Button>
-              {isAdminOrHead && (
+              {/* antes: sem restrição */}
+              {podeCriarTicket && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => setChildOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Filho
+                </Button>
+              )}
+              {/* antes: isAdminOrHead */}
+              {podeExcluir && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -2018,7 +2036,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                           <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
                           Aberto
                         </div>
-                        {terminalStatus && (() => {
+                        {/* antes: sem restrição */}
+                        {podeEncerrar && terminalStatus && (() => {
                           // O banco barra de qualquer jeito (trg_block_close_with_open_trainings);
                           // aqui o operador vê o motivo antes de tentar.
                           const travado = treinoResumo.emAberto.length > 0;
@@ -2057,7 +2076,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                         <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-muted text-muted-foreground border border-border">
                           <Lock className="h-3 w-3" /> Encerrado
                         </div>
-                        {initialStatus && (
+                        {/* antes: sem restrição */}
+                        {podeReabrir && initialStatus && (
                           <button
                             onClick={() => handleFieldUpdate({ status_id: initialStatus.id })}
                             disabled={updating}
@@ -2076,11 +2096,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
           {/* Top strip */}
           <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap shrink-0">
-            {/* Prioridade */}
+            {/* Prioridade — antes: sem restrição */}
             <Select
               value={ticket?.prioridade ?? ""}
               onValueChange={(v) => handleFieldUpdate({ prioridade: v })}
-              disabled={updating}
+              disabled={updating || !podeEditar}
             >
               <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
                 <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -2108,11 +2128,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               </SelectContent>
             </Select>
 
-            {/* Canal */}
+            {/* Canal — antes: sem restrição */}
             <Select
               value={ticket?.canal_origem ?? ""}
               onValueChange={(v) => handleFieldUpdate({ canal_origem: v })}
-              disabled={updating}
+              disabled={updating || !podeEditar}
             >
               <SelectTrigger className="h-auto w-auto min-w-[120px] border rounded-md px-3 py-1.5 text-xs gap-1.5 bg-muted/30 [&>svg]:hidden [&>span]:!flex [&>span]:!overflow-visible">
                 <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -2153,7 +2173,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   key={t}
                   type="button"
                   onClick={() => handleFieldUpdate({ tipo_horario: t })}
-                  disabled={updating}
+                  disabled={updating || !podeEditar}
                   className={`px-3 py-1 text-[11px] rounded-md border transition-colors ${
                     (ticket?.tipo_horario ?? "comercial") === t
                       ? "bg-primary/10 text-primary border-primary"
@@ -2199,9 +2219,11 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                         style={{ background: tag.color + "22", color: tag.color }}
                       >
                         {tag.name}
+                        {/* antes: sem restrição */}
                         <button
                           onClick={(e) => { e.stopPropagation(); handleRemoveTag(tag.assignmentId); }}
-                          className="hover:opacity-70"
+                          disabled={!podeEditar}
+                          className="hover:opacity-70 disabled:hidden"
                         >
                           <X className="h-3 w-3" />
                         </button>
@@ -2209,7 +2231,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     ))}
                     <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
+                        <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1" disabled={!podeEditar}>
                           <TagIcon className="h-3 w-3" />
                           Tag
                         </Button>
@@ -2249,7 +2271,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreateAndAddTag(); } }}
                             />
                             <Button size="sm" variant="outline" className="h-8 px-2" onClick={handleCreateAndAddTag}
-                              disabled={!quickTagName.trim() || creatingTag}>
+                              disabled={!quickTagName.trim() || creatingTag || !podeEditar}>
                               <Plus className="h-3.5 w-3.5" />
                             </Button>
                           </div>
@@ -2259,7 +2281,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                   </div>
                 </div>
 
-                {/* Marcados */}
+                {/* Marcados — antes: sem restrição */}
+                {podeMencionar && (
                 <div>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium mb-2">Marcados</p>
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -2298,6 +2321,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                     </Popover>
                   </div>
                 </div>
+                )}
 
                 <Separator />
 

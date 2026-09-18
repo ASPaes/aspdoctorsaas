@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { usePortao } from "@/hooks/usePortao";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,11 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
 
   const { isBlocked } = useAgentPresence();
+
+  // antes: sem restrição — qualquer operador assumia/puxava da fila e transferia.
+  // O portão entra em série com as regras atuais (presença, setor, bloqueio).
+  const podeAssumir = usePortao("atend.assumir");
+  const podeTransferir = usePortao("atendimento_transferir");
 
   // Bloqueios ativos do contato/cliente desta conversa
   const { data: allClientAlerts = [] } = useClientAlerts();
@@ -134,11 +140,11 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const ChipIcon = chipConfig.icon;
 
   // Assumir: conversa na fila (waiting + sem dono)
-  const canClaim = isInQueue && !isAssignedToMe && isInUserDepartment;
+  const canClaim = podeAssumir && isInQueue && !isAssignedToMe && isInUserDepartment;
   // Takeover: chat ATIVO com dono que não sou eu
-  const canTakeOver = !!activeAssignedTo && !isAssignedToMe && isInUserDepartment;
+  const canTakeOver = podeAssumir && !!activeAssignedTo && !isAssignedToMe && isInUserDepartment;
   // Reabrir: conversa encerrada / sem atendimento ativo (não-grupo). Gate no loading evita flash.
-  const canReopen = isClosedOrNone && isInUserDepartment && !attendanceLoading && !attendance?.is_group;
+  const canReopen = podeAssumir && isClosedOrNone && isInUserDepartment && !attendanceLoading && !attendance?.is_group;
 
   return (
     <div className="flex items-center gap-1.5">
@@ -194,15 +200,18 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
               Assumir
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-full"
-            onClick={onTransferClick}
-            aria-label="Transferir"
-          >
-            <ArrowRightLeft className="h-3 w-3" />
-          </Button>
+          {/* antes: sem restrição */}
+          {podeTransferir && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 rounded-full"
+              onClick={onTransferClick}
+              aria-label="Transferir"
+            >
+              <ArrowRightLeft className="h-3 w-3" />
+            </Button>
+          )}
         </>
       )}
 

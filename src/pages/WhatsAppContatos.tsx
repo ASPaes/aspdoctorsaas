@@ -30,6 +30,8 @@ import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppIns
 import { Separator } from "@/components/ui/separator";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { usePortao } from "@/hooks/usePortao";
+import AccessDenied from "@/pages/AccessDenied";
 
 export default function WhatsAppContatos() {
   const navigate = useNavigate();
@@ -47,6 +49,8 @@ export default function WhatsAppContatos() {
   const [confirmInativar, setConfirmInativar] = useState(false);
   const { instances } = useWhatsAppInstances();
   const setContactActive = useSetContactActive();
+  // antes: sem restrição — a agenda de contatos abria para qualquer operador.
+  const podeContatos = usePortao("atend.contatos");
 
   const clienteFilter: ContactClienteFilter =
     vinculo === "none"
@@ -87,6 +91,8 @@ export default function WhatsAppContatos() {
     if (s === "negative") return <ThumbsDown className="h-3 w-3 text-red-500" />;
     return <Minus className="h-3 w-3 text-muted-foreground" />;
   };
+
+  if (!podeContatos) return <AccessDenied />;
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] overflow-hidden bg-background">

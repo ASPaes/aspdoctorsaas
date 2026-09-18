@@ -47,6 +47,8 @@ import { ClientAlertsManager } from "@/components/clientes/ClientAlertsManager";
 import DeleteClienteDialog from "@/components/clientes/DeleteClienteDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProtectedElement } from "@/components/auth/ProtectedElement";
+import { usePortao } from "@/hooks/usePortao";
+import AccessDenied from "@/pages/AccessDenied";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import type { Database } from "@/integrations/supabase/types";
@@ -387,6 +389,28 @@ export default function ClienteForm() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const canDelete = profile?.role === 'admin' || profile?.is_super_admin;
+
+  // Portões de permissão da ficha. Cada um entra EM SÉRIE com a condição de
+  // dado que já existia (isEditing, id, integração ativa etc.).
+  // antes: quem tinha `clientes` abria a ficha
+  const podeVerFicha = usePortao("clientes.ficha");
+  // antes: sem restrição
+  const podeVerDados = usePortao("clientes.dados");
+  // antes: sem restrição
+  const podeVerProdutos = usePortao("clientes.venda_produto");
+  // antes: sem restrição
+  const podeVerContratos = usePortao("clientes.contratos");
+  // antes: sem restrição
+  const podeVerParametrosAtendimento = usePortao("clientes.parametros_atendimento");
+  // antes: sem restrição
+  const podeVerTickets = usePortao("clientes.tickets");
+  // antes: sem restrição
+  const podeVerFiliais = usePortao("clientes.filiais");
+  // antes: sem restrição (só dependia de a integração estar ativa)
+  const podeVerIntegracao = usePortao("clientes.integracao");
+  // antes: admin (ou super admin) — o mesmo `canDelete`
+  const podeExcluirTudo = usePortao("clientes.purge", !!canDelete);
+
   const lookups = useLookups(estadoId);
 
   // Draft persistence
@@ -695,6 +719,9 @@ export default function ClienteForm() {
     }
   };
 
+  // Ficha inteira fechada: mesma tela de acesso negado do resto do sistema.
+  if (!podeVerFicha) return <AccessDenied />;
+
   return (
     <div className="space-y-6">
       {/* Unsaved changes dialog */}
@@ -830,38 +857,40 @@ export default function ClienteForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} onKeyDown={handleFormKeyDown} className="space-y-6">
           {/* Card: Dados Cadastrais */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Building2 className="h-5 w-5 text-primary" />
-                Dados Cadastrais
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DadosClienteTab
-                form={form}
-                estados={lookups.estados.data ?? []}
-                cidades={lookups.cidades.data ?? []}
-                areasAtuacao={lookups.areasAtuacao.data ?? []}
-                segmentos={lookups.segmentos.data ?? []}
-                unidadesBase={lookups.unidadesBase.data ?? []}
-                clienteId={id}
-                codigoSequencial={(clienteQuery.data as any)?.codigo_sequencial ?? null}
-                onNavigate={guardedNavigate}
-              />
-            </CardContent>
-          </Card>
+          {podeVerDados && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  Dados Cadastrais
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <DadosClienteTab
+                  form={form}
+                  estados={lookups.estados.data ?? []}
+                  cidades={lookups.cidades.data ?? []}
+                  areasAtuacao={lookups.areasAtuacao.data ?? []}
+                  segmentos={lookups.segmentos.data ?? []}
+                  unidadesBase={lookups.unidadesBase.data ?? []}
+                  clienteId={id}
+                  codigoSequencial={(clienteQuery.data as any)?.codigo_sequencial ?? null}
+                  onNavigate={guardedNavigate}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {/* Card: Parametros de atendimento */}
-          <ParametrosAtendimentoSection form={form} />
+          {podeVerParametrosAtendimento && <ParametrosAtendimentoSection form={form} />}
 
-          {isEditing && id && (
+          {isEditing && id && podeVerProdutos && (
             <div id="cliente-produtos-section">
               <ClienteProdutosSection clienteId={id} />
             </div>
           )}
 
-          {isEditing && id && !hasNonImplicitContracts && !forceShowContracts && (
+          {isEditing && id && podeVerContratos && !hasNonImplicitContracts && !forceShowContracts && (
             <div className="flex justify-center">
               <Button
                 type="button"
@@ -876,11 +905,11 @@ export default function ClienteForm() {
             </div>
           )}
 
-          {isEditing && id && (hasNonImplicitContracts || forceShowContracts) && (
+          {isEditing && id && podeVerContratos && (hasNonImplicitContracts || forceShowContracts) && (
             <ClienteContratosSection clienteId={id} />
           )}
 
-          {isEditing && id && <IntegracaoCard clienteId={id} />}
+          {isEditing && id && podeVerIntegracao && <IntegracaoCard clienteId={id} />}
 
           {isEditing && id && (
             <FinanceiroCard
@@ -969,7 +998,7 @@ export default function ClienteForm() {
           />
 
           {/* Tickets CS (apenas em edição) */}
-          {isEditing && id && (
+          {isEditing && id && podeVerTickets && (
             <ClienteTicketsSection
               clienteId={id}
               clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}
@@ -977,7 +1006,7 @@ export default function ClienteForm() {
           )}
 
           {/* Avisos e Bloqueios (apenas em edição) */}
-          {isEditing && id && (
+          {isEditing && id && podeVerParametrosAtendimento && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -995,7 +1024,7 @@ export default function ClienteForm() {
           )}
 
           {/* Filiais vinculadas (apenas em edição) */}
-          {isEditing && id && <FiliaisSection clienteId={id} />}
+          {isEditing && id && podeVerFiliais && <FiliaisSection clienteId={id} />}
 
           {/* Card: Cancelamento (read-only — derivado dos contratos) */}
           {isEditing && (
@@ -1048,7 +1077,7 @@ export default function ClienteForm() {
             </Card>
           )}
 
-          {isEditing && id && canDelete && (
+          {isEditing && id && podeExcluirTudo && (
             <Card className="border-destructive/50">
               <CardHeader>
                 <CardTitle className="text-base text-destructive flex items-center gap-2">
@@ -1095,7 +1124,7 @@ export default function ClienteForm() {
         />
       )}
 
-      {isEditing && id && canDelete && (
+      {isEditing && id && podeExcluirTudo && (
         <DeleteClienteDialog
           clienteId={id}
           clienteNome={form.watch("razao_social") || form.watch("nome_fantasia") || ""}

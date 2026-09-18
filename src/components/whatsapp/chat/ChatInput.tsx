@@ -27,6 +27,7 @@ import { useSmartReply } from "../hooks/useSmartReply";
 import { useWhatsAppSend } from "../hooks/useWhatsAppSend";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
+import { usePortao } from "@/hooks/usePortao";
 import type { Message } from "../hooks/useWhatsAppMessages";
 import type { MediaSendParams } from "./input/types";
 import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupParticipants";
@@ -125,7 +126,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const [macroSending, setMacroSending] = useState(false);
   const isInternalNote = mode === "note";
   const isDraftMode = mode === "draft";
-  const isScheduleMode = mode === "schedule";
+  // antes: sem restrição — a aba "Agendar" existia para todo mundo.
+  const podeAgendar = usePortao("atend.agendar");
+  const isScheduleMode = mode === "schedule" && podeAgendar;
   const { createNote, isCreating: isCreatingNote } = useConversationNotes(conversationId);
 
   // --- Mensagens agendadas ---------------------------------------------------
@@ -832,8 +835,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [editandoAgendadaId, onEditandoAgendadaChange]);
 
   useEffect(() => {
-    onModoAgendarChange?.(mode === "schedule");
-  }, [mode, onModoAgendarChange]);
+    onModoAgendarChange?.(isScheduleMode);
+  }, [isScheduleMode, onModoAgendarChange]);
 
 
   const handleSendMedia = useCallback((params: MediaSendParams) => {
@@ -1173,21 +1176,24 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               <FileText className="w-3 h-3" />
               Rascunho
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!scheduleAt) setScheduleAt(paraInputLocal(proximaHoraCheia()));
-                switchMode("schedule");
-              }}
-              className={cn(
-                "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
-                mode === "schedule" ? "bg-violet-500 text-violet-50" : "bg-transparent text-muted-foreground hover:bg-muted"
-              )}
-              aria-pressed={mode === "schedule"}
-            >
-              <CalendarClock className="w-3 h-3" />
-              Agendar
-            </button>
+            {/* antes: sem restrição */}
+            {podeAgendar && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!scheduleAt) setScheduleAt(paraInputLocal(proximaHoraCheia()));
+                  switchMode("schedule");
+                }}
+                className={cn(
+                  "px-3 py-1 transition-colors flex items-center gap-1.5 border-l border-border",
+                  mode === "schedule" ? "bg-violet-500 text-violet-50" : "bg-transparent text-muted-foreground hover:bg-muted"
+                )}
+                aria-pressed={mode === "schedule"}
+              >
+                <CalendarClock className="w-3 h-3" />
+                Agendar
+              </button>
+            )}
           </div>
           {isInternalNote && (
             <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
