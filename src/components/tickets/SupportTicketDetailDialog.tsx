@@ -83,6 +83,40 @@ function formatEvtDate(iso: string): string {
   return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
+// DEM-0422: layout da janela do ticket lembrado por navegador
+const TICKET_PANEL_WIDTH_KEY = "ticket-dialog:right-panel-width";
+const TICKET_DIALOG_SIZE_KEY = "ticket-dialog:size";
+
+function clampNum(v: number, min: number, max: number): number {
+  return Math.min(Math.max(v, min), max);
+}
+
+function ticketDialogBounds() {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  const maxW = Math.max(vw - 32, 360);
+  const maxH = Math.max(vh - 32, 360);
+  return { minW: Math.min(760, maxW), maxW, minH: Math.min(480, maxH), maxH };
+}
+
+function readTicketLayoutPref<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeTicketLayoutPref(key: string, value: unknown) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // navegador sem storage: o layout só não fica lembrado
+  }
+}
+
 interface Props {
   ticketId: string | null;
   open: boolean;
@@ -111,7 +145,14 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const [deleting, setDeleting] = useState(false);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
   const [closeTargetStatusId, setCloseTargetStatusId] = useState<string | null>(null);
-  const [rightPanelWidth, setRightPanelWidth] = useState(300);
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    const saved = readTicketLayoutPref<number>(TICKET_PANEL_WIDTH_KEY);
+    return typeof saved === "number" ? clampNum(saved, 220, 700) : 300;
+  });
+  const [dialogSize, setDialogSize] = useState<{ w: number; h: number } | null>(() => {
+    const saved = readTicketLayoutPref<{ w: number; h: number }>(TICKET_DIALOG_SIZE_KEY);
+    return saved && typeof saved.w === "number" && typeof saved.h === "number" ? saved : null;
+  });
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const newCommentRef = useRef<HTMLTextAreaElement>(null);
@@ -133,14 +174,20 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     const startX = e.clientX;
     const startWidth = rightPanelWidth;
 
+    let lastWidth = startWidth;
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const delta = startX - moveEvent.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 220), 700);
-      setRightPanelWidth(newWidth);
+      // A coluna da esquerda nunca fica abaixo de 360px
+      const containerWidth = containerRef.current?.clientWidth ?? 1100;
+      const maxWidth = Math.min(700, containerWidth - 360);
+      lastWidth = clampNum(startWidth + delta, 220, Math.max(220, maxWidth));
+      setRightPanelWidth(lastWidth);
     };
 
     const handleMouseUp = () => {
       setIsDragging(false);
+      writeTicketLayoutPref(TICKET_PANEL_WIDTH_KEY, lastWidth);
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
@@ -148,6 +195,58 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
+
+  // Redimensionar a janela pelas bordas. O dialog é centralizado, então a
+  // borda anda metade do que o tamanho cresce: o delta conta em dobro para a
+  // borda acompanhar o mouse.
+  const handleDialogResizeStart = (e: React.MouseEvent, axis: "x" | "y" | "xy") => {
+    e.preventDefault();
+    e.stopPropagation();
+    const content = (e.currentTarget as HTMLElement).closest('[role="dialog"]') as HTMLElement | null;
+    if (!content) return;
+    const rect = content.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startW = rect.width;
+    const startH = rect.height;
+    let last = { w: Math.round(startW), h: Math.round(startH) };
+    setIsDragging(true);
+    document.body.style.cursor = axis === "x" ? "ew-resize" : axis === "y" ? "ns-resize" : "nwse-resize";
+
+    const handleMove = (ev: MouseEvent) => {
+      const bounds = ticketDialogBounds();
+      const w = axis === "y" ? startW : clampNum(startW + (ev.clientX - startX) * 2, bounds.minW, bounds.maxW);
+      const h = axis === "x" ? startH : clampNum(startH + (ev.clientY - startY) * 2, bounds.minH, bounds.maxH);
+      last = { w: Math.round(w), h: Math.round(h) };
+      setDialogSize(last);
+    };
+
+    const handleUp = () => {
+      setIsDragging(false);
+      document.body.style.cursor = "";
+      writeTicketLayoutPref(TICKET_DIALOG_SIZE_KEY, last);
+      document.removeEventListener("mousemove", handleMove);
+      document.removeEventListener("mouseup", handleUp);
+    };
+
+    document.addEventListener("mousemove", handleMove);
+    document.addEventListener("mouseup", handleUp);
+  };
+
+  const resetDialogSize = () => {
+    setDialogSize(null);
+    writeTicketLayoutPref(TICKET_DIALOG_SIZE_KEY, null);
+  };
+
+  // Tamanho salvo numa tela maior não pode estourar numa tela menor
+  const effectiveDialogSize = (() => {
+    if (!dialogSize) return null;
+    const bounds = ticketDialogBounds();
+    return {
+      w: clampNum(dialogSize.w, bounds.minW, bounds.maxW),
+      h: clampNum(dialogSize.h, bounds.minH, bounds.maxH),
+    };
+  })();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [quickTagName, setQuickTagName] = useState("");
   const [quickTagColor, setQuickTagColor] = useState("#3b82f6");
@@ -1969,8 +2068,35 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[1100px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none">
+        <DialogContent
+          className={`p-0 gap-0 overflow-hidden flex flex-col shadow-none ${effectiveDialogSize ? "max-w-none max-h-none" : "max-w-[1100px] max-h-[90vh]"}`}
+          style={effectiveDialogSize ? { width: effectiveDialogSize.w, height: effectiveDialogSize.h } : undefined}
+        >
           <DialogTitle className="sr-only">Detalhes do ticket {ticket?.ticket_code ?? ""}</DialogTitle>
+          {/* Alças de redimensionar a janela: borda direita, inferior e canto.
+              Duplo clique volta ao tamanho padrão. */}
+          <div
+            onMouseDown={(e) => handleDialogResizeStart(e, "x")}
+            onDoubleClick={resetDialogSize}
+            className="absolute top-0 right-0 bottom-4 w-1 z-20 cursor-ew-resize hover:bg-primary/30 transition-colors"
+            title="Arraste para redimensionar (duplo clique restaura)"
+          />
+          <div
+            onMouseDown={(e) => handleDialogResizeStart(e, "y")}
+            onDoubleClick={resetDialogSize}
+            className="absolute left-0 right-4 bottom-0 h-1 z-20 cursor-ns-resize hover:bg-primary/30 transition-colors"
+            title="Arraste para redimensionar (duplo clique restaura)"
+          />
+          <div
+            onMouseDown={(e) => handleDialogResizeStart(e, "xy")}
+            onDoubleClick={resetDialogSize}
+            className="absolute right-0 bottom-0 h-4 w-4 z-20 cursor-nwse-resize flex items-end justify-end p-0.5"
+            title="Arraste para redimensionar (duplo clique restaura)"
+          >
+            <svg viewBox="0 0 12 12" className="h-3 w-3 text-muted-foreground/60" aria-hidden>
+              <path d="M11 5L5 11M11 8L8 11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+          </div>
           {/* Header */}
           <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b shrink-0">
             <div className="flex items-center gap-3 min-w-0">
@@ -2189,7 +2315,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           {isLoading ? (
             <div className="flex-1 overflow-hidden px-6 py-4">{loadingNode}</div>
           ) : (
-            <div ref={containerRef} className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: `1fr auto ${rightPanelWidth}px` }}>
+            <div ref={containerRef} className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: `minmax(0, 1fr) auto min(${rightPanelWidth}px, max(220px, calc(100% - 368px)))` }}>
               <div className="p-4 space-y-4 overflow-y-auto">
                 {detailsContent}
               </div>
