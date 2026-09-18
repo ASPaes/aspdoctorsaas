@@ -13,6 +13,13 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
 export type AutomationAction = "route_to_department" | "route_to_agent";
 
+/**
+ * chat_inbound: o chat chegou (ou está esperando) na condição.
+ * no_agent_available: ninguém do setor está conectado (pausa conta como
+ * conectado), passada a carência depois da abertura do expediente.
+ */
+export type AutomationTrigger = "chat_inbound" | "no_agent_available";
+
 /** Situação derivada do relógio, não uma coluna. */
 export type AutomationStatus = "valendo" | "agendada" | "encerrada" | "desligada";
 
@@ -23,7 +30,9 @@ export interface AutomationRule {
   is_active: boolean;
   starts_at: string | null;
   ends_at: string | null;
-  trigger_event: string;
+  trigger_event: AutomationTrigger;
+  /** Só vale para no_agent_available: minutos depois da abertura do expediente. */
+  grace_minutes: number;
   match_department_id: string | null;
   match_agent_id: string | null;
   match_instance_id: string | null;
@@ -217,6 +226,15 @@ function traduzErro(e: any): string {
   }
   if (msg.includes("chk_automation_rules_no_self_agent")) {
     return "A pessoa de destino é a mesma da condição.";
+  }
+  if (msg.includes("chk_automation_rules_no_agent_setor")) {
+    return "O gatilho de setor sem agente precisa do setor escolhido, e não usa a condição de pessoa.";
+  }
+  if (msg.includes("chk_automation_rules_grace")) {
+    return "A espera depois da abertura tem de ficar entre 0 e 480 minutos.";
+  }
+  if (msg.includes("chk_automation_rules_trigger")) {
+    return "Este gatilho ainda não foi liberado no banco. Aplique a atualização antes de usar.";
   }
   if (msg.includes("row-level security") || msg.includes("violates row-level")) {
     return "Seu perfil não tem permissão para mexer nas automações.";

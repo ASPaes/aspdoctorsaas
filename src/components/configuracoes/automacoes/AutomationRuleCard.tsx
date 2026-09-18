@@ -9,6 +9,7 @@ import {
   StopCircle,
   Trash2,
   User,
+  UserX,
   Zap,
 } from "lucide-react";
 import { isSameDay } from "date-fns";
@@ -102,10 +103,21 @@ export function AutomationRuleCard({
   const encerrada = status === "encerrada";
   const temporaria = Boolean(rule.starts_at || rule.ends_at);
 
+  const semAgente = rule.trigger_event === "no_agent_available";
+
   // Condição: setor, pessoa e canal se acumulam (todos têm de bater).
-  const condicoes: Array<{ icone: typeof Building2; texto: string; alvo: string }> = [];
+  const condicoes: Array<{ icone: typeof Building2; texto: string; alvo: string; depois?: string }> = [];
   if (rule.match_department_id) {
-    condicoes.push({ icone: Building2, texto: "Chat entra no setor", alvo: nomeDoSetor(rule.match_department_id)! });
+    condicoes.push(
+      semAgente
+        ? {
+            icone: UserX,
+            texto: "Setor",
+            alvo: nomeDoSetor(rule.match_department_id)!,
+            depois: "fica sem ninguém conectado",
+          }
+        : { icone: Building2, texto: "Chat entra no setor", alvo: nomeDoSetor(rule.match_department_id)! },
+    );
   }
   if (rule.match_agent_id) {
     condicoes.push({ icone: User, texto: "Chat entra para", alvo: nomeDaPessoa(rule.match_agent_id)! });
@@ -162,6 +174,7 @@ export function AutomationRuleCard({
             >
               <Icone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               {c.texto} <strong className="font-semibold">{c.alvo}</strong>
+              {c.depois && <> {c.depois}</>}
             </span>
           );
         })}
@@ -194,6 +207,13 @@ export function AutomationRuleCard({
             ? "Ainda não aplicada"
             : `${rule.applied_count} ${rule.applied_count === 1 ? "chat encaminhado" : "chats encaminhados"}`}
         </button>
+        {semAgente && (
+          <span>
+            {rule.grace_minutes > 0
+              ? `Espera ${rule.grace_minutes} min depois da abertura`
+              : "Vale desde a abertura"}
+          </span>
+        )}
         {rule.last_applied_at && <span>Última aplicação em {dataHora(rule.last_applied_at)}</span>}
       </div>
 

@@ -53,6 +53,7 @@ const base: AutomationRule = {
   starts_at: emHoras(-1),
   ends_at: emHoras(4),
   trigger_event: "chat_inbound",
+  grace_minutes: 30,
   match_department_id: "dept-fin",
   match_agent_id: null,
   match_instance_id: null,
@@ -94,6 +95,20 @@ const fixaPorCanal: AutomationRule = {
   target_department_id: "dept-coord",
   priority: 50,
   applied_count: 212,
+};
+
+const semNinguemNoFinanceiro: AutomationRule = {
+  ...base,
+  id: "r5",
+  name: "Financeiro sem ninguém",
+  trigger_event: "no_agent_available",
+  grace_minutes: 30,
+  starts_at: null,
+  ends_at: null,
+  match_department_id: "dept-fin",
+  target_department_id: "dept-sup",
+  priority: 5,
+  applied_count: 3,
 };
 
 const encerrada: AutomationRule = {
@@ -190,7 +205,21 @@ describe("automationStatus", () => {
 // ─── A tela ─────────────────────────────────────────────────────────────────
 
 describe("AutomacoesTab", () => {
-  it("sem nenhuma regra, oferece os 3 modelos", async () => {
+  it("gatilho sem agente aparece com o setor, a condição e a espera", async () => {
+    dadosPorTabela.automation_rules = [semNinguemNoFinanceiro];
+    await render();
+
+    const texto = container.textContent ?? "";
+    expect(texto).toContain("Financeiro");
+    expect(texto).toContain("fica sem ninguém conectado");
+    expect(texto).toContain("Vai para a fila do setor");
+    expect(texto).toContain("Espera 30 min depois da abertura");
+    // regra fixa, sem janela
+    expect(texto).toContain("Fixa");
+    expect(texto).not.toContain("Chat entra no setor");
+  });
+
+  it("sem nenhuma regra, oferece os 4 modelos", async () => {
     dadosPorTabela.automation_rules = [];
     await render();
 
@@ -198,6 +227,7 @@ describe("AutomacoesTab", () => {
     expect(container.textContent).toContain("Faltou alguém no setor");
     expect(container.textContent).toContain("Férias de uma pessoa");
     expect(container.textContent).toContain("Número que vai para outro setor");
+    expect(container.textContent).toContain("Setor ficou sem ninguém");
   });
 
   it("mostra o desvio de cada regra em português", async () => {

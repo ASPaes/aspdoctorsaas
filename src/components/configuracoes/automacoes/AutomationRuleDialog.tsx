@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAutomationLookups } from "@/components/whatsapp/hooks/useAutomationLookups";
-import type { AutomationAction, AutomationRule } from "@/components/whatsapp/hooks/useAutomationRules";
+import type {
+  AutomationAction,
+  AutomationRule,
+  AutomationTrigger,
+} from "@/components/whatsapp/hooks/useAutomationRules";
 
 const QUALQUER = "qualquer";
 
@@ -62,6 +66,8 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
   const { setores, pessoas, canais } = useAutomationLookups();
 
   const [nome, setNome] = useState("");
+  const [gatilho, setGatilho] = useState<AutomationTrigger>("chat_inbound");
+  const [carencia, setCarencia] = useState("30");
   const [setorCond, setSetorCond] = useState(QUALQUER);
   const [pessoaCond, setPessoaCond] = useState(QUALQUER);
   const [canalCond, setCanalCond] = useState(QUALQUER);
@@ -78,6 +84,8 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
     if (!open) return;
     setErro(null);
     setNome(rule?.name ?? "");
+    setGatilho((rule?.trigger_event as AutomationTrigger) ?? "chat_inbound");
+    setCarencia(String(rule?.grace_minutes ?? 30));
     setSetorCond(rule?.match_department_id ?? QUALQUER);
     setPessoaCond(rule?.match_agent_id ?? QUALQUER);
     setCanalCond(rule?.match_instance_id ?? QUALQUER);
@@ -91,7 +99,23 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
     setPrioridade(String(rule?.priority ?? 10));
   }, [open, rule]);
 
+  const semAgente = gatilho === "no_agent_available";
+
   const resumo = useMemo(() => {
+    const nomeSetorCond = setores.find((s) => s.id === setorCond)?.name;
+    const destinoTexto =
+      acao === "route_to_department"
+        ? `a fila do setor ${setores.find((s) => s.id === setorDestino)?.name ?? "(escolha)"}`
+        : `${pessoas.find((p) => p.user_id === pessoaDestino)?.nome ?? "(escolha)"}`;
+
+    if (gatilho === "no_agent_available") {
+      if (setorCond === QUALQUER || !nomeSetorCond) return null;
+      const canal =
+        canalCond !== QUALQUER ? ` pelo canal ${canais.find((c) => c.id === canalCond)?.nome ?? ""}` : "";
+      const espera = Number(carencia) > 0 ? `, a partir de ${Number(carencia)} min depois da abertura,` : "";
+      return `Quando ninguém do setor ${nomeSetorCond} estiver conectado${espera} o chat que chegar${canal} ou estiver esperando lá vai para ${destinoTexto}. Cada atendimento é desviado uma vez só.`;
+    }
+
     const partes: string[] = [];
     if (setorCond !== QUALQUER) partes.push(`no setor ${setores.find((s) => s.id === setorCond)?.name ?? ""}`);
     if (pessoaCond !== QUALQUER) partes.push(`para ${pessoas.find((p) => p.user_id === pessoaCond)?.nome ?? ""}`);
@@ -110,12 +134,19 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
       : "Sem prazo";
 
     return `${quando}, todo chat que entrar ${partes.join(" e ")} vai para ${destino}.`;
-  }, [setorCond, pessoaCond, canalCond, acao, setorDestino, pessoaDestino, temporaria, inicio, fim, setores, pessoas, canais]);
+  }, [gatilho, carencia, setorCond, pessoaCond, canalCond, acao, setorDestino, pessoaDestino, temporaria, inicio, fim, setores, pessoas, canais]);
 
   const salvar = () => {
     // A tela repete as travas do banco para o recado ser em português, não em
     // nome de constraint.
     if (!nome.trim()) return setErro("Dê um nome para a automação.");
+    if (semAgente && setorCond === QUALQUER) {
+      return setErro("Escolha o setor que, sem ninguém conectado, deve passar os chats adiante.");
+    }
+    const minutos = Number(carencia);
+    if (semAgente && (!Number.isFinite(minutos) || minutos < 0 || minutos > 480)) {
+      return setErro("A espera depois da abertura tem de ficar entre 0 e 480 minutos.");
+    }
     if (setorCond === QUALQUER && pessoaCond === QUALQUER && canalCond === QUALQUER) {
       return setErro("Escolha ao menos uma condição. Sem nenhuma, a regra pegaria todo chat da operação.");
     }
@@ -136,9 +167,11 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
     onSave({
       ...(rule?.id ? { id: rule.id } : {}),
       name: nome.trim(),
-      trigger_event: "chat_inbound",
+      trigger_event: gatilho,
+      grace_minutes: semAgente ? Math.round(minutos) : 30,
       match_department_id: setorCond === QUALQUER ? null : setorCond,
-      match_agent_id: pessoaCond === QUALQUER ? null : pessoaCond,
+      // o banco recusa condição de pessoa no gatilho "sem agente"
+      match_agent_id: semAgente || pessoaCond === QUALQUER ? null : pessoaCond,
       match_instance_id: canalCond === QUALQUER ? null : canalCond,
       action: acao,
       target_department_id: acao === "route_to_department" ? setorDestino : null,
@@ -184,25 +217,43 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
 
             <div className="space-y-2">
               <Label>Gatilho</Label>
-              <Select value="chat_inbound" disabled>
+              <Select
+                value={gatilho}
+                onValueChange={(v) => {
+                  setGatilho(v as AutomationTrigger);
+                  // condição de pessoa não existe no gatilho "sem agente"
+                  if (v === "no_agent_available") setPessoaCond(QUALQUER);
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="chat_inbound">Chat entra no atendimento</SelectItem>
+                  <SelectItem value="no_agent_available">Setor ficou sem ninguém conectado</SelectItem>
                 </SelectContent>
               </Select>
+              {semAgente && (
+                <p className="text-xs text-muted-foreground">
+                  Dispara quando ninguém do setor está conectado. Quem está em pausa conta como presente, e setor lotado
+                  não dispara. O sistema considera que a pessoa saiu uns 20 minutos depois de o navegador dela parar de
+                  responder.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Setor de destino do chat</Label>
-                <Select value={setorCond} onValueChange={setSetorCond}>
+                <Label>{semAgente ? "Setor que ficou sem ninguém" : "Setor de destino do chat"}</Label>
+                <Select
+                  value={semAgente && setorCond === QUALQUER ? "" : setorCond}
+                  onValueChange={setSetorCond}
+                >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Escolha o setor" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={QUALQUER}>Qualquer setor</SelectItem>
+                    {!semAgente && <SelectItem value={QUALQUER}>Qualquer setor</SelectItem>}
                     {setores.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.name}
@@ -212,22 +263,40 @@ export function AutomationRuleDialog({ open, onOpenChange, rule, onSave, salvand
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label>Pessoa (opcional)</Label>
-                <Select value={pessoaCond} onValueChange={setPessoaCond}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={QUALQUER}>Qualquer pessoa</SelectItem>
-                    {pessoas.map((p) => (
-                      <SelectItem key={p.user_id} value={p.user_id}>
-                        {p.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {semAgente ? (
+                <div className="space-y-2">
+                  <Label htmlFor="automacao-carencia">Esperar depois da abertura (min)</Label>
+                  <Input
+                    id="automacao-carencia"
+                    type="number"
+                    min={0}
+                    max={480}
+                    value={carencia}
+                    onChange={(e) => setCarencia(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Dá tempo de a equipe chegar. Sem isso, logo na abertura os chats da madrugada sairiam do setor antes
+                    de alguém sentar.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Pessoa (opcional)</Label>
+                  <Select value={pessoaCond} onValueChange={setPessoaCond}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={QUALQUER}>Qualquer pessoa</SelectItem>
+                      {pessoas.map((p) => (
+                        <SelectItem key={p.user_id} value={p.user_id}>
+                          {p.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Plus, Shield, UserX, Zap } from "lucide-react";
+import { CalendarDays, Plus, Shield, Users, UserX, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -180,7 +180,30 @@ export default function AutomacoesTab() {
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5">
               Começar de um modelo
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  abrirNova({
+                    name: "Setor sem ninguém",
+                    trigger_event: "no_agent_available",
+                    action: "route_to_department",
+                    grace_minutes: 30,
+                    priority: 10,
+                  })
+                }
+                className="text-left rounded-lg border p-3.5 hover:bg-muted/50 transition"
+              >
+                <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-lg bg-success/15 text-success mb-2">
+                  <Users className="h-4 w-4" />
+                </span>
+                <span className="block text-[13px] font-semibold">Setor ficou sem ninguém</span>
+                <span className="block text-xs text-muted-foreground mt-1 leading-snug">
+                  Regra fixa: se ninguém do setor estiver conectado, os chats vão para outra fila. Ninguém precisa lembrar
+                  de ligar no dia da falta.
+                </span>
+              </button>
+
               <button
                 type="button"
                 onClick={() =>
