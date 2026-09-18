@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 17/09
 
+- 🆕 **Automações do atendimento** — Em **Configurações › Atendimento › Automações** dá para criar regras que mudam para onde o chat vai no momento em que ele chega. Exemplo: faltou alguém no Financeiro, e os chats que iriam para lá seguem para a fila do Suporte, ou direto para uma pessoa, até o fim do dia. A regra pode valer por um período, com começo e fim, e para sozinha na hora marcada, sem ninguém precisar lembrar de desligar; ou pode ficar fixa. Ela escolhe os chats pelo setor, pela pessoa ou pelo número de WhatsApp, e a tela mostra quantos chats cada regra já desviou, com o histórico de cada um. Também dá para encerrar uma regra antes da hora e duplicar uma antiga para reaproveitar. Vale só para o chat que chega depois de salvar: atendimento em andamento não muda de dono.
+
 - ⬆️ **Responsável do ticket agora segue o setor** — Ao abrir um ticket, a lista de **Responsável** passa a mostrar só quem é do **Setor** escolhido, e trocar o setor limpa o campo para a escolha ser feita de novo. Se o setor não tiver ninguém vinculado, a lista continua completa e a tela avisa. Ticket com responsável de outro setor não é mais criado, nem por engano.
 
 - 🔧 **Venda da calculadora entrava sem custo do OEM** — Os módulos de clientes vindos da calculadora de vendas chegavam com custo zero e continuavam zerados mesmo depois de vincular a licença, então a conferência do OEM acusava diferença contra R$ 0,00. Agora a venda já entra com o custo da tabela de preços do OEM, e se a licença cobrar diferente a divergência aparece para ajustar. Os 10 clientes que tinham entrado assim foram corrigidos.
