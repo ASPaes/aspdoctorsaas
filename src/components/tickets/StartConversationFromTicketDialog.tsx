@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,8 @@ import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import { supabase } from "@/integrations/supabase/client";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { normalizeBRPhone, isValidBRPhone, formatBRPhone } from "@/lib/phoneBR";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -55,6 +57,8 @@ function StartConversationFromTicketDialog({
 }: Props) {
   const { instances } = useWhatsAppInstances();
   const { effectiveTenantId: tid } = useTenantFilter();
+  const { departments, userDepartmentId } = useDepartmentFilter();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [mode, setMode] = useState<"client" | "third_party">("client");
@@ -65,12 +69,40 @@ function StartConversationFromTicketDialog({
   const [thirdPartyName, setThirdPartyName] = useState("");
   const [thirdPartyLabel, setThirdPartyLabel] = useState("");
   const [sending, setSending] = useState(false);
+  // Enquanto o usuário não mexe no campo, ele acompanha o padrão (setores e
+  // instâncias chegam em queries separadas). Mexeu, a escolha dele vale.
+  const instanceTouchedRef = useRef(false);
 
-  useEffect(() => {
-    if (open && !instanceId && instances.length === 1) {
-      setInstanceId(instances[0].id);
+  // DEM-0413: a instância do usuário vem pré-selecionada. Prioridade: aparelho
+  // pessoal dele (default_operator_id) > instância padrão do setor do ticket >
+  // do setor do cadastro do usuário > instância única. Só vale instância que
+  // está na lista — inativa deixaria o Select sem item visível.
+  const defaultInstanceId = useMemo(() => {
+    const isAvailable = (id?: string | null): id is string => !!id && instances.some((i) => i.id === id);
+    const pessoal = user?.id ? instances.find((i: any) => i.default_operator_id === user.id) : undefined;
+    if (pessoal) return pessoal.id;
+    const ticketDept = departmentId ? departments.find((d) => d.id === departmentId) : null;
+    const userDept = userDepartmentId ? departments.find((d) => d.id === userDepartmentId) : null;
+    for (const id of [ticketDept?.default_instance_id, userDept?.default_instance_id]) {
+      if (isAvailable(id)) return id;
     }
-  }, [open, instances, instanceId]);
+    return instances.length === 1 ? instances[0].id : "";
+  }, [instances, user?.id, departmentId, departments, userDepartmentId]);
+
+  // O diálogo fica montado entre aberturas: ao fechar, a escolha manual é
+  // esquecida e a próxima abertura volta ao padrão.
+  useEffect(() => {
+    if (!open) {
+      instanceTouchedRef.current = false;
+      return;
+    }
+    if (!instanceTouchedRef.current) setInstanceId(defaultInstanceId);
+  }, [open, defaultInstanceId]);
+
+  const handleInstanceChange = (id: string) => {
+    instanceTouchedRef.current = true;
+    setInstanceId(id);
+  };
 
   const { data: contatosData = EMPTY_CONTATOS } = useQuery({
     queryKey: ["ticket_start_conv_contatos", clienteId],
@@ -161,7 +193,7 @@ function StartConversationFromTicketDialog({
 
   const resetForm = () => {
     setMode("client");
-    setInstanceId(instances.length === 1 ? instances[0].id : "");
+    setInstanceId(defaultInstanceId);
     setSelectedContactPhone("");
     setSelectedContactName("");
     setThirdPartyPhone("");
@@ -229,7 +261,7 @@ function StartConversationFromTicketDialog({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Instância WhatsApp</Label>
-            <Select value={instanceId} onValueChange={setInstanceId}>
+            <Select value={instanceId} onValueChange={handleInstanceChange}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Selecione a instância" />
               </SelectTrigger>
