@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, lazy, Suspense } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import PropostaVendaSection, { useTemProposta } from "./PropostaVendaSection";
@@ -19,12 +19,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { toExternalHref } from "@/lib/externalUrl";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
+import { useAbrirEnvioEmail } from "@/components/whatsapp/chat/email/useAbrirEnvioEmail";
+// a tela de leitura traz o editor de resposta junto: só baixa quando alguém abre um e-mail
+const LerEmailDialog = lazy(() => import("@/components/emails/LerEmailDialog").then((m) => ({ default: m.LerEmailDialog })));
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
 import {
   Loader2, Clock, Pause, Play, ChevronRight, Calendar, CheckCircle2,
   Circle, AlertCircle, MessageSquare, GraduationCap, User, ArrowRight,
   UserPlus, Star, X, Users, Package, Plus, Trash2, Download, RotateCcw, AlertTriangle, Ban, Building2, Paperclip,
-  ExternalLink, Link2, Mail,
+  ExternalLink, Link2, Mail, Eye, Send,
   Sparkles, Rocket, StickyNote, Undo2, XCircle, Tag,
   Check, ChevronDown, Pencil, GitCommitHorizontal, MessageSquareText,
   GripVertical, Search,
@@ -188,15 +191,18 @@ const TL_META: Record<string, { label: string; Icon: any; tone: TLTone }> = {
   nota_agente: { label: "Nota do agente", Icon: StickyNote, tone: "slate" },
   comment: { label: "Comentário", Icon: MessageSquare, tone: "slate" },
   // mensagem do cliente que chegou por e-mail (ler-emails-recebidos, 13/09/2026)
-  email_cliente: { label: "Mensagem por e-mail", Icon: Mail, tone: "sky" },
+  email_cliente: { label: "Cliente respondeu por e-mail", Icon: Mail, tone: "sky" },
+  email_enviado: { label: "E-mail enviado ao cliente", Icon: Send, tone: "emerald" },
   email_reaberto: { label: "Reaberto por e-mail", Icon: RotateCcw, tone: "sky" },
   email_continuacao: { label: "Continuou em outro ticket", Icon: ArrowRight, tone: "slate" },
 };
 const tlMeta = (t: string) => TL_META[t] ?? { label: EVENT_LABELS[t] ?? t, Icon: Circle, tone: "slate" as TLTone };
 
 // Coluna esquerda da timeline = o que alguém digitou. Todo o resto é movimentação/log.
-// A mensagem do cliente por e-mail também é "o que alguém digitou".
-const TL_NOTE_TYPES = new Set(["nota_agente", "email_cliente"]);
+// 17/09/2026: os e-mails (enviado e resposta do cliente) passaram para Movimentação,
+// a pedido do Alexandre, lado a lado, com "Ver e responder".
+const TL_NOTE_TYPES = new Set(["nota_agente"]);
+const TL_EMAIL_TYPES: Record<string, "enviado" | "recebido"> = { email_enviado: "enviado", email_cliente: "recebido" };
 
 // old_value/new_value às vezes vêm como UUID cru — não serve para exibir.
 const TL_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -214,19 +220,22 @@ function TimelineEventItem({
   author,
   canEdit = false,
   onSaveEdit,
+  onVerEmail,
 }: {
   ev: any;
   author: string;
   canEdit?: boolean;
   onSaveEdit?: (id: string, content: string) => Promise<boolean>;
+  onVerEmail?: (tipo: "enviado" | "recebido", id: string) => void;
 }) {
+  const tipoEmail = TL_EMAIL_TYPES[ev.event_type];
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<string>(ev.content ?? "");
   const [saving, setSaving] = useState(false);
   const meta = tlMeta(ev.event_type);
   const Icon = meta.Icon;
   const oldV = tlCleanValue(ev.old_value);
-  const newV = tlCleanValue(ev.new_value);
+  const newV = TL_EMAIL_TYPES[ev.event_type] ? null : tlCleanValue(ev.new_value);
   const hasChips = ev.event_type === "onboarding_mudou_etapa" && !!oldV && !!newV;
   // Na mudança de etapa o content repete "Etapa: X → Y" — escondemos p/ não duplicar os chips.
   const showContent = ev.content && !hasChips;
@@ -267,6 +276,16 @@ function TimelineEventItem({
             >
               {ev.origem.ticket_code}
             </span>
+          )}
+          {tipoEmail && ev.new_value && onVerEmail && (
+            <button
+              type="button"
+              onClick={() => onVerEmail(tipoEmail, String(ev.new_value))}
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-sky-600 hover:bg-sky-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
+            >
+              <Eye className="h-3 w-3" />
+              Ver e responder
+            </button>
           )}
           <span className="text-[10px] text-muted-foreground font-mono ml-auto pl-2">{formatTime(ev.created_at)}</span>
           {canEdit && !editing && (
@@ -332,11 +351,13 @@ function TimelineDayGroups({
   authorOf,
   canEdit,
   onSaveEdit,
+  onVerEmail,
 }: {
   groups: Array<{ key: string; label: string; items: any[] }>;
   authorOf: (ev: any) => string;
   canEdit?: (ev: any) => boolean;
   onSaveEdit?: (id: string, content: string) => Promise<boolean>;
+  onVerEmail?: (tipo: "enviado" | "recebido", id: string) => void;
 }) {
   return (
     <div className="space-y-5">
@@ -359,6 +380,7 @@ function TimelineDayGroups({
                   author={authorOf(ev)}
                   canEdit={canEdit ? canEdit(ev) : false}
                   onSaveEdit={onSaveEdit}
+                  onVerEmail={onVerEmail}
                 />
               ))}
             </div>
@@ -800,6 +822,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     },
   });
 
+
+  // e-mail pela jornada (17/09/2026): mesma tela do ticket, sem gerar texto ao abrir
+  const envioEmail = useAbrirEnvioEmail({
+    tipo: "ticket",
+    tenantId: tenantId ?? "",
+    ticketId: journey?.ticket_id ?? "",
+    jornada: true,
+  });
+  /** e-mail aberto pela timeline: a tela de leitura de E-mails, com Responder */
+  const [emailAberto, setEmailAberto] = useState<{ tipo: "enviado" | "recebido"; id: string } | null>(null);
 
   const eventsQ = useQuery({
     queryKey: ["onboarding-ticket-events", journey?.ticket_id],
@@ -2340,6 +2372,22 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <MessageSquare className="h-3.5 w-3.5 mr-1" /> Conversa
                     </Button>
                   )}
+                  {journey.ticket_id && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs"
+                      onClick={envioEmail.abrir}
+                      disabled={envioEmail.verificando}
+                    >
+                      {envioEmail.verificando ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                      ) : (
+                        <Mail className="h-3.5 w-3.5 mr-1" />
+                      )}{" "}
+                      E-mail
+                    </Button>
+                  )}
                   {canScheduleTraining && (
                     <>
                       <Button size="sm" variant="outline" className="h-8 text-xs"
@@ -3675,7 +3723,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                               </p>
                             </div>
                           ) : (
-                            <TimelineDayGroups groups={tlLogsByDay} authorOf={tlAuthorOf} />
+                            <TimelineDayGroups
+                              groups={tlLogsByDay}
+                              authorOf={tlAuthorOf}
+                              onVerEmail={(tipo, id) => setEmailAberto({ tipo, id })}
+                            />
                           )}
                         </div>
                       </section>
@@ -3859,6 +3911,21 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       openedAt={viewChatMeta.openedAt}
       closedAt={viewChatMeta.closedAt}
     />
+    {envioEmail.elementos}
+    {emailAberto && (
+      <Suspense fallback={null}>
+        <LerEmailDialog
+          tipo={emailAberto.tipo}
+          id={emailAberto.id}
+          onOpenChange={(aberto) => {
+            if (aberto) return;
+            setEmailAberto(null);
+            // respondeu ou encaminhou daqui: a linha nova aparece na hora
+            qc.invalidateQueries({ queryKey: ["onboarding-ticket-events"] });
+          }}
+        />
+      </Suspense>
+    )}
     {journey && journey.ticket_id && (
       <StartConversationFromTicketDialog
         open={startConvOpen}

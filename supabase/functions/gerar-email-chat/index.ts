@@ -251,7 +251,7 @@ Deno.serve(async (req) => {
   if (ticketId) {
     const { data } = await supabase
       .from('support_tickets')
-      .select('id, tenant_id, ticket_code, assunto, descricao, aberto_em, concluido_em, cliente_id, department_id, status_id, deleted_at')
+      .select('id, tenant_id, ticket_code, assunto, descricao, aberto_em, concluido_em, cliente_id, department_id, status_id, deleted_at, contexto')
       .eq('id', ticketId)
       .maybeSingle();
     if (!data || data.deleted_at) return falha('nao_encontrada', 'Chamado não encontrado.', 404);
@@ -579,9 +579,13 @@ Responda chamando a função escrever_email. Se não puder usar a função, resp
     atendente ? `Atendente que vai enviar: ${atendente}` : null,
     '',
     ticketId
-      ? `Objetivo: e-mail ao cliente sobre o chamado ${ticket.ticket_code ?? ''}, dizendo em que pé está, o que já foi feito e o que falta ou o que foi resolvido.${
-          comChats ? ' Depois do chamado vêm os chats de WhatsApp ligados a ele.' : ''
-        }`
+      ? ticket.contexto === 'onboarding'
+        ? `Objetivo: e-mail ao cliente sobre a jornada de implantação ${ticket.ticket_code ?? ''}: em que etapa está, o que já foi feito, os próximos passos e o que depende do cliente.${
+            comChats ? ' Depois da jornada vêm os chats de WhatsApp ligados a ela.' : ''
+          }`
+        : `Objetivo: e-mail ao cliente sobre o chamado ${ticket.ticket_code ?? ''}, dizendo em que pé está, o que já foi feito e o que falta ou o que foi resolvido.${
+            comChats ? ' Depois do chamado vêm os chats de WhatsApp ligados a ele.' : ''
+          }`
       : base === 'ultimo'
       ? 'Objetivo: e-mail sobre o atendimento abaixo, registrando o que foi tratado e os próximos passos combinados.'
       : `Objetivo: e-mail com o resumo dos últimos ${blocos.length} atendimentos abaixo, um item por atendimento, em ordem do mais antigo ao mais recente, e os próximos passos que ainda estiverem em aberto.`,

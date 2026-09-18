@@ -68,3 +68,28 @@ describe("cabeçalho do chamado", () => {
     expect(c).toContain("Descrição da abertura: Não sai no fechamento");
   });
 });
+
+describe("jornada de implantação", () => {
+  const eventos = [
+    ev({ event_type: "onboarding_criado", content: "Jornada criada" }),
+    ev({ event_type: "onboarding_mudou_etapa", old_value: "Kickoff", new_value: "Cadastro", created_at: "2026-09-17T10:00:00Z" }),
+    ev({ event_type: "nota_agente", content: "cliente atrasou a planilha de novo", created_at: "2026-09-17T10:05:00Z" }),
+    ev({ event_type: "onboarding_retorno_vendedor", content: "venda com módulo errado", created_at: "2026-09-17T10:06:00Z" }),
+    ev({ event_type: "email_enviado", content: "Assunto: Próximos passos", created_at: "2026-09-17T10:10:00Z" }),
+  ];
+
+  test("o andamento e os e-mails já enviados entram; nota e retorno ao vendedor não", () => {
+    const texto = formatarEventos(eventos, false, hora);
+    expect(texto).toContain("Jornada iniciada");
+    expect(texto).toContain("Mudança de etapa: Kickoff para Cadastro");
+    expect(texto).toContain("E-mail já enviado ao cliente: Assunto: Próximos passos");
+    expect(texto).not.toContain("atrasou a planilha");
+    expect(texto).not.toContain("módulo errado");
+  });
+
+  test("com a opção ligada, as internas entram marcadas", () => {
+    const texto = formatarEventos(eventos, true, hora);
+    expect(texto).toContain("Nota interna: cliente atrasou a planilha");
+    expect(texto).toContain("Retorno ao vendedor: venda com módulo errado");
+  });
+});

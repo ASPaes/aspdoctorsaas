@@ -207,7 +207,9 @@ Deno.serve(async (req) => {
   // os setores" é a conta ligada a cada setor). O servidor confere, não só a
   // tela. As outras origens (teste de conta, resumo automático) seguem como antes.
   // super admin é bypass: não é membro dos setores do tenant que está simulando
-  if (['chat', 'resposta', 'encaminho'].includes(origem) && enviadoPor && !chamadaInterna && !superAdmin) {
+  // 17/09/2026: 'ticket' e 'onboarding' (e-mail pelo chamado e pela jornada)
+  // entraram na regra; antes só a tela filtrava as contas desses dois.
+  if (['chat', 'resposta', 'encaminho', 'ticket', 'onboarding'].includes(origem) && enviadoPor && !chamadaInterna && !superAdmin) {
     const [ativas, doUsuario, membros] = await Promise.all([
       supabase.from('email_accounts').select('id').eq('tenant_id', tenantId).eq('ativo', true),
       supabase.from('email_account_usuarios').select('account_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor),

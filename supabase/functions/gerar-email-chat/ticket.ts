@@ -20,6 +20,16 @@ const EVENTOS_PUBLICOS: Record<string, string> = {
   reclassification: 'Reclassificado',
   department_change: 'Trocou de setor',
   ai_summary: 'Resumo registrado',
+  email_enviado: 'E-mail já enviado ao cliente',
+  // jornada de implantação/onboarding (17/09/2026): o andamento que o cliente acompanha
+  onboarding_criado: 'Jornada iniciada',
+  onboarding_mudou_etapa: 'Mudança de etapa',
+  onboarding_fase_implantacao: 'Implantação iniciada',
+  onboarding_treino_criado: 'Treinamento agendado',
+  onboarding_pausado: 'Jornada pausada',
+  onboarding_retomado: 'Jornada retomada',
+  onboarding_concluido: 'Jornada concluída',
+  onboarding_cancelado: 'Jornada cancelada',
 };
 
 /** conteúdo interno da equipe: só entra se a tela pedir, e só como contexto */
@@ -27,6 +37,14 @@ const EVENTOS_INTERNOS: Record<string, string> = {
   comment: 'Nota interna',
   checklist: 'Checklist',
   assignment_change: 'Responsável',
+  nota_agente: 'Nota interna',
+  onboarding_retorno_vendedor: 'Retorno ao vendedor',
+  onboarding_retorno_vendedor_resolvido: 'Retorno ao vendedor resolvido',
+  onboarding_info_editada: 'Correção de cadastro',
+  onboarding_participante: 'Participante alterado',
+  onboarding_anexo_adicionado: 'Anexo adicionado',
+  onboarding_anexo_removido: 'Anexo removido',
+  onboarding_fase_revertida: 'Fase revertida',
 };
 
 export interface EventoTicket {

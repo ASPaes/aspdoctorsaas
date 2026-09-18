@@ -77,10 +77,17 @@ export function EnviarEmailTicketDialog({
   open,
   onOpenChange,
   ticketId,
+  jornada = false,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   ticketId: string;
+  /**
+   * Aberto pela jornada de implantação/onboarding (17/09/2026). Diferenças
+   * pedidas pelo Alexandre: NÃO gera texto ao abrir (a IA só roda se a pessoa
+   * clicar), e o envio sai como origem 'onboarding'.
+   */
+  jornada?: boolean;
 }) {
   const { user, profile } = useAuth();
   const dadosQuery = useEmailDoTicket(ticketId, open);
@@ -110,6 +117,8 @@ export function EnviarEmailTicketDialog({
   const [corrigindo, setCorrigindo] = useState(false);
   const [reescrevendo, setReescrevendo] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  /** a trava do Enviar só vale depois da primeira geração: sem IA, a pessoa escreve livre */
+  const [jaGerou, setJaGerou] = useState(false);
   const assuntoDaIa = useRef("");
   const pedidoAtual = useRef(0);
   const geracaoInicial = useRef(false);
@@ -138,6 +147,7 @@ export function EnviarEmailTicketDialog({
     setCorrigindo(false);
     setReescrevendo(false);
     setEnviando(false);
+    setJaGerou(false);
     assuntoDaIa.current = "";
     pedidoAtual.current++;
     geracaoInicial.current = false;
@@ -156,7 +166,10 @@ export function EnviarEmailTicketDialog({
     if (sugestoes.length > 0) setPara([sugestoes[0].email]);
   }, [open, dadosQuery.isSuccess, sugestoes]);
 
-  const trava = useMemo(() => conferirTravaTicket(opcoes, gerado), [opcoes, gerado]);
+  const trava = useMemo(
+    () => (jaGerou ? conferirTravaTicket(opcoes, gerado) : { travado: false, aviso: null }),
+    [jaGerou, opcoes, gerado],
+  );
   const temChats = (dados?.chats ?? 0) > 0;
   const anexando = anexos.some((a) => a.status === "enviando");
   const referencia = referenciaDoAssunto(dados?.ticket?.ticket_code ?? null, null);
@@ -193,6 +206,7 @@ export function EnviarEmailTicketDialog({
       setAssunto((atual) => (!atual.trim() || atual === assuntoDaIa.current ? r.assunto : atual));
       assuntoDaIa.current = r.assunto;
       setGerado(alvoOpcoes);
+      setJaGerou(true);
     } catch (err: any) {
       if (pedido === pedidoAtual.current) toast.error(err?.message || "Não foi possível gerar o texto.");
     } finally {
@@ -200,9 +214,9 @@ export function EnviarEmailTicketDialog({
     }
   };
 
-  // a tela abre com o texto já gerado a partir do histórico do chamado
+  // no chamado, a tela abre com o texto já gerado; na jornada, só se a pessoa pedir
   useEffect(() => {
-    if (!open || geracaoInicial.current || !dadosQuery.isSuccess || !dados?.ticket) return;
+    if (jornada || !open || geracaoInicial.current || !dadosQuery.isSuccess || !dados?.ticket) return;
     geracaoInicial.current = true;
     gerar(PADRAO);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,7 +375,7 @@ export function EnviarEmailTicketDialog({
         assunto: assuntoComReferencia(assunto, referencia),
         texto: corpo.trim(),
         html: htmlParaEmail(corpoHtml),
-        origem: "ticket",
+        origem: jornada ? "onboarding" : "ticket",
         atendimento_id: dados.ticket.id,
         cliente_id: dados.ticket.cliente_id,
         department_id: dados.ticket.department_id,
@@ -396,7 +410,7 @@ export function EnviarEmailTicketDialog({
         html: htmlParaEmail(corpoHtml),
         historico_html: historico?.html ?? null,
         historico_texto: historico?.texto ?? null,
-        origem: "ticket",
+        origem: jornada ? "onboarding" : "ticket",
         referencia_id: dados.ticket.id,
         cliente_id: dados.ticket.cliente_id,
         department_id: dados.ticket.department_id,
@@ -425,8 +439,12 @@ export function EnviarEmailTicketDialog({
           </DialogTitle>
           <DialogDescription className="text-xs">
             {dadosQuery.isLoading
-              ? "Carregando o chamado..."
-              : [dados?.ticket?.ticket_code, clienteNome ?? "Chamado sem cliente vinculado"].filter(Boolean).join(" · ")}
+              ? jornada
+                ? "Carregando a jornada..."
+                : "Carregando o chamado..."
+              : [dados?.ticket?.ticket_code, clienteNome ?? (jornada ? "Jornada sem cliente vinculado" : "Chamado sem cliente vinculado")]
+                  .filter(Boolean)
+                  .join(" · ")}
           </DialogDescription>
         </DialogHeader>
 
@@ -439,7 +457,7 @@ export function EnviarEmailTicketDialog({
             >
               <div className="flex items-center gap-2">
                 <RadioGroupItem id="ticket-base-historico" value="ticket" />
-                <Label htmlFor="ticket-base-historico" className="cursor-pointer font-normal">Histórico do chamado</Label>
+                <Label htmlFor="ticket-base-historico" className="cursor-pointer font-normal">{jornada ? "Histórico da jornada" : "Histórico do chamado"}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <RadioGroupItem id="ticket-base-chats" value="ticket_chats" disabled={!temChats} />
@@ -575,7 +593,7 @@ export function EnviarEmailTicketDialog({
             {referencia && (
               <p className="text-xs text-muted-foreground sm:pl-[108px]">
                 No envio, o assunto termina com <span className="font-medium text-foreground">· {referencia}</span>, e a
-                resposta do cliente entra no histórico deste chamado.
+                resposta do cliente entra no histórico {jornada ? "desta jornada" : "deste chamado"}.
               </p>
             )}
           </Grupo>
@@ -593,7 +611,7 @@ export function EnviarEmailTicketDialog({
               )}
             >
               {gerando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              {gerando ? "Gerando..." : "Gerar novo"}
+              {gerando ? "Gerando..." : jaGerou || !jornada ? "Gerar novo" : "Gerar texto com IA"}
             </Button>
           </div>
 
@@ -613,12 +631,16 @@ export function EnviarEmailTicketDialog({
               desabilitado={ocupado}
               placeholder={
                 gerando
-                  ? "Gerando o texto a partir do chamado..."
+                  ? jornada
+                    ? "Gerando o texto a partir da jornada..."
+                    : "Gerando o texto a partir do chamado..."
                   : corrigindo
                     ? "Corrigindo a gramática..."
                     : reescrevendo
                       ? "Ajustando o texto..."
-                      : "Escreva o e-mail"
+                      : jornada && !jaGerou
+                        ? "Escreva o e-mail, ou clique em Gerar texto com IA para um rascunho"
+                        : "Escreva o e-mail"
               }
               acaoAnexar={
                 <>

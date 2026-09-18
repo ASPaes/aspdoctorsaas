@@ -28,7 +28,7 @@ const EnviarEmailTicketDialog = lazy(() => carregarTelaTicket().then((m) => ({ d
 /** de onde o e-mail sai: a conversa do chat ou o chamado (17/09/2026) */
 export type AlvoDoEnvio =
   | { tipo: "chat"; conversation: ConversationWithContact }
-  | { tipo: "ticket"; tenantId: string; ticketId: string };
+  | { tipo: "ticket"; tenantId: string; ticketId: string; jornada?: boolean };
 
 /**
  * Botão "Enviar e-mail" do chat (cabeçalho e painel Detalhes).
@@ -88,7 +88,7 @@ export function useAbrirEnvioEmail(alvo: AlvoDoEnvio) {
           {alvo.tipo === "chat" ? (
             <EnviarEmailChatDialog open={aberto} onOpenChange={setAberto} conversation={alvo.conversation} />
           ) : (
-            <EnviarEmailTicketDialog open={aberto} onOpenChange={setAberto} ticketId={alvo.ticketId} />
+            <EnviarEmailTicketDialog open={aberto} onOpenChange={setAberto} ticketId={alvo.ticketId} jornada={alvo.jornada} />
           )}
         </Suspense>
       )}
