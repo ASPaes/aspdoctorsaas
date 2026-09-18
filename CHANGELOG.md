@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 18/09
 
+- 🆕 **Horário de acesso por setor e por pessoa** — Em **Configurações › Equipe › Horário de acesso**, o administrador define em que horários cada setor ou pessoa pode usar o DoctorSaaS, com um ou mais intervalos por dia (ex.: seg a sex das 07:20 às 20:15 e sábado até 12:15). Fora do horário o login é recusado, mostrando quando o acesso volta. Quem está conectado recebe um aviso no topo da tela antes do fim e, passada a tolerância, é desconectado; os atendimentos em andamento voltam para a fila do setor. A regra de uma pessoa vence a do setor, e administradores nunca são bloqueados. A mesma tela mostra quem tem restrição e quem está fora do horário agora.
+
 - 🆕 **Histórico de agendamentos da conversa** — No rodapé da aba **Agendar** do chat, o link **Histórico** abre a lista de tudo o que foi agendado naquela conversa: quando foi agendado, para quando, quem agendou, se era **Novo atendimento** ou **Mensagem nesta conversa**, a mensagem, se saiu, se foi cancelada (e por quem) ou se não conseguiu sair (e o motivo), e o número do atendimento aberto. Dá para filtrar por pendentes, enviados, cancelados e os que falharam. O botão de agendar também passou a dizer o que vai fazer: **Agendar mensagem** ou **Agendar atendimento**.
 
 - 🔧 **Mensagem agendada que falhou pode ser reagendada ou cancelada** — Quando uma mensagem agendada não conseguia sair (por exemplo, com o WhatsApp desconectado na hora), ela ficava na conversa como "Não foi enviada" e os botões **Reagendar** e **Cancelar** não faziam nada. Agora os dois funcionam: Reagendar já sugere um horário novo e a mensagem volta para a fila; Cancelar tira ela da conversa.
