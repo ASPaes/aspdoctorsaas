@@ -2,11 +2,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import EmailAccountsTab from "./EmailAccountsTab";
 import EmailParametrosTab from "./EmailParametrosTab";
 import EmailParametrosRecebidosTab from "./EmailParametrosRecebidosTab";
+import EmailMacrosTab from "./EmailMacrosTab";
 
 /**
  * Aba E-mail dentro de Canais: Cadastros (as contas), Parâmetros de Envio
  * (o que sai sozinho) e Parâmetros de Recebidos (e-mail do cliente vira
- * ticket). Cadastros abre por padrão.
+ * ticket), e Macros (18/09/2026: textos prontos da tela Enviar e-mail).
+ * Cadastros abre por padrão.
  */
 export default function EmailCanalTab() {
   return (
@@ -15,6 +17,7 @@ export default function EmailCanalTab() {
         <TabsTrigger value="cadastros">Cadastros</TabsTrigger>
         <TabsTrigger value="parametros">Parâmetros de Envio</TabsTrigger>
         <TabsTrigger value="recebidos">Parâmetros de Recebidos</TabsTrigger>
+        <TabsTrigger value="macros">Macros</TabsTrigger>
       </TabsList>
       <TabsContent value="cadastros" className="mt-4">
         <EmailAccountsTab />
@@ -24,6 +27,9 @@ export default function EmailCanalTab() {
       </TabsContent>
       <TabsContent value="recebidos" className="mt-4">
         <EmailParametrosRecebidosTab />
+      </TabsContent>
+      <TabsContent value="macros" className="mt-4">
+        <EmailMacrosTab />
       </TabsContent>
     </Tabs>
   );

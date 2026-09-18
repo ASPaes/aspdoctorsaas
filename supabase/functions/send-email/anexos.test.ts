@@ -59,6 +59,28 @@ describe("validarAnexos", () => {
     ).toBe(false);
   });
 
+  test("aceita o anexo fixo da macro só no bucket da macro e só no próprio tenant", () => {
+    const daMacro = `${TENANT}/1b0f7c6f-0000-4000-8000-000000000001.pdf`;
+    const r = validarAnexos(
+      [{ path: daMacro, nome: "Manual.pdf", mime: "application/pdf", bucket: "email-macro-anexos" }],
+      TENANT,
+    );
+    expect(r).toEqual({
+      ok: true,
+      anexos: [{ path: daMacro, nome: "Manual.pdf", mime: "application/pdf", bucket: "email-macro-anexos" }],
+    });
+    // o mesmo caminho no bucket temporário não vale (seria apagado depois do envio)
+    expect(validarAnexos([{ path: daMacro, nome: "a.pdf", mime: "application/pdf" }], TENANT).ok).toBe(false);
+    const outro = `b0000000-0000-0000-0000-000000000009/1b0f7c6f-0000-4000-8000-000000000001.pdf`;
+    expect(
+      validarAnexos([{ path: outro, nome: "a.pdf", mime: "application/pdf", bucket: "email-macro-anexos" }], TENANT).ok,
+    ).toBe(false);
+    // subpasta no bucket da macro também não
+    expect(
+      validarAnexos([{ path: caminho(), nome: "a.pdf", mime: "application/pdf", bucket: "email-macro-anexos" }], TENANT).ok,
+    ).toBe(false);
+  });
+
   test("recusa subir de pasta mesmo no bucket de recebidos", () => {
     expect(
       validarAnexos(

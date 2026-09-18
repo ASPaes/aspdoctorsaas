@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 import { callAI, getAIConfig } from '../_shared/ai-client.ts';
 import { lerReescrita, promptReescrita } from './sotaque.ts';
 import { cabecalhoDoTicket, formatarEventos } from './ticket.ts';
+import { FERRAMENTA_ADAPTAR, promptAdaptar } from './adaptar.ts';
 
 /**
  * Escreve assunto e corpo de um e-mail ao cliente a partir da conversa do chat.
@@ -32,6 +33,10 @@ import { cabecalhoDoTicket, formatarEventos } from './ticket.ts';
  * mensagens dos mesmos atendimentos que o resumo usa, sem IA. Por isso roda
  * ANTES do teto de gasto: não custa nada e precisa funcionar com o limite
  * estourado. A tela monta o bloco; a send-email põe depois da assinatura.
+ *
+ * Modo "adaptar" (18/09/2026, "Adaptar com IA" depois de usar uma macro): lê
+ * o mesmo histórico do "gerar" e encaixa o caso do cliente no HTML da macro,
+ * sem mudar a estrutura nem tirar o que ela informa. Ver adaptar.ts.
  */
 
 const corsHeaders = {
@@ -222,9 +227,12 @@ Deno.serve(async (req) => {
   if (body.modo === 'sotaque') {
     body = { ...body, modo: 'reescrever', sotaque: { uf: body.uf, intensidade: body.intensidade } };
   }
-  const modo = body.modo === 'corrigir' || body.modo === 'reescrever' || body.modo === 'conversa' ? body.modo : 'gerar';
+  const modo =
+    body.modo === 'corrigir' || body.modo === 'reescrever' || body.modo === 'conversa' || body.modo === 'adaptar'
+      ? body.modo
+      : 'gerar';
   const htmlParaCorrigir = typeof body.html === 'string' ? body.html.trim() : '';
-  if ((modo === 'corrigir' || modo === 'reescrever') && !htmlParaCorrigir) {
+  if ((modo === 'corrigir' || modo === 'reescrever' || modo === 'adaptar') && !htmlParaCorrigir) {
     return falha('corpo_invalido', 'Não há texto para reescrever.', 400);
   }
   const reescrita = modo === 'reescrever' ? lerReescrita(body) : null;
@@ -550,6 +558,35 @@ Responda chamando a função devolver_texto_corrigido. Se não puder usar a fun�
   if (perfil.funcionario_id) {
     const { data: func } = await supabase.from('funcionarios').select('nome').eq('id', perfil.funcionario_id).maybeSingle();
     atendente = (func?.nome || '').trim().split(/\s+/)[0] || null;
+  }
+
+  // ── modo adaptar: a macro já preenchida, com o caso do cliente encaixado ──
+  if (modo === 'adaptar') {
+    const pedidoAdaptar = [
+      empresa ? `Empresa do cliente: ${empresa}` : null,
+      atendente ? `Atendente que vai enviar: ${atendente}` : null,
+      '',
+      'E-MAIL-MODELO (HTML):',
+      htmlParaCorrigir,
+      '',
+      'HISTÓRICO:',
+      blocos.join('\n\n---\n\n'),
+    ].filter((l) => l !== null).join('\n');
+
+    let aiAdaptar;
+    try {
+      aiAdaptar = await callAI({ ...aiConfig, systemPrompt: null }, [
+        { role: 'system', content: promptAdaptar(typeof body.tom === 'string' && TONS[body.tom] ? TONS[body.tom] : null, !!ticketId) },
+        { role: 'user', content: pedidoAdaptar },
+      ], FERRAMENTA_ADAPTAR, { maxTokens: 6000 });
+    } catch (e) {
+      return falhaDaIa(e);
+    }
+    await registrarCusto(supabase, tenantId, aiConfig, aiAdaptar.usage);
+
+    const htmlAdaptado = lerHtmlCorrigido(aiAdaptar.content);
+    if (!htmlAdaptado) return falha('resposta_invalida', 'A IA devolveu o texto fora do formato. Tente adaptar de novo.');
+    return json(200, { ok: true, html: htmlAdaptado });
   }
 
   const sistema = `Você escreve e-mails de uma empresa de software para os clientes dela, em português do Brasil, a partir do ${

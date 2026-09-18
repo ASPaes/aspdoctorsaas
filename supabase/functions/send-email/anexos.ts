@@ -14,6 +14,8 @@
 export const ANEXO_BUCKET = "whatsapp-media";
 /** onde o robô de recebidos guarda o anexo do cliente; só é LIDO, nunca apagado */
 export const ANEXO_BUCKET_RECEBIDOS = "ticket-attachments";
+/** anexo fixo de macro de e-mail (18/09/2026); é da macro: só é LIDO, nunca apagado */
+export const ANEXO_BUCKET_MACRO = "email-macro-anexos";
 export const ANEXO_MAX_ARQUIVOS = 10;
 /** somados: em base64 o e-mail cresce ~37%, e 18 MB viram ~25 MB, o teto de Gmail e Outlook */
 export const ANEXO_MAX_TOTAL_BYTES = 18 * 1024 * 1024;
@@ -58,8 +60,10 @@ export function tipoPermitido(mime: string, nome: string): boolean {
  *                         a send-email apaga depois de enviar.
  *   ticket-attachments -> anexo de um e-mail RECEBIDO, sendo encaminhado
  *                         (16/09/2026). É o arquivo do ticket: NUNCA apagar.
+ *   email-macro-anexos -> anexo fixo da macro usada no e-mail (18/09/2026).
+ *                         Serve a todos os envios da macro: NUNCA apagar.
  */
-export type BucketAnexo = typeof ANEXO_BUCKET | typeof ANEXO_BUCKET_RECEBIDOS;
+export type BucketAnexo = typeof ANEXO_BUCKET | typeof ANEXO_BUCKET_RECEBIDOS | typeof ANEXO_BUCKET_MACRO;
 
 export interface AnexoPedido {
   path: string;
@@ -92,19 +96,28 @@ export function validarAnexos(
   // e o do e-mail recebido, escrito pelo robô: <tenant>/email/<hash>-<n>-<nome>.
   // O nome é livre, então a trava é não deixar subir de pasta nem sair do tenant.
   const doRecebido = new RegExp(`^${tenantId}/email/[^/]+$`, "i");
+  // e o anexo fixo da macro, subido pela aba Macros: <tenant>/<uuid>.<ext>
+  const daMacro = new RegExp(`^${tenantId}/${UUID}\\.[a-z0-9]{1,5}$`, "i");
 
   const anexos: AnexoPedido[] = [];
   for (const item of lista) {
     const path = typeof item?.path === "string" ? item.path : "";
     const nome = typeof item?.nome === "string" ? item.nome.trim() : "";
     const mime = typeof item?.mime === "string" ? item.mime.trim() : "";
-    const bucket: BucketAnexo = item?.bucket === ANEXO_BUCKET_RECEBIDOS ? ANEXO_BUCKET_RECEBIDOS : ANEXO_BUCKET;
+    const bucket: BucketAnexo =
+      item?.bucket === ANEXO_BUCKET_RECEBIDOS
+        ? ANEXO_BUCKET_RECEBIDOS
+        : item?.bucket === ANEXO_BUCKET_MACRO
+          ? ANEXO_BUCKET_MACRO
+          : ANEXO_BUCKET;
 
     const formatoOk = path.includes("..")
       ? false
       : bucket === ANEXO_BUCKET
         ? temporario.test(path)
-        : doRecebido.test(path);
+        : bucket === ANEXO_BUCKET_MACRO
+          ? daMacro.test(path)
+          : doRecebido.test(path);
     if (!formatoOk) return { ok: false, erro: "Anexo inválido: arquivo fora da área do seu tenant." };
     if (!nome) return { ok: false, erro: "Anexo sem nome." };
     if (!tipoPermitido(mime, nome)) return { ok: false, erro: `Tipo de arquivo não aceito: ${nome}` };

@@ -1,5 +1,7 @@
 import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
+import { EditorContent, Extension, useEditor, useEditorState, type Editor } from "@tiptap/react";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { StarterKit } from "@tiptap/starter-kit";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import { TextAlign } from "@tiptap/extension-text-align";
@@ -65,7 +67,42 @@ interface Props {
   rodape?: ReactNode;
   /** botão Anexar, no começo do grupo da direita */
   acaoAnexar?: ReactNode;
+  /** "/" digitado no começo de uma linha vazia: abre as macros (o "/" não entra no texto) */
+  onBarra?: () => void;
+  /** pinta os {{campos}} de macro (aba Macros) */
+  destacarCampos?: boolean;
+  /** o editor, para quem precisa inserir texto na posição do cursor */
+  onEditor?: (editor: Editor | null) => void;
 }
+
+/** {{campo}} de macro pintado no editor, sem mudar o texto guardado */
+const DestaqueCampos = Extension.create({
+  name: "destaqueCampos",
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey("destaqueCampos"),
+        props: {
+          decorations(state) {
+            const marcas: Decoration[] = [];
+            state.doc.descendants((no, pos) => {
+              if (!no.isText || !no.text) return;
+              for (const m of no.text.matchAll(/\{\{[^{}]{1,60}\}\}/g)) {
+                const de = pos + (m.index ?? 0);
+                marcas.push(
+                  Decoration.inline(de, de + m[0].length, {
+                    class: "rounded bg-sky-500/15 px-0.5 font-semibold text-sky-700 dark:text-sky-300",
+                  }),
+                );
+              }
+            });
+            return DecorationSet.create(state.doc, marcas);
+          },
+        },
+      }),
+    ];
+  },
+});
 
 /**
  * Corpo do e-mail do chat com a barra de formatação aprovada em 15/09/2026
@@ -135,9 +172,14 @@ export function EditorEmail({
   corrigindo = false,
   rodape,
   acaoAnexar,
+  onBarra,
+  destacarCampos = false,
+  onEditor,
 }: Props) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onBarraRef = useRef(onBarra);
+  onBarraRef.current = onBarra;
   const placeholderRef = useRef(placeholder);
   placeholderRef.current = placeholder;
   const [sublinharErros, setSublinharErros] = useState(true);
@@ -164,9 +206,16 @@ export function EditorEmail({
       FontSize,
       TextAlign.configure({ types: ["paragraph"] }),
       Placeholder.configure({ placeholder: () => placeholderRef.current }),
+      ...(destacarCampos ? [DestaqueCampos] : []),
     ],
     content: valor,
     editorProps: {
+      handleTextInput: (view, de, ate, texto) => {
+        if (texto !== "/" || !onBarraRef.current || de !== ate) return false;
+        if (view.state.selection.$from.parent.textContent.length > 0) return false;
+        onBarraRef.current();
+        return true;
+      },
       // função: o corretor do navegador liga e desliga sem recriar o editor
       attributes: () => ({
         id,
@@ -201,6 +250,12 @@ export function EditorEmail({
   useEffect(() => {
     if (editor && !editor.isDestroyed) editor.setEditable(!desabilitado);
   }, [editor, desabilitado]);
+
+  useEffect(() => {
+    onEditor?.(editor);
+    return () => onEditor?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor]);
 
   useEffect(atualizarVista, [editor, sublinharErros, placeholder]); // eslint-disable-line react-hooks/exhaustive-deps
 

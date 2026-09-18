@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
 import {
+  adaptarEmailChat,
   corrigirEmailChat,
   enviarEmailChat,
   gerarEmailChat,
@@ -31,6 +32,8 @@ import { BotaoEnviarComAgenda } from "@/components/whatsapp/chat/email/AgendarEn
 import { descreverHorario } from "@/components/whatsapp/chat/email/EscolherHorario";
 import { uploadAnexoEmail } from "@/components/whatsapp/chat/email/uploadAnexoEmail";
 import { agendarEmail } from "@/components/emails/useEmailsAgendados";
+import { BotaoMacros, FaixaMacro, useMacroNoEmail } from "@/components/emails/macros/MacrosNoEmail";
+import { baixarAnexoDaMacro } from "@/components/emails/macros/useEmailMacros";
 import {
   ANEXO_MAX_ARQUIVOS,
   ANEXO_MAX_TOTAL_BYTES,
@@ -185,6 +188,36 @@ export function EnviarEmailTicketDialog({
     [conversaDados],
   );
 
+  // Macros (18/09/2026): os campos saem do cliente e do chamado (ou da jornada)
+  const macro = useMacroNoEmail({
+    open: open && !!tenantId,
+    contexto: {
+      tenantId: tenantId ?? "",
+      clienteId: dados?.cliente?.id ?? null,
+      departmentId: dados?.ticket?.department_id ?? null,
+      contatoNome: dados?.contatoNome ?? null,
+      numeroAtendimento: null,
+      numeroChamado: dados?.ticket?.ticket_code ?? null,
+      assuntoChamado: dados?.ticket?.assunto ?? null,
+    },
+    corpoHtml,
+    corpoVazio: !corpo.trim(),
+    assunto,
+    anexos,
+    aplicar: ({ html, assunto: novoAssunto }) => {
+      // geração em curso perde a vez: a resposta dela seria ignorada de qualquer jeito
+      pedidoAtual.current++;
+      setGerando(false);
+      setCorpoHtml(html);
+      setVersaoCorpo((v) => v + 1);
+      setAjustes(null);
+      setAssunto(novoAssunto);
+    },
+    setAnexos,
+    adaptarComIa: (html) =>
+      adaptarEmailChat({ alvo, html, base: opcoes.base, tom: opcoes.tom, com_notas: opcoes.comNotas }),
+  });
+
   const gerar = async (alvoOpcoes: OpcoesTicket) => {
     const pedido = ++pedidoAtual.current;
     setGerando(true);
@@ -207,6 +240,7 @@ export function EnviarEmailTicketDialog({
       assuntoDaIa.current = r.assunto;
       setGerado(alvoOpcoes);
       setJaGerou(true);
+      macro.esquecer();
     } catch (err: any) {
       if (pedido === pedidoAtual.current) toast.error(err?.message || "Não foi possível gerar o texto.");
     } finally {
@@ -324,7 +358,12 @@ export function EnviarEmailTicketDialog({
   };
 
   const prontoParaSair = (): boolean => {
-    if (enviando || gerando || corrigindo || reescrevendo || trava.travado) return false;
+    if (enviando || gerando || corrigindo || reescrevendo || macro.adaptando || trava.travado) return false;
+    const pendentes = macro.pendentes();
+    if (pendentes.length) {
+      toast.error(`Complete no texto: ${pendentes.map((p) => `{{${p}}}`).join(", ")}.`, { duration: 10000 });
+      return false;
+    }
     if (incluirConversa) {
       if (conversaQuery.isFetching || !conversaQuery.data) {
         toast.error("Espere a conversa completa terminar de carregar antes de enviar.");
@@ -356,7 +395,9 @@ export function EnviarEmailTicketDialog({
   };
 
   const anexosProntos = () =>
-    anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime }));
+    anexos
+      .filter((a) => a.status === "pronto" && a.path)
+      .map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime, ...(a.bucket ? { bucket: a.bucket } : {}) }));
   const conversaParaEnviar = () =>
     incluirConversa && conversaMontada && conversaMontada.mensagens > 0
       ? { html: conversaMontada.html, texto: conversaMontada.texto }
@@ -427,7 +468,7 @@ export function EnviarEmailTicketDialog({
     }
   };
 
-  const ocupado = gerando || corrigindo || reescrevendo || enviando;
+  const ocupado = gerando || corrigindo || reescrevendo || enviando || macro.adaptando;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -617,6 +658,7 @@ export function EnviarEmailTicketDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="ticket-corpo" className="font-normal text-muted-foreground">Corpo do e-mail</Label>
+            <FaixaMacro m={macro} desabilitado={gerando || corrigindo || reescrevendo || enviando} />
             {ajustes && (
               <FaixaAjustes ajustes={ajustesAtuais} onVoltar={voltarAoOriginal} desabilitado={ocupado} />
             )}
@@ -629,8 +671,11 @@ export function EnviarEmailTicketDialog({
                 setCorpo(c.vazio ? "" : c.texto);
               }}
               desabilitado={ocupado}
+              onBarra={() => macro.setPaletaAberta(true)}
               placeholder={
-                gerando
+                macro.adaptando
+                  ? "Adaptando a macro ao caso..."
+                  : gerando
                   ? jornada
                     ? "Gerando o texto a partir da jornada..."
                     : "Gerando o texto a partir do chamado..."
@@ -639,11 +684,12 @@ export function EnviarEmailTicketDialog({
                     : reescrevendo
                       ? "Ajustando o texto..."
                       : jornada && !jaGerou
-                        ? "Escreva o e-mail, ou clique em Gerar texto com IA para um rascunho"
-                        : "Escreva o e-mail"
+                        ? "Escreva o e-mail, digite / para usar uma macro, ou clique em Gerar texto com IA"
+                        : "Escreva o e-mail, ou digite / para usar uma macro"
               }
               acaoAnexar={
                 <>
+                  <BotaoMacros m={macro} desabilitado={corrigindo || reescrevendo || enviando || macro.adaptando} />
                   <BotaoAnexar desabilitado={ocupado} onEscolher={adicionarAnexos} />
                   <BotaoSotaque
                     ufCliente={dados?.ufCliente ?? null}
@@ -667,7 +713,15 @@ export function EnviarEmailTicketDialog({
                 </p>
               }
             />
-            <ListaAnexos anexos={anexos} onRemover={(id) => setAnexos((l) => l.filter((a) => a.id !== id))} />
+            <ListaAnexos
+              anexos={anexos}
+              onRemover={(id) => setAnexos((l) => l.filter((a) => a.id !== id))}
+              buscarRemoto={(a) =>
+                a.bucket === "email-macro-anexos" && a.path
+                  ? baixarAnexoDaMacro(a.path)
+                  : Promise.reject(new Error("Este arquivo ainda está sendo anexado."))
+              }
+            />
             {incluirConversa && temChats && (
               <div className="pt-1.5">
                 <ConversaCompletaPrevia

@@ -37,8 +37,10 @@ export interface AnexoNaTela {
    * de onde o servidor vai ler na hora de enviar. Vazio = `whatsapp-media`, o
    * arquivo que acabou de subir. `ticket-attachments` é o anexo de um e-mail
    * recebido sendo encaminhado: ele já está no Storage e não tem `arquivo`.
+   * `email-macro-anexos` é o anexo fixo de uma macro (18/09/2026): também já
+   * está no Storage, e a send-email nunca apaga.
    */
-  bucket?: "whatsapp-media" | "ticket-attachments";
+  bucket?: "whatsapp-media" | "ticket-attachments" | "email-macro-anexos";
   erro?: string;
 }
 

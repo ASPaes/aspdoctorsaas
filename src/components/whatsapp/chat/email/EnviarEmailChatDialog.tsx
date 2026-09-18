@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import {
+  adaptarEmailChat,
   reescreverEmailChat,
   corrigirEmailChat,
   enviarEmailChat,
@@ -33,6 +34,8 @@ import { descreverHorario } from "./EscolherHorario";
 import { agendarEmail } from "@/components/emails/useEmailsAgendados";
 import { useBusinessHoursConfig } from "../../hooks/useBusinessHoursConfig";
 import { uploadAnexoEmail } from "./uploadAnexoEmail";
+import { BotaoMacros, FaixaMacro, useMacroNoEmail } from "@/components/emails/macros/MacrosNoEmail";
+import { baixarAnexoDaMacro } from "@/components/emails/macros/useEmailMacros";
 import {
   assuntoComReferencia,
   referenciaDoAssunto,
@@ -175,6 +178,43 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
     .filter(Boolean)
     .join(" · ");
 
+  // Macros (18/09/2026): os campos saem do cliente e do atendimento deste chat
+  const macro = useMacroNoEmail({
+    open,
+    contexto: {
+      tenantId: conversation.tenant_id,
+      clienteId: cliente?.id ?? null,
+      departmentId: clienteQuery.data?.departmentId ?? null,
+      // em grupo o nome do contato é o do grupo: vale o contato do cadastro
+      contatoNome: conversation.contact?.is_group ? null : (conversation.contact?.name ?? null),
+      numeroAtendimento: atendimentoCodigo ?? null,
+      numeroChamado: clienteQuery.data?.ticketCodigo ?? null,
+      assuntoChamado: null,
+    },
+    corpoHtml,
+    corpoVazio: !corpo.trim(),
+    assunto,
+    anexos,
+    aplicar: ({ html, assunto: novoAssunto }) => {
+      // geração em curso perde a vez: a resposta dela seria ignorada de qualquer jeito
+      pedidoAtual.current++;
+      setGerando(false);
+      setCorpoHtml(html);
+      setVersaoCorpo((v) => v + 1);
+      setAjustes(null);
+      setAssunto(novoAssunto);
+    },
+    setAnexos,
+    adaptarComIa: (html) =>
+      adaptarEmailChat({
+        alvo: { conversation_id: conversation.id },
+        html,
+        base: opcoes.base,
+        quantidade: opcoes.quantidade,
+        tom: opcoes.tom,
+      }),
+  });
+
   const gerar = async (alvo: OpcoesGeracao) => {
     const pedido = ++pedidoAtual.current;
     setGerando(true);
@@ -194,6 +234,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
       setAssunto((atual) => (!atual.trim() || atual === assuntoDaIa.current ? r.assunto : atual));
       assuntoDaIa.current = r.assunto;
       setGerado(alvo);
+      macro.esquecer();
     } catch (err: any) {
       if (pedido === pedidoAtual.current) toast.error(err?.message || "Não foi possível gerar o texto.");
     } finally {
@@ -329,7 +370,12 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
   /** as mesmas conferências valem para enviar agora e para agendar */
   const prontoParaSair = (): boolean => {
-    if (enviando || gerando || corrigindo || reescrevendo || trava.travado) return false;
+    if (enviando || gerando || corrigindo || reescrevendo || macro.adaptando || trava.travado) return false;
+    const pendentes = macro.pendentes();
+    if (pendentes.length) {
+      toast.error(`Complete no texto: ${pendentes.map((p) => `{{${p}}}`).join(", ")}.`, { duration: 10000 });
+      return false;
+    }
     if (incluirConversa) {
       if (conversaQuery.isFetching || !conversaQuery.data) {
         toast.error("Espere a conversa completa terminar de carregar antes de enviar.");
@@ -361,7 +407,9 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   };
 
   const anexosProntos = () =>
-    anexos.filter((a) => a.status === "pronto" && a.path).map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime }));
+    anexos
+      .filter((a) => a.status === "pronto" && a.path)
+      .map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime, ...(a.bucket ? { bucket: a.bucket } : {}) }));
   const conversaParaEnviar = () =>
     incluirConversa && conversaMontada && conversaMontada.mensagens > 0
       ? { html: conversaMontada.html, texto: conversaMontada.texto }
@@ -625,6 +673,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
 
           <div className="space-y-1.5">
             <Label htmlFor="envio-corpo" className="font-normal text-muted-foreground">Corpo do e-mail</Label>
+            <FaixaMacro m={macro} desabilitado={gerando || corrigindo || enviando || reescrevendo} />
             {ajustes && (
               <FaixaAjustes
                 ajustes={ajustesAtuais}
@@ -640,18 +689,22 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                 setCorpoHtml(c.html);
                 setCorpo(c.vazio ? "" : c.texto);
               }}
-              desabilitado={gerando || corrigindo || enviando || reescrevendo}
+              desabilitado={gerando || corrigindo || enviando || reescrevendo || macro.adaptando}
+              onBarra={() => macro.setPaletaAberta(true)}
               placeholder={
-                gerando
+                macro.adaptando
+                  ? "Adaptando a macro ao caso..."
+                  : gerando
                   ? "Gerando o texto a partir da conversa..."
                   : corrigindo
                     ? "Corrigindo a gramática..."
                     : reescrevendo
                       ? "Ajustando o texto..."
-                      : "Escreva o e-mail"
+                      : "Escreva o e-mail, ou digite / para usar uma macro"
               }
               acaoAnexar={
                 <>
+                  <BotaoMacros m={macro} desabilitado={corrigindo || enviando || reescrevendo || macro.adaptando} />
                   <BotaoAnexar desabilitado={gerando || corrigindo || enviando || reescrevendo} onEscolher={adicionarAnexos} />
                   <BotaoSotaque
                     ufCliente={(cliente as any)?.estados?.sigla ?? null}
@@ -675,7 +728,15 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
                 </p>
               }
             />
-            <ListaAnexos anexos={anexos} onRemover={removerAnexo} />
+            <ListaAnexos
+              anexos={anexos}
+              onRemover={removerAnexo}
+              buscarRemoto={(a) =>
+                a.bucket === "email-macro-anexos" && a.path
+                  ? baixarAnexoDaMacro(a.path)
+                  : Promise.reject(new Error("Este arquivo ainda está sendo anexado."))
+              }
+            />
             {incluirConversa && (
               <div className="pt-1.5">
                 <ConversaCompletaPrevia
@@ -707,7 +768,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
           </Button>
           <BotaoEnviarComAgenda
             enviando={enviando}
-            desabilitado={trava.travado || gerando || enviando || corrigindo || anexando || reescrevendo}
+            desabilitado={trava.travado || gerando || enviando || corrigindo || anexando || reescrevendo || macro.adaptando}
             horario={horarioComercial}
             onEnviar={enviar}
             onAgendar={agendar}

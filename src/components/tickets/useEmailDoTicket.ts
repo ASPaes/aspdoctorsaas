@@ -24,6 +24,8 @@ export interface DadosEmailTicket {
   sugestoes: SugestaoEmail[];
   /** chats de WhatsApp ligados a este chamado */
   chats: number;
+  /** o contato do chamado, para o campo "Nome do contato" das macros */
+  contatoNome: string | null;
 }
 
 export function useEmailDoTicket(ticketId: string | null, enabled: boolean) {
@@ -32,7 +34,7 @@ export function useEmailDoTicket(ticketId: string | null, enabled: boolean) {
     enabled: enabled && !!ticketId,
     staleTime: 60_000,
     queryFn: async () => {
-      const vazio: DadosEmailTicket = { ticket: null, cliente: null, ufCliente: null, sugestoes: [], chats: 0 };
+      const vazio: DadosEmailTicket = { ticket: null, cliente: null, ufCliente: null, sugestoes: [], chats: 0, contatoNome: null };
       if (!ticketId) return vazio;
 
       const { data: t } = await (supabase.from("support_tickets" as any) as any)
@@ -109,6 +111,7 @@ export function useEmailDoTicket(ticketId: string | null, enabled: boolean) {
         ufCliente: cliente?.estados?.sigla ?? null,
         sugestoes,
         chats: (chatsRes as any)?.count ?? 0,
+        contatoNome: (doTicket?.nome as string | undefined)?.trim() || null,
       };
     },
   });

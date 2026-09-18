@@ -180,8 +180,11 @@ export async function enviarEmailChat(input: {
   atendimento_id: string | null;
   cliente_id: string | null;
   department_id: string | null;
-  /** já no bucket whatsapp-media; a send-email baixa, anexa e apaga depois de enviar */
-  anexos: { path: string; nome: string; mime: string }[];
+  /**
+   * já no Storage. Sem bucket = whatsapp-media: a send-email baixa, anexa e
+   * apaga depois de enviar. email-macro-anexos (anexo fixo de macro) só é lido.
+   */
+  anexos: { path: string; nome: string; mime: string; bucket?: string }[];
   /** conversa completa do atendimento: a send-email põe depois da assinatura */
   historico?: { html: string; texto: string } | null;
   /** 'chat' (padrão) ou 'ticket', para a tela E-mails mostrar de onde saiu */
@@ -290,6 +293,26 @@ export async function reescreverEmailChat(input: {
   });
   if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
   return data as ResultadoReescrita;
+}
+
+/**
+ * "Adaptar com IA" (18/09/2026), depois de usar uma macro: a IA encaixa o caso
+ * do cliente no texto da macro, lendo o mesmo histórico do Gerar novo.
+ */
+export async function adaptarEmailChat(input: {
+  alvo: AlvoEmail;
+  html: string;
+  base: string;
+  quantidade?: number;
+  tom: string;
+  com_notas?: boolean;
+}): Promise<ResultadoCorrecao> {
+  const { alvo, ...resto } = input;
+  const { data, error } = await supabase.functions.invoke("gerar-email-chat", {
+    body: { ...alvo, ...resto, modo: "adaptar" },
+  });
+  if (error) return { ok: false, mensagem: await mensagemDoErro(error) };
+  return data as ResultadoCorrecao;
 }
 
 export type ResultadoConversa =
