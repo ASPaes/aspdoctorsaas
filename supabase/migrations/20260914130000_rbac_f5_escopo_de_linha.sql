@@ -1,3 +1,20 @@
+-- ⛔ NÃO APLICADA EM PRODUÇÃO — decisão de 17/09/2026, na noite da publicação.
+--
+-- Medido em produção ANTES de aplicar: as chaves `tickets`, `fin.mrr` e
+-- `clientes.contratos` nasceram nesta entrega e NÃO têm linha de papel nenhuma,
+-- então a cadeia termina em `false` para TODO MUNDO — inclusive administradores,
+-- nas 10 empresas com RBAC ligado. Como estas policies são RESTRICTIVE, elas
+-- passariam a barrar a leitura das tabelas: a tela de Tickets, os contratos e o
+-- MRR morreriam para ~100 pessoas.
+--
+-- A foto de acesso NÃO pega isto: ela mede permissão de tela, e aqui o que muda
+-- é leitura de tabela (RLS).
+--
+-- Para aplicar um dia: primeiro semear `role_permissions` / `tenant_role_permissions`
+-- das chaves usadas por estas policies, espelhando o acesso de hoje (foi o que a
+-- migration 20260917230000 fez para `tickets`), e só então ligar as policies —
+-- uma tabela por vez, medindo entre cada uma.
+--
 -- ============================================================================
 -- F5 — escopo de linha: "quais linhas", e não só "pode ou não pode"
 --
