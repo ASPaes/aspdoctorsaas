@@ -14,6 +14,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 18/09
 
+- 🆕 **Histórico de agendamentos da conversa** — No rodapé da aba **Agendar** do chat, o link **Histórico** abre a lista de tudo o que foi agendado naquela conversa: quando foi agendado, para quando, quem agendou, se era **Novo atendimento** ou **Mensagem nesta conversa**, a mensagem, se saiu, se foi cancelada (e por quem) ou se não conseguiu sair (e o motivo), e o número do atendimento aberto. Dá para filtrar por pendentes, enviados, cancelados e os que falharam. O botão de agendar também passou a dizer o que vai fazer: **Agendar mensagem** ou **Agendar atendimento**.
+
 - 🔧 **Mensagem agendada que falhou pode ser reagendada ou cancelada** — Quando uma mensagem agendada não conseguia sair (por exemplo, com o WhatsApp desconectado na hora), ela ficava na conversa como "Não foi enviada" e os botões **Reagendar** e **Cancelar** não faziam nada. Agora os dois funcionam: Reagendar já sugere um horário novo e a mensagem volta para a fila; Cancelar tira ela da conversa.
 
 - ⬆️ **Novo atendimento agendado vai para o setor se você estiver desconectado** — Se na hora marcada quem agendou não estiver conectado à plataforma, a mensagem sai normalmente e o atendimento entra na **fila do setor da pessoa**, para o próximo atendente disponível assumir, em vez de ficar parado no nome de quem está fora. Quem está em pausa continua recebendo o atendimento.

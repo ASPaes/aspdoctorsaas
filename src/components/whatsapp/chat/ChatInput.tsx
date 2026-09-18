@@ -6,7 +6,7 @@ import { useMetaWindow } from "@/hooks/useMetaWindow";
 import { MetaTemplatePicker, type TemplateEscolhido } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock, History as HistoryIcon } from "lucide-react";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -34,6 +34,8 @@ import { useGroupParticipants, type GroupParticipant } from "../hooks/useGroupPa
 import { MentionSuggestions, displayFor } from "./input/MentionSuggestions";
 import { ScheduleBar, paraInputLocal, proximaHoraCheia } from "./input/ScheduleBar";
 import { ScheduledPill } from "./input/ScheduledPill";
+import { ScheduledHistoryDialog } from "./input/ScheduledHistoryDialog";
+import { useScheduledHistoryCount } from "../hooks/useScheduledHistory";
 import { useScheduledMessages, type ScheduledMessage } from "../hooks/useScheduledMessages";
 import { useBusinessHoursConfig } from "../hooks/useBusinessHoursConfig";
 import { uploadChatMedia } from "../hooks/uploadChatMedia";
@@ -339,6 +341,14 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   });
   const contactName = (contactNameData as any)?.whatsapp_contacts?.name ?? null;
   const agentName = useAgentDisplayName();
+
+  // Histórico de agendamentos (link no rodapé da aba Agendar) e o nome do botão,
+  // que diz o que vai acontecer: com a escolha escondida num botão genérico,
+  // "Mensagem nesta conversa" passava despercebido e o atendimento não abria.
+  const [showHistoricoAgendados, setShowHistoricoAgendados] = useState(false);
+  const { data: totalAgendados } = useScheduledHistoryCount(conversationId, isScheduleMode);
+  const abreAtendimentoNaEscolha = novoAtendimento && !isGroup;
+  const rotuloAgendar = abreAtendimentoNaEscolha ? "Agendar atendimento" : "Agendar mensagem";
 
   const macroPrefillValues = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1504,14 +1514,18 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                     !scheduleAt || agendar.isPending || reagendar.isPending || agendandoAnexo
                   }
                   className="bg-violet-500 hover:bg-violet-600 text-violet-50 gap-1.5"
-                  aria-label={editandoAgendadaId ? "Salvar agendamento" : "Agendar envio"}
+                  aria-label={editandoAgendadaId ? "Salvar agendamento" : rotuloAgendar}
                 >
                   <CalendarClock className="w-4 h-4" />
-                  {agendandoAnexo ? "Subindo anexo..." : editandoAgendadaId ? "Salvar" : "Agendar"}
+                  {agendandoAnexo ? "Subindo anexo..." : editandoAgendadaId ? "Salvar" : rotuloAgendar}
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                {editandoAgendadaId ? "Salvar as alterações do agendamento" : "A mensagem sai sozinha na hora marcada"}
+                {editandoAgendadaId
+                  ? "Salvar as alterações do agendamento"
+                  : abreAtendimentoNaEscolha
+                  ? "Na hora marcada a mensagem sai e abre um novo atendimento"
+                  : "A mensagem sai sozinha na hora marcada, sem abrir atendimento"}
               </TooltipContent>
             </Tooltip>
           ) : isInternalNote ? (
@@ -1539,16 +1553,35 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </Button>
           )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          {isScheduleMode
-            ? (editandoAgendadaId
-                ? "Enter para salvar a alteração, Shift+Enter para nova linha"
-                : "Enter para agendar, Shift+Enter para nova linha")
-            : isInternalNote
-            ? "Enter para salvar a nota, Shift+Enter para nova linha"
-            : "Enter para enviar, Shift+Enter para nova linha"}
-        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            {isScheduleMode
+              ? (editandoAgendadaId
+                  ? "Enter para salvar a alteração, Shift+Enter para nova linha"
+                  : "Enter para agendar, Shift+Enter para nova linha")
+              : isInternalNote
+              ? "Enter para salvar a nota, Shift+Enter para nova linha"
+              : "Enter para enviar, Shift+Enter para nova linha"}
+          </p>
+          {isScheduleMode && (
+            <button
+              type="button"
+              onClick={() => setShowHistoricoAgendados(true)}
+              className="inline-flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[11.5px] text-violet-700 hover:bg-violet-500/10 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/60 dark:text-violet-300"
+            >
+              <HistoryIcon className="h-3 w-3" />
+              Histórico{typeof totalAgendados === "number" ? ` (${totalAgendados})` : ""}
+            </button>
+          )}
+        </div>
       </div>
+
+      <ScheduledHistoryDialog
+        open={showHistoricoAgendados}
+        onOpenChange={setShowHistoricoAgendados}
+        conversationId={conversationId}
+        contactName={contactName}
+      />
 
       {isMeta && metaWindow?.instanceId && contactPhone && (
         <MetaTemplatePicker

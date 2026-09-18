@@ -157,8 +157,8 @@ export function ScheduleBar({
           <Headset className="h-3.5 w-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
           <span>
             Na hora marcada a mensagem sai e um <b className="font-semibold text-foreground">novo atendimento
-            abre na fila de {nomeResponsavel || "quem agendou"}</b>. Se o cliente estiver com outro
-            operador nessa hora, a mensagem sai e o atendimento continua com ele.
+            abre na fila de {nomeResponsavel || "quem agendou"}</b>. Se você estiver desconectado nessa
+            hora, ele vai para a fila do seu setor; se o cliente estiver com outro operador, continua com ele.
           </span>
         </p>
       )}
