@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAtendimentoFilter, SEM_CATEGORIA_ID } from "@/contexts/AtendimentoFilterContext";
 import type { AgenteCategoriaRow, AgenteRow } from "./useAtendimentoAgentes";
@@ -15,6 +16,13 @@ import { AgenteCategoriaChatsDialog, type CelulaSelecionada } from "./AgenteCate
  */
 const MIN_ATEND = 10;
 const MAX_COLUNAS = 6;
+/**
+ * O quadro abre recolhido nos primeiros agentes (ordem do scorecard). Sempre
+ * recolhido ao entrar: o estado é local, e a aba desmonta ao trocar de aba ou
+ * recarregar. Mudar filtro também recolhe (ver o useEffect abaixo). O verde e o
+ * vermelho continuam sendo da coluna inteira, não só das linhas visíveis.
+ */
+const AGENTES_RECOLHIDO = 3;
 
 interface Props {
   agentes: AgenteRow[];
@@ -24,6 +32,12 @@ interface Props {
 export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
   const { categorias, categoryIds } = useAtendimentoFilter();
   const [aberta, setAberta] = useState<CelulaSelecionada | null>(null);
+  const [expandido, setExpandido] = useState(false);
+  // Dado novo = filtro mudou: volta recolhido. O React Query mantém a mesma
+  // referência quando a resposta vem igual, então refetch sem mudança não recolhe.
+  useEffect(() => setExpandido(false), [porCategoria]);
+  const agentesVisiveis = expandido ? agentes : agentes.slice(0, AGENTES_RECOLHIDO);
+  const ocultos = agentes.length - AGENTES_RECOLHIDO;
   // "Sem categoria" não vira coluna de TMA: vira a coluna de contagem do fim.
   const mostrarSem = categoryIds.length === 0 || categoryIds.includes(SEM_CATEGORIA_ID);
 
@@ -95,7 +109,7 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
               </tr>
             </thead>
             <tbody>
-              {agentes.map((a) => (
+              {agentesVisiveis.map((a) => (
                 <tr key={a.agent_id} className="border-b border-border/50 last:border-0">
                   <td className="py-2 pr-3 truncate max-w-[14rem]">{a.nome}</td>
                   {colunas.map((c) => {
@@ -152,6 +166,26 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
               ))}
             </tbody>
           </table>
+          {ocultos > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              aria-expanded={expandido}
+              className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-2 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {expandido ? (
+                <>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                  Mostrar só os {AGENTES_RECOLHIDO} primeiros
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                  Mostrar todos os {agentes.length} agentes ({ocultos} {ocultos === 1 ? "oculto" : "ocultos"})
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
       <AgenteCategoriaChatsDialog celula={aberta} onClose={() => setAberta(null)} />
