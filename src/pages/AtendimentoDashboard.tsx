@@ -16,7 +16,7 @@ import { BacklogTab } from "@/components/atendimento/BacklogTab";
 import { CoberturaTab } from "@/components/atendimento/CoberturaTab";
 import { ClientesTab } from "@/components/atendimento/ClientesTab";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import { AtendimentoFilterProvider, useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { AtendimentoFilterProvider, useAtendimentoFilter, SEM_CATEGORIA_ID } from "@/contexts/AtendimentoFilterContext";
 import { useAtendimentoRealtime } from "@/components/atendimento/useAtendimentoRealtime";
 import { MultiSelectFilter } from "@/components/atendimento/MultiSelectFilter";
 
@@ -94,6 +94,8 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
   } = useAtendimentoFilter();
 
   // Com categoria escolhida, só as subcategorias dela; sem, todas agrupadas.
+  // "Sem categoria" sozinha não tem subcategoria para escolher.
+  const soSemCategoria = categoryIds.length > 0 && categoryIds.every((id) => id === SEM_CATEGORIA_ID);
   const subcategoriasVisiveis = categoryIds.length
     ? subcategorias.filter((s) => categoryIds.includes(s.category_id))
     : subcategorias;
@@ -168,8 +170,20 @@ function FiltrosGlobais({ cfg }: { cfg: FiltroConfig }) {
       )}
       {cfg.categoria && (
         <>
-          <MultiSelectFilter label="Categoria" options={categorias} selected={categoryIds} onChange={setCategoryIds} />
-          <MultiSelectFilter label="Subcategoria" options={subcategoriasVisiveis} selected={subcategoryIds} onChange={setSubcategoryIds} />
+          <MultiSelectFilter
+            label="Categoria"
+            options={[{ id: SEM_CATEGORIA_ID, nome: "Sem categoria" }, ...categorias]}
+            selected={categoryIds}
+            onChange={setCategoryIds}
+          />
+          <MultiSelectFilter
+            label="Subcategoria"
+            options={subcategoriasVisiveis}
+            selected={subcategoryIds}
+            onChange={setSubcategoryIds}
+            disabled={soSemCategoria}
+            title={soSemCategoria ? "Sem categoria não tem subcategoria" : undefined}
+          />
         </>
       )}
       {cfg.cliente && (

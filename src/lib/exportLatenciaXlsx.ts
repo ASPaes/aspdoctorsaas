@@ -129,3 +129,43 @@ export function exportLatenciaAgenteXlsx(params: {
 
   salvar(ws, `Latência ${nome}`, `latencia_${slug(nome)}_${dia(from)}_a_${dia(to)}.xlsx`);
 }
+
+/** Os chats de uma célula do quadro Agente × Categoria (DEM-0315). */
+export function exportChatsDaCelulaXlsx(params: {
+  agente: string;
+  categoria: string;
+  itens: {
+    attendance_code: string | null; contato: string; cliente_nome: string | null;
+    opened_at: string; handle_seconds: number | null; no_calculo: boolean;
+    categoria: string | null; subcategoria: string | null; conversation_id: string | null;
+  }[];
+  from: Date;
+  to: Date;
+}) {
+  const { agente, categoria, itens, from, to } = params;
+  const aoa: any[][] = [[
+    "Agente", "Categoria", "Subcategoria", "Atendimento", "Aberto em", "Duração (s)", "Duração",
+    "No cálculo do TMA", "Contato", "Cliente", "Conversa (id)",
+  ]];
+  for (const i of itens) {
+    aoa.push([
+      agente,
+      i.categoria ?? "Sem categoria",
+      i.subcategoria ?? "",
+      i.attendance_code ?? "",
+      new Date(i.opened_at).toLocaleString("pt-BR"),
+      num(i.handle_seconds),
+      fmtDur(i.handle_seconds),
+      i.no_calculo ? "sim" : "nao",
+      i.contato,
+      i.cliente_nome ?? "",
+      i.conversation_id ?? "",
+    ]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = [
+    { wch: 22 }, { wch: 20 }, { wch: 22 }, { wch: 16 }, { wch: 20 }, { wch: 12 },
+    { wch: 11 }, { wch: 17 }, { wch: 24 }, { wch: 28 }, { wch: 38 },
+  ];
+  salvar(ws, `${agente} ${categoria}`, `chats_${slug(agente)}_${slug(categoria)}_${dia(from)}_a_${dia(to)}.xlsx`);
+}

@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { useAtendimentoFilter, SEM_CATEGORIA_ID } from "@/contexts/AtendimentoFilterContext";
 import type { AgenteCategoriaRow, AgenteRow } from "./useAtendimentoAgentes";
 import { fmtDur } from "./fmtDuracao";
+import { AgenteCategoriaChatsDialog, type CelulaSelecionada } from "./AgenteCategoriaChatsDialog";
 
 /**
  * Quadro Agente × Categoria (DEM-0315): TMA mediano de cada agente em cada
@@ -22,6 +23,9 @@ interface Props {
 
 export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
   const { categorias, categoryIds } = useAtendimentoFilter();
+  const [aberta, setAberta] = useState<CelulaSelecionada | null>(null);
+  // "Sem categoria" não vira coluna de TMA: vira a coluna de contagem do fim.
+  const mostrarSem = categoryIds.length === 0 || categoryIds.includes(SEM_CATEGORIA_ID);
 
   const { colunas, celula, semCategoria, destaque } = useMemo(() => {
     const grupoDe = new Map(categorias.map((c) => [c.id, c.grupo]));
@@ -40,7 +44,9 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
     }
     // Com filtro, as colunas são as escolhidas. Sem filtro, as de maior volume.
     let ids = [...volume.entries()].sort((a, b) => b[1].total - a[1].total).map(([id]) => id);
-    if (categoryIds.length) ids = ids.filter((id) => categoryIds.includes(id));
+    const catReais = categoryIds.filter((id) => id !== SEM_CATEGORIA_ID);
+    if (catReais.length) ids = ids.filter((id) => catReais.includes(id));
+    else if (categoryIds.length) ids = [];
     else ids = ids.slice(0, MAX_COLUNAS);
     const colunas = ids.map((id) => ({ id, nome: volume.get(id)!.nome, grupo: grupoDe.get(id) ?? null }));
 
@@ -66,10 +72,10 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
       </div>
       <p className="mb-3 text-xs text-muted-foreground">
         TMA de cada agente em cada categoria do ticket. Verde é o mais rápido da coluna, vermelho o mais lento.
-        Com menos de {MIN_ATEND} atendimentos a célula fica cinza e não concorre.
+        Com menos de {MIN_ATEND} atendimentos a célula fica cinza e não concorre. Clique numa célula para ver os chats.
         {!categoryIds.length && colunas.length === MAX_COLUNAS && ` Mostrando as ${MAX_COLUNAS} categorias com mais atendimentos.`}
       </p>
-      {colunas.length === 0 ? (
+      {colunas.length === 0 && !mostrarSem ? (
         <p className="text-sm text-muted-foreground">Nenhum atendimento com ticket categorizado no período.</p>
       ) : (
         <div className="overflow-x-auto">
@@ -85,7 +91,7 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
                     )}
                   </th>
                 ))}
-                {!categoryIds.length && <th className="py-2 pl-2 text-center font-medium">Sem categoria</th>}
+                {mostrarSem && <th className="py-2 pl-2 text-center font-medium">Sem categoria</th>}
               </tr>
             </thead>
             <tbody>
@@ -103,9 +109,18 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
                     const pior = concorre && d && x.tma_p50 === d.pior && d.pior !== d.melhor;
                     return (
                       <td key={c.id} className="py-1.5 px-2 text-center">
-                        <div
+                        <button
+                          type="button"
+                          onClick={() => setAberta({
+                            agentId: a.agent_id,
+                            agente: a.nome,
+                            categoryId: c.id,
+                            categoria: c.grupo && nomeRepetido(c.nome) ? `${c.nome} (${c.grupo})` : c.nome,
+                          })}
+                          title={`Ver os ${x.total} chats de ${a.nome} em ${c.nome}`}
                           className={cn(
-                            "mx-auto inline-flex min-w-[5.5rem] flex-col rounded px-2 py-1 tabular-nums",
+                            "mx-auto inline-flex min-w-[5.5rem] flex-col rounded border border-transparent px-2 py-1 tabular-nums transition-colors",
+                            "hover:border-accent hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
                             melhor && "bg-green-500/15 text-green-400 font-medium",
                             pior && "bg-destructive/15 text-destructive",
                             !concorre && "text-muted-foreground",
@@ -113,13 +128,24 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
                         >
                           <span>{fmtDur(x.tma_p50)}</span>
                           <span className="text-[11px] font-normal text-muted-foreground">{x.total} atend.</span>
-                        </div>
+                        </button>
                       </td>
                     );
                   })}
-                  {!categoryIds.length && (
+                  {mostrarSem && (
                     <td className="py-2 pl-2 text-center text-xs text-muted-foreground tabular-nums">
-                      {semCategoria.get(a.agent_id) ?? 0} atend.
+                      {(semCategoria.get(a.agent_id) ?? 0) > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setAberta({ agentId: a.agent_id, agente: a.nome, categoryId: null, categoria: "Sem categoria" })}
+                          title={`Ver os chats de ${a.nome} sem ticket categorizado`}
+                          className="rounded border border-transparent px-2 py-1 transition-colors hover:border-accent hover:bg-accent/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          {semCategoria.get(a.agent_id)} atend.
+                        </button>
+                      ) : (
+                        "0 atend."
+                      )}
                     </td>
                   )}
                 </tr>
@@ -128,6 +154,7 @@ export function AgenteCategoriaQuadro({ agentes, porCategoria }: Props) {
           </table>
         </div>
       )}
+      <AgenteCategoriaChatsDialog celula={aberta} onClose={() => setAberta(null)} />
     </div>
   );
 }

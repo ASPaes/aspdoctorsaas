@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
 import { ChatsListaDialog } from "./ChatsListaDialog";
+import { AvisoCategoria } from "./AvisoCategoria";
 import { fmtDur } from "./fmtDuracao";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
@@ -182,8 +183,7 @@ export function ChatsTab() {
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
-  const { categorias, categoryIds, subcategoryIds } = useAtendimentoFilter();
-  const filtraCategoria = categoryIds.length > 0 || subcategoryIds.length > 0;
+  const { categorias } = useAtendimentoFilter();
   // Mesmo nome em produtos diferentes (PDV × Pdv): o produto vai junto no rótulo.
   const nomeCategoria = (id: string | null, nome: string) => {
     if (!id) return nome;
@@ -200,12 +200,7 @@ export function ChatsTab() {
   const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
   return (
     <div className="space-y-4">
-      {filtraCategoria && (
-        <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-          Categoria e subcategoria vêm do ticket. Com esse filtro, só entram os atendimentos que viraram ticket
-          categorizado; os outros ficam fora de todos os números desta aba.
-        </p>
-      )}
+      <AvisoCategoria />
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3">
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground whitespace-nowrap">Encerramento:</span>

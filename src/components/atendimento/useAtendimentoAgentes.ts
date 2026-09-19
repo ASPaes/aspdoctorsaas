@@ -43,15 +43,23 @@ export interface AtendimentoAgentes {
   por_categoria: AgenteCategoriaRow[];
 }
 
-export function useAtendimentoAgentes() {
+/**
+ * `ignorarCategoria`: a mesma consulta sem o filtro de categoria. É a base do
+ * "% do agente" quando a tela filtra só "Sem categoria".
+ */
+export function useAtendimentoAgentes(opts: { ignorarCategoria?: boolean; enabled?: boolean } = {}) {
+  const { ignorarCategoria = false, enabled = true } = opts;
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
-  const { dateRange, departmentId, tipoAtendimento, plantao, categoryIds, subcategoryIds } = useAtendimentoFilter();
+  const filtro = useAtendimentoFilter();
+  const { dateRange, departmentId, tipoAtendimento, plantao } = filtro;
+  const categoryIds = ignorarCategoria ? [] : filtro.categoryIds;
+  const subcategoryIds = ignorarCategoria ? [] : filtro.subcategoryIds;
   const pIsGroup = tipoAtendimento === 'all' ? null : tipoAtendimento === 'group';
   const pPlantao = plantao === 'all' ? null : plantao;
   return useQuery<AtendimentoAgentes>({
     queryKey: ["atendimento-agentes", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), viewKey, departmentId, tipoAtendimento, plantao, categoryIds, subcategoryIds],
-    enabled: !!tid && unidadeFilterReady,
+    enabled: enabled && !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await (supabase.rpc as any)("get_atendimento_agentes", {

@@ -20,6 +20,13 @@ export interface FiltroOpcoes {
  * (PDV Legal "PDV" × Gula "Pdv"), e sem ele o filtro fica ambíguo.
  */
 export interface CategoriaOpt { id: string; nome: string; grupo: string; }
+
+/**
+ * Opção "Sem categoria" do filtro: o UUID nulo vai junto em p_category_ids e as
+ * RPCs o tratam como "atendimento sem ticket, ou com ticket sem categoria"
+ * (o mesmo balde do "(sem categoria)" dos quadros).
+ */
+export const SEM_CATEGORIA_ID = "00000000-0000-0000-0000-000000000000";
 export interface SubcategoriaOpt { id: string; nome: string; grupo: string; category_id: string; }
 
 export type TipoAtendimento = 'all' | 'individual' | 'group';

@@ -27,9 +27,12 @@ interface MultiSelectFilterProps<T extends string | number> {
   className?: string;
   /** Placeholder da busca. Default: `Buscar {label}...` — útil quando o label é dinâmico ("3 selecionado(s)"). */
   searchPlaceholder?: string;
+  disabled?: boolean;
+  /** Dica no botão (útil para explicar por que está desabilitado). */
+  title?: string;
 }
 
-export function MultiSelectFilter<T extends string | number>({ label, options, selected, onChange, className, searchPlaceholder }: MultiSelectFilterProps<T>) {
+export function MultiSelectFilter<T extends string | number>({ label, options, selected, onChange, className, searchPlaceholder, disabled, title }: MultiSelectFilterProps<T>) {
   const [open, setOpen] = useState(false);
 
   const toggle = (id: T) => {
@@ -52,6 +55,8 @@ export function MultiSelectFilter<T extends string | number>({ label, options, s
         <Button
           variant="outline"
           role="combobox"
+          disabled={disabled}
+          title={title}
           aria-expanded={open}
           className={cn("justify-between gap-2 min-w-[180px]", className)}
         >

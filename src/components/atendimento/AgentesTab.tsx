@@ -7,26 +7,31 @@ import { Button } from "@/components/ui/button";
 import { LatenciaHistograma } from "./LatenciaHistograma";
 import { LatenciaAgenteDialog } from "./LatenciaAgenteDialog";
 import { AgenteCategoriaQuadro } from "./AgenteCategoriaQuadro";
+import { AvisoCategoria } from "./AvisoCategoria";
 import { fmtDur } from "./fmtDuracao";
-import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { useAtendimentoFilter, SEM_CATEGORIA_ID } from "@/contexts/AtendimentoFilterContext";
 import { exportScorecardAgentesXlsx } from "@/lib/exportLatenciaXlsx";
 import { cn } from "@/lib/utils";
 
 export function AgentesTab() {
   const { data, isLoading, isError, error } = useAtendimentoAgentes();
   const { dateRange, categoryIds, subcategoryIds } = useAtendimentoFilter();
-  const filtraCategoria = categoryIds.length > 0 || subcategoryIds.length > 0;
+  // Só "Sem categoria": o scorecard ganha "% do agente" (quanto do trabalho de
+  // cada um ficou sem ticket categorizado), contra a mesma consulta sem o filtro.
+  const soSemCategoria =
+    categoryIds.length === 1 && categoryIds[0] === SEM_CATEGORIA_ID && subcategoryIds.length === 0;
+  const { data: semFiltro } = useAtendimentoAgentes({ ignorarCategoria: true, enabled: soSemCategoria });
+  const totalSemFiltro = new Map((semFiltro?.agentes ?? []).map((a) => [a.agent_id, a.total]));
+  const pctDoAgente = (a: AgenteRow) => {
+    const t = totalSemFiltro.get(a.agent_id);
+    return t ? Math.round((100 * a.total) / t) : null;
+  };
   const [verLatencia, setVerLatencia] = useState<AgenteRow | null>(null);
   const dur = (s: number | null | undefined) => fmtDur(s);
 
   return (
     <div className="space-y-4">
-      {filtraCategoria && (
-        <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
-          Categoria e subcategoria vêm do ticket. Com esse filtro, só entram os atendimentos que viraram ticket
-          categorizado; os outros ficam fora de todos os números desta aba.
-        </p>
-      )}
+      <AvisoCategoria />
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -115,6 +120,14 @@ export function AgentesTab() {
                       <th className="py-2 px-3 text-right">
                         <KpiHelpPopover wrapLabel="Atend." kpiKey="atendimento_ag_total" labelSize="sm" />
                       </th>
+                      {soSemCategoria && (
+                        <th
+                          className="py-2 px-3 text-right font-medium"
+                          title="Parte dos atendimentos do agente no período que não virou ticket categorizado"
+                        >
+                          % do agente
+                        </th>
+                      )}
                       <th className="py-2 px-3 text-right">
                         <KpiHelpPopover wrapLabel="Encerr." kpiKey="atendimento_ag_encerrados" labelSize="sm" />
                       </th>
@@ -161,6 +174,16 @@ export function AgentesTab() {
                       >
                         <td className="py-2 pr-3 truncate max-w-[14rem]">{a.nome}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.total}</td>
+                        {soSemCategoria && (
+                          <td
+                            className={cn(
+                              "py-2 px-3 text-right tabular-nums",
+                              (pctDoAgente(a) ?? 0) >= 50 && "text-amber-600 dark:text-amber-400 font-medium",
+                            )}
+                          >
+                            {pctDoAgente(a) !== null ? `${pctDoAgente(a)}%` : "—"}
+                          </td>
+                        )}
                         <td className="py-2 px-3 text-right tabular-nums">{a.encerrados}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.pico_simultaneos}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
