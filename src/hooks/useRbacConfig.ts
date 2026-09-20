@@ -55,9 +55,7 @@ export interface RbacConfig {
  * `can("<chave>"` em src/ — se achar, a chave não pertence a esta lista.
  */
 export const RECURSOS_SEM_PORTAO = new Set<string>([
-  "clientes.oem_aprovacao", "super_monitor", "cfg.whatsapp",
-  "nav.super", "dash.valores_financeiros", "super.tenants",
-  "super.templates", "super.limpeza_uras",
+  "clientes.oem_aprovacao", "dash.valores_financeiros",
 ]);
 /** Quais ações a tela mostra em cada nível de controle. */
 export const ACOES_POR_NIVEL: Record<Nivel, Acao[]> = {

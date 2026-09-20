@@ -1,0 +1,31 @@
+-- ============================================================================
+-- RBAC — tira do catálogo 6 itens que não decidem nada
+--
+-- Autorizado pelo Alexandre em 20/09/2026 ("pode apagar, se não tem função
+-- nenhuma"), depois de conferido item a item:
+--
+--   · nav.super, super_monitor, super.tenants, super.templates,
+--     super.limpeza_uras — o menu Super Admin é decidido por
+--     `profiles.is_super_admin` (AppSidebar.tsx:66,288,444), e o super admin
+--     passa por cima do RBAC por desenho (decisão D4). Portão ali nunca
+--     decide nada.
+--   · cfg.whatsapp — chave MORTA: nenhuma seção da tela de Configurações
+--     aponta para ela. O mapa `SECTION_TO_RESOURCE` (SettingsSidebar.tsx)
+--     liga a aba de WhatsApp a `cfg.canais`, que continua existindo.
+--
+-- Conferido no código: 0 referências às 6 chaves em `src/`.
+--
+-- O QUE FOI JUNTO, pelo CASCADE de `resource_key`: 240 regras de grupo, 6 de
+-- papel, 60 ajustes por empresa. Nenhuma exceção por pessoa, nenhum filho no
+-- catálogo.
+--
+-- EDIÇÃO MANUAL DESCARTADA, de propósito: 3 em `cfg.whatsapp` e 6 em
+-- `super_monitor`, todas do Pedro em 29/05 e 01/06/2026 — na tela antiga,
+-- meses antes do motor v2, em chaves que nunca tiveram efeito.
+--
+-- Conferido DEPOIS de aplicar, com foto de acesso das 123 pessoas: sumiram
+-- exatamente estas 6 chaves e nenhuma outra mudou de valor.
+-- ============================================================================
+delete from public.resources
+ where key in ('nav.super','super_monitor','super.tenants','super.templates',
+               'super.limpeza_uras','cfg.whatsapp');
