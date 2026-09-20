@@ -47,7 +47,7 @@ export function ChipAcao({ acao, ligado, existe, travado, desabilitado, rotulo, 
       </TooltipTrigger>
       <TooltipContent>
         {existe ? ACAO_LABEL[acao] : `${ACAO_LABEL[acao]} não existe neste item`}
-        {travado && " · anti-lockout: o grupo de administração nunca perde isto"}
+        {travado && " · anti-lockout: o perfil de administração nunca perde isto"}
       </TooltipContent>
     </Tooltip>
   );

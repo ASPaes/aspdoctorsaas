@@ -93,7 +93,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   "motivos-cancelamento": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de cancelamento"], title: "Motivos de cancelamento", description: "Motivos disponíveis para cancelamento de contratos." },
   "motivos-pausa": { breadcrumb: ["Cadastros", "Ciclo de vida", "Motivos de pausa"], title: "Motivos de pausa", description: "Motivos para pausa de atendimentos." },
   acessos: { breadcrumb: ["Equipe", "Acessos & permissões"], title: "Acessos & permissões", description: "Gerencie usuários, papéis e permissões da equipe." },
-  permissoes: { breadcrumb: ["Equipe", "Permissões e papéis"], title: "Permissões e papéis", description: "Configure o que cada papel pode fazer no seu tenant." },
+  permissoes: { breadcrumb: ["Equipe", "Permissões e perfis"], title: "Permissões e perfis", description: "Configure o que cada perfil de acesso pode fazer na sua empresa." },
 
   canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Por onde a operação fala com o cliente: números de WhatsApp e contas de e-mail." },
   distribuicao: { breadcrumb: ["Atendimento", "Distribuição"], title: "Distribuição", description: "Para qual setor e agente cada atendimento é encaminhado." },

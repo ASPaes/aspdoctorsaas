@@ -200,7 +200,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
       icon: Users,
       subgroups: [{ items: [
         { value: "acessos", label: "Acessos & permissões" },
-        { value: "permissoes", label: "Permissões e papéis" },
+        { value: "permissoes", label: "Permissões e perfis" },
         { value: "seguranca", label: "Segurança" },
         { value: "horario-acesso", label: "Horário de acesso" },
       ] }],

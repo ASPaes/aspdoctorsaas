@@ -1510,7 +1510,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                   <TableHead>Nome</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Setor</TableHead>
-                  <TableHead>{usaGrupos ? "Grupo" : "Papel"}</TableHead>
+                  <TableHead>{usaGrupos ? "Perfil" : "Papel"}</TableHead>
                   <TableHead>Acesso</TableHead>
                   <TableHead>Status</TableHead>
                   {isAdmin && (

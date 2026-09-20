@@ -72,7 +72,7 @@ export default function GrupoDoUsuarioSelect({ userId, disabled, grupos, vinculo
       qc.invalidateQueries({ queryKey: ["my-permissions"] });
       qc.invalidateQueries({ queryKey: ["tenant-users", tid] });
       qc.invalidateQueries({ queryKey: ["rbac-config", tid] });
-      toast.success("Grupo alterado.");
+      toast.success("Perfil alterado.");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -86,12 +86,12 @@ export default function GrupoDoUsuarioSelect({ userId, disabled, grupos, vinculo
             <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
           </TooltipTrigger>
           <TooltipContent className="max-w-xs">
-            Esta pessoa não está em nenhum grupo e por isso não tem acesso a nada.
-            Escolha um grupo para liberar.
+            Esta pessoa não está em nenhum perfil e por isso não tem acesso a nada.
+            Escolha um perfil para liberar.
           </TooltipContent>
         </Tooltip>
         <Select onValueChange={(v) => atribuir.mutate(v)} disabled={atribuir.isPending}>
-          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Sem grupo" /></SelectTrigger>
+          <SelectTrigger className="h-8 w-40"><SelectValue placeholder="Sem perfil" /></SelectTrigger>
           <SelectContent>
             {grupos.map((g) => <SelectItem key={g.id} value={g.id}>{g.nome}</SelectItem>)}
           </SelectContent>

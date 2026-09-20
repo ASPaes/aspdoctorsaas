@@ -89,7 +89,7 @@ export default function OnboardingConfigPage() {
   }
 
   if (nenhumaAba) {
-    return <div className="p-6 text-sm text-muted-foreground">Seu grupo não tem acesso a nenhuma aba da configuração de Implantação.</div>;
+    return <div className="p-6 text-sm text-muted-foreground">Seu perfil não tem acesso a nenhuma aba da configuração de Implantação.</div>;
   }
 
   return (

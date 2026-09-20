@@ -116,9 +116,9 @@ export default function GruposPermissoesContent() {
   return (
     <TooltipProvider delayDuration={200}>
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-        {/* ---------------- grupos ---------------- */}
+        {/* ---------------- perfis ---------------- */}
         <aside className="space-y-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Grupos</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Perfis</p>
           <div className="space-y-1.5">
             {config.grupos.map((g) => (
               <div
@@ -192,7 +192,7 @@ export default function GruposPermissoesContent() {
             <Input
               value={novoNome}
               onChange={(e) => setNovoNome(e.target.value)}
-              placeholder="Nome do novo grupo"
+              placeholder="Nome do novo perfil"
               className="h-8 text-xs"
             />
             <Button
@@ -204,7 +204,7 @@ export default function GruposPermissoesContent() {
               Duplicar “{grupo.nome}”
             </Button>
             <p className="text-[11px] leading-snug text-muted-foreground">
-              Grupo não nasce em branco: um grupo vazio não teria de onde herdar as regras.
+              Perfil não nasce em branco: um perfil vazio não teria de onde herdar as regras.
               Duplique e ajuste o que muda.
             </p>
           </div>
@@ -338,7 +338,7 @@ export default function GruposPermissoesContent() {
                           </span>
                           <span className="text-[11.5px] text-muted-foreground">
                             {entradaLigada
-                              ? "Desligue e o módulo inteiro fica inacessível para este grupo."
+                              ? "Desligue e o módulo inteiro fica inacessível para este perfil."
                               : "Desligada: nada deste módulo é alcançável."}
                           </span>
                         </div>
@@ -394,15 +394,15 @@ export default function GruposPermissoesContent() {
       <AlertDialog open={!!excluindo} onOpenChange={(o) => !o && setExcluindo(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir o grupo “{excluindo?.nome}”?</AlertDialogTitle>
+            <AlertDialogTitle>Excluir o perfil “{excluindo?.nome}”?</AlertDialogTitle>
             <AlertDialogDescription>
               {excluindo && excluindo.membros > 0 ? (
                 <>
                   Este grupo tem <b>{excluindo.membros} {excluindo.membros === 1 ? "pessoa" : "pessoas"}</b>.
-                  Mova-as para outro grupo antes de excluir — sem grupo, elas ficariam sem acesso a nada.
+                  Mova-as para outro perfil antes de excluir — sem perfil, elas ficariam sem acesso a nada.
                 </>
               ) : (
-                <>O grupo não tem ninguém. As permissões dele são descartadas e a ação não pode ser desfeita.</>
+                <>O perfil não tem ninguém. As permissões dele são descartadas e a ação não pode ser desfeita.</>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>

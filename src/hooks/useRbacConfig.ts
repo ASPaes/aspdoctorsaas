@@ -119,7 +119,7 @@ export function useRbacConfig() {
   const duplicarGrupo = useMutation({
     mutationFn: (v: { origemId: string; nome: string }) =>
       chamar("rbac_duplicate_group", { p_source_group_id: v.origemId, p_nome: v.nome }),
-    onSuccess: () => { invalidar(); toast.success("Grupo criado a partir da cópia."); },
+    onSuccess: () => { invalidar(); toast.success("Perfil criado a partir da cópia."); },
     onError: (e: Error) => toast.error(e.message),
   });
   const renomearGrupo = useMutation({
@@ -130,7 +130,7 @@ export function useRbacConfig() {
   });
   const excluirGrupo = useMutation({
     mutationFn: (groupId: string) => chamar("rbac_delete_group", { p_group_id: groupId }),
-    onSuccess: () => { invalidar(); toast.success("Grupo excluído."); },
+    onSuccess: () => { invalidar(); toast.success("Perfil excluído."); },
     onError: (e: Error) => toast.error(e.message),
   });
   return {
