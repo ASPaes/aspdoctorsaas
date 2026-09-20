@@ -12,6 +12,11 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 20/09
+
+- 🆕 **Permissões por grupo chegam à Implantação, ao Dashboard, às Configurações e aos Certificados** — Em **Configurações › Equipe › Permissões e papéis**, 29 itens que antes apareciam marcados como "ainda não aplicado" passaram a valer de verdade. Na **Implantação**: abrir o módulo, arrastar cartão de etapa, criar jornada, editar os dados da jornada, dar go-live, cancelar, reabrir, transferir responsável, treinos, o Dashboard de Implantação e as 10 abas de configuração (incluindo o checklist das etapas e o botão de aplicar template). Fora dela: a **Ponte de MRR** no Dashboard de Crescimento, a aba **Meu Painel**, as **Macros e respostas rápidas**, **Desativar pessoa**, o **Histórico de alterações** de acessos e a aba **Dashboard** dos Certificados A1. Ninguém perdeu nada na virada: cada item nasceu com exatamente o acesso que o grupo já tinha, conferido pessoa a pessoa nas 14 empresas. Continuam valendo as travas de sempre — a Implantação só aparece para a empresa que recebeu o módulo, o go-live na etapa final segue liberado para toda a equipe e quem edita cadastro de jornada continua sendo o administrador.
+
+
 ### 18/09
 
 - ⬆️ **Quadro Agente × Categoria mais enxuto** — Na aba **Agentes** do Dashboard de Atendimento, o quadro **Agente × Categoria** abre mostrando só os 3 primeiros agentes, com o botão **Mostrar todos** para ver o resto. Ele sempre volta recolhido ao trocar de aba, mudar um filtro ou recarregar a página.
