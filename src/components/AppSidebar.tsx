@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 
 import { usePermissions } from "@/hooks/usePermissions";
+import { usePortao } from "@/hooks/usePortao";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3 } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
@@ -65,6 +66,10 @@ export function AppSidebar() {
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const { canAccess: canOnboarding } = useOnboardingAccess();
+  /** A empresa recebeu o módulo (flag) e o grupo pode abri-lo (permissão) — em
+   *  série. Hoje só a flag manda, então o portão nasce ligado para todos. */
+  const podeAbrirImplantacao = usePortao("nav.onboarding");
+  const podeVerDashboardImplantacao = usePortao("onb.dashboard");
 
   const getGroupOpen = (title: string) => {
     const v = localStorage.getItem(`sidebar.group.${title}`);
@@ -176,7 +181,7 @@ export function AppSidebar() {
   }, [temNovo]);
 
 
-  const onboardingMenu = canOnboarding && (
+  const onboardingMenu = canOnboarding && podeAbrirImplantacao && (
     collapsed ? (
       <SidebarMenuItem>
         <DropdownMenu>
@@ -191,10 +196,12 @@ export function AppSidebar() {
               <Rocket className="h-4 w-4 mr-2" />
               Kanban
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/dashboard")}>
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Dashboard
-            </DropdownMenuItem>
+            {podeVerDashboardImplantacao && (
+              <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/dashboard")}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                Dashboard
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => navigate("/onboarding-implantacao/config")}>
               <SlidersHorizontal className="h-4 w-4 mr-2" />
               Configuração
@@ -226,14 +233,16 @@ export function AppSidebar() {
                   </NavLink>
                 </SidebarMenuSubButton>
               </SidebarMenuSubItem>
-              <SidebarMenuSubItem>
-                <SidebarMenuSubButton asChild>
-                  <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                    <BarChart3 className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </NavLink>
-                </SidebarMenuSubButton>
-              </SidebarMenuSubItem>
+              {podeVerDashboardImplantacao && (
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton asChild>
+                    <NavLink to="/onboarding-implantacao/dashboard" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+                      <BarChart3 className="h-4 w-4" />
+                      <span>Dashboard</span>
+                    </NavLink>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              )}
               <SidebarMenuSubItem>
                 <SidebarMenuSubButton asChild>
                   <NavLink to="/onboarding-implantacao/config" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">

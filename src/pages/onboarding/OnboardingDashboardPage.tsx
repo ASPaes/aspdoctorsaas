@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -95,6 +96,7 @@ export default function OnboardingDashboardPage() {
   const { effectiveTenantId } = useTenantFilter();
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
+  const podeVerDashboard = usePortao("onb.dashboard");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -448,6 +450,10 @@ export default function OnboardingDashboardPage() {
   }
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">Acesso não liberado a este módulo.</div>;
+  }
+  // O menu esconde o item; isto fecha a URL digitada à mão.
+  if (!podeVerDashboard) {
+    return <div className="p-6 text-sm text-muted-foreground">Você não tem acesso ao Dashboard de Implantação.</div>;
   }
 
   const loading = journeysQ.isLoading || trainingsAllQ.isLoading;

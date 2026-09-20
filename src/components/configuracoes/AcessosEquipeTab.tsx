@@ -84,6 +84,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HistoricoAcessosDialog } from "./HistoricoAcessosDialog";
+import { usePortao } from "@/hooks/usePortao";
 
 // ========== Types ==========
 
@@ -1145,6 +1146,11 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
   });
 
   const isAdmin = profile?.role === "admin" || profile?.is_super_admin;
+  // Histórico: hoje é botão só de administrador. Desativar/reativar acesso:
+  // hoje qualquer pessoa que abre esta tela consegue (menos em si mesma e
+  // em super admin, que continuam travados por regra própria).
+  const podeVerHistorico = usePortao("usuarios.auditoria", !!isAdmin);
+  const podeDesativar = usePortao("usuarios.desativar", true);
 
   // RBAC v2: quando o tenant usa grupos, a coluna "Papel" vira "Grupo" e a
   // troca passa pela RPC, que mantém `profiles.role` coerente com o nível base
@@ -1225,7 +1231,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isAdmin && (
+          {podeVerHistorico && (
             <Button size="sm" variant="outline" onClick={() => setShowHistorico(true)}>
               <History className="h-4 w-4 mr-1" />
               Histórico
@@ -1699,7 +1705,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                               );
                             }
                           }}
-                          disabled={u.user_id === profile?.user_id || u.is_super_admin}
+                          disabled={!podeDesativar || u.user_id === profile?.user_id || u.is_super_admin}
                         >
                           <SelectTrigger className="w-28 h-8">
                             <SelectValue />

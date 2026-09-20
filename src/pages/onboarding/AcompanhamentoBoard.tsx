@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -53,6 +54,7 @@ export default function AcompanhamentoBoard({
   onTotalChange?: (total: number) => void;
 }) {
   const qc = useQueryClient();
+  const podeMover = usePortao("onb.mover");
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
 
   const { data: tickets = [] } = useQuery({
@@ -173,7 +175,7 @@ export default function AcompanhamentoBoard({
                     return (
                       <div
                         key={t.id}
-                        draggable
+                        draggable={podeMover}
                         onDragStart={(e) => e.dataTransfer.setData("ticketId", t.id)}
                         onClick={() => onOpenTicket(t.id)}
                         className={`border rounded-md p-2.5 cursor-pointer transition-all ${

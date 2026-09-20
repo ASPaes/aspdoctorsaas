@@ -20,7 +20,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUnidadeFilter } from '@/contexts/UnidadeFilterContext';
 import { NotificationSetupBanner } from '@/components/NotificationSetupBanner';
 import { MeuPainelTab } from '@/components/meuPainel/MeuPainelTab';
-import { podeVerMeuPainel } from '@/lib/meuPainelAcesso';
+import { empresaNoPiloto, papelPadraoDoMeuPainel } from '@/lib/meuPainelAcesso';
+import { usePortao } from '@/hooks/usePortao';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 export default function Dashboard() {
@@ -42,11 +43,14 @@ export default function Dashboard() {
 
   /** Meu Painel: piloto fechado, ver src/lib/meuPainelAcesso.ts. */
   const { effectiveTenantId, isSuperAdmin } = useTenantFilter();
-  const temMeuPainel = podeVerMeuPainel({
-    tenantId: effectiveTenantId,
-    role: profile?.role,
-    isSuperAdmin,
-  });
+  /** O piloto por empresa fica EM SÉRIE e o portão substitui só a parte do
+   *  papel: permissão não entrega módulo que a empresa não recebeu, mas dentro
+   *  do piloto ligar o item no grupo passa a valer de verdade. */
+  const permiteMeuPainel = usePortao(
+    'dash.meu_painel',
+    papelPadraoDoMeuPainel({ role: profile?.role, isSuperAdmin }),
+  );
+  const temMeuPainel = empresaNoPiloto(effectiveTenantId) && permiteMeuPainel;
   /** A barra global (Fornecedor + Período) some SÓ na aba Meu Painel: lá cada
    *  seção tem o filtro da própria área, e um card de Atendimento embaixo de
    *  um filtro de Fornecedor seria mentira visual. As outras 7 abas não mudam. */

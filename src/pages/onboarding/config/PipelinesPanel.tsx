@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -113,6 +114,10 @@ interface Props {
 
 export function PipelinesPanel({ phaseId }: Props) {
   const { effectiveTenantId } = useTenantFilter();
+  /** O checklist não é aba: é a terceira coluna desta tela. Sem ele a tela vira
+   *  duas colunas — por isso o grid também muda, senão sobra um vão à direita.
+   *  Hoje quem abre Pipelines vê o checklist; é esse o valor de partida. */
+  const podeVerChecklist = usePortao("onb.cfg.checklists");
   const qc = useQueryClient();
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
@@ -511,7 +516,7 @@ export function PipelinesPanel({ phaseId }: Props) {
   const selectedStage = stages.find((s) => s.id === selectedStageId) ?? null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] gap-4 h-full min-h-0">
+    <div className={`grid grid-cols-1 gap-4 h-full min-h-0 ${podeVerChecklist ? "lg:grid-cols-[280px_1fr_320px]" : "lg:grid-cols-[280px_1fr]"}`}>
       {/* Coluna 1: Pipelines */}
       <div className="flex flex-col border border-border rounded-lg bg-card/50 min-h-0">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
@@ -616,6 +621,7 @@ export function PipelinesPanel({ phaseId }: Props) {
       </div>
 
       {/* Coluna 3: Checklist */}
+      {podeVerChecklist && (
       <div className="flex flex-col border border-border rounded-lg bg-card/50 min-h-0">
         <div className="px-3 py-2 border-b border-border">
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Checklist</span>
@@ -645,6 +651,7 @@ export function PipelinesPanel({ phaseId }: Props) {
           )}
         </div>
       </div>
+      )}
 
       {/* Diálogos */}
       <PipelineDialog

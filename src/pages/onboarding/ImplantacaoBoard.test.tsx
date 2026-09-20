@@ -10,6 +10,13 @@ import ImplantacaoBoard, { type TrainingCardRow } from "./ImplantacaoBoard";
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: vi.fn() } }));
+// O portão do RBAC lê o perfil, que não existe fora do AuthProvider. O mock
+// devolve a REGRA DE HOJE (o 2º argumento) — que é como o portão se comporta
+// numa empresa sem o sistema de permissões ligado. Devolver `true` cego
+// esconderia uma regressão de portão fechado indevidamente.
+vi.mock("@/hooks/usePortao", () => ({
+  usePortao: (_chave: string, regraDeHoje: boolean = true) => regraDeHoje,
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));

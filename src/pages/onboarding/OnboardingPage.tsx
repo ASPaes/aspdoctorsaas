@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -141,6 +142,10 @@ export default function OnboardingPage() {
   const { effectiveTenantId } = useTenantFilter();
   const { selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
   const { canAccess, isLoading: accessLoading } = useOnboardingAccess();
+  // Hoje o quadro é livre para quem abre o módulo: arrastar cartão e criar
+  // jornada não pedem papel nenhum. Os portões nascem com essa regra.
+  const podeMover = usePortao("onb.mover");
+  const podeCriarJornada = usePortao("onb.criar_jornada");
   const queryClient = useQueryClient();
   // Quadro vivo: ação de qualquer usuário (mover etapa, criar jornada, trocar
   // responsável) reaparece aqui em ~1s, sem F5.
@@ -911,7 +916,7 @@ export default function OnboardingPage() {
               Configurar
             </Link>
           </Button>
-          {isAcompanhamento ? (
+          {podeCriarJornada && (isAcompanhamento ? (
             <Button size="sm" onClick={() => setNewAcompOpen(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Novo acompanhamento
@@ -921,7 +926,7 @@ export default function OnboardingPage() {
               <Plus className="h-4 w-4 mr-1" />
               Nova jornada
             </Button>
-          )}
+          ))}
         </div>
       </div>
 
@@ -1165,7 +1170,7 @@ export default function OnboardingPage() {
                         return (
                           <div
                             key={j.journey_id}
-                            draggable={!parado && !concluida && !cancelada}
+                            draggable={podeMover && !parado && !concluida && !cancelada}
                             onDragStart={(e) => {
                               e.dataTransfer.setData("journeyId", j.journey_id);
                               e.dataTransfer.setData("fromStageId", j.current_stage_id ?? "");

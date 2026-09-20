@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
+import { usePortao } from "@/hooks/usePortao";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,12 +35,46 @@ export default function OnboardingConfigPage() {
   }, [phases, phaseId]);
   const [aiOpen, setAiOpen] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
-  const canGenerateAI = profile?.role === "admin" || profile?.is_super_admin === true;
+  const ehAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
+  /** "Usar template" e "Gerar com IA" são as duas portas do mesmo poder — montar
+   *  a operação de uma vez. Hoje as duas são só de administrador, e continuam
+   *  respondendo pela mesma chave. */
+  const canGenerateAI = usePortao("onb.cfg.templates", ehAdmin);
+
+  /** As 10 abas. Hoje nenhuma tem restrição de papel: quem abre a tela vê todas,
+   *  e é esse o valor com que cada portão nasce. */
+  const podeAba = {
+    jornadas: usePortao("onb.cfg.jornadas"),
+    pipelines: usePortao("onb.cfg.pipelines"),
+    distribuicao: usePortao("onb.cfg.distribuicao"),
+    motivos: usePortao("onb.cfg.motivos"),
+    demandas: usePortao("onb.cfg.demandas"),
+    treinos: usePortao("onb.cfg.tipos_treino"),
+    papeis: usePortao("onb.cfg.papeis"),
+    retornos: usePortao("onb.cfg.retornos"),
+    contabilidade: usePortao("onb.cfg.contabilidade"),
+    indicadores: usePortao("onb.cfg.indicadores"),
+  } as const;
+
+  /** Se a aba aberta for negada ao grupo, cair na primeira liberada — senão a
+   *  tela abriria com a barra de abas e o corpo vazio. A dependência é a
+   *  assinatura das abas (string), não o objeto, que nasce novo a cada render. */
+  const ordemAbas = Object.keys(podeAba) as (keyof typeof podeAba)[];
+  const assinaturaAbas = ordemAbas.map((k) => (podeAba[k] ? "1" : "0")).join("");
+  useEffect(() => {
+    if (podeAba[tab]) return;
+    const primeira = ordemAbas.find((k) => podeAba[k]);
+    if (primeira) setTab(primeira);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assinaturaAbas, tab]);
 
 
 
 
 
+
+  /** Grupo sem nenhuma aba liberada veria a tela vazia. Diz o motivo. */
+  const nenhumaAba = !ordemAbas.some((k) => podeAba[k]);
 
   if (profileLoading || accessLoading) {
     return (
@@ -51,6 +86,10 @@ export default function OnboardingConfigPage() {
 
   if (!canAccess) {
     return <div className="p-6 text-sm text-muted-foreground">Acesso não liberado a este módulo.</div>;
+  }
+
+  if (nenhumaAba) {
+    return <div className="p-6 text-sm text-muted-foreground">Seu grupo não tem acesso a nenhuma aba da configuração de Implantação.</div>;
   }
 
   return (
@@ -93,48 +132,68 @@ export default function OnboardingConfigPage() {
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
         <TabsList className="mx-4 mt-3 self-start">
-          <TabsTrigger value="jornadas">Jornadas</TabsTrigger>
-          <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>
-          <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>
-          <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>
-          <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>
-          <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>
-          <TabsTrigger value="papeis">Papéis</TabsTrigger>
-          <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>
-          <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>
-          <TabsTrigger value="indicadores">Indicadores</TabsTrigger>
+          {podeAba.jornadas && <TabsTrigger value="jornadas">Jornadas</TabsTrigger>}
+          {podeAba.pipelines && <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>}
+          {podeAba.distribuicao && <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>}
+          {podeAba.motivos && <TabsTrigger value="motivos">Motivos de Parada</TabsTrigger>}
+          {podeAba.demandas && <TabsTrigger value="demandas">Tipos de demanda</TabsTrigger>}
+          {podeAba.treinos && <TabsTrigger value="treinos">Tipos de treino</TabsTrigger>}
+          {podeAba.papeis && <TabsTrigger value="papeis">Papéis</TabsTrigger>}
+          {podeAba.retornos && <TabsTrigger value="retornos">Retorno ao vendedor</TabsTrigger>}
+          {podeAba.contabilidade && <TabsTrigger value="contabilidade">Dados da contabilidade</TabsTrigger>}
+          {podeAba.indicadores && <TabsTrigger value="indicadores">Indicadores</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="jornadas" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
-          <PhasesPanel />
-        </TabsContent>
-        <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
-          <PipelinesPanel phaseId={phaseId} />
-        </TabsContent>
-        <TabsContent value="distribuicao" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
-          <DistribuicaoPanel />
-        </TabsContent>
-        <TabsContent value="motivos" className="flex-1 min-h-0 p-4 pt-3">
-          <PauseReasonsPanel />
-        </TabsContent>
-        <TabsContent value="demandas" className="flex-1 min-h-0 p-4 pt-3">
-          <DemandTypesPanel />
-        </TabsContent>
-        <TabsContent value="treinos" className="flex-1 min-h-0 p-4 pt-3">
-          <TrainingTypesPanel />
-        </TabsContent>
-        <TabsContent value="papeis" className="flex-1 min-h-0 p-4 pt-3">
-          <ParticipantRolesPanel />
-        </TabsContent>
-        <TabsContent value="retornos" className="flex-1 min-h-0 p-4 pt-3">
-          <VendorReturnReasonsPanel />
-        </TabsContent>
-        <TabsContent value="contabilidade" className="flex-1 min-h-0 p-4 pt-3">
-          <AccountingFieldsPanel />
-        </TabsContent>
-        <TabsContent value="indicadores" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
-          <IndicatorsPanel />
-        </TabsContent>
+        {podeAba.jornadas && (
+          <TabsContent value="jornadas" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
+            <PhasesPanel />
+          </TabsContent>
+        )}
+        {podeAba.pipelines && (
+          <TabsContent value="pipelines" className="flex-1 min-h-0 p-4 pt-3">
+            <PipelinesPanel phaseId={phaseId} />
+          </TabsContent>
+        )}
+        {podeAba.distribuicao && (
+          <TabsContent value="distribuicao" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
+            <DistribuicaoPanel />
+          </TabsContent>
+        )}
+        {podeAba.motivos && (
+          <TabsContent value="motivos" className="flex-1 min-h-0 p-4 pt-3">
+            <PauseReasonsPanel />
+          </TabsContent>
+        )}
+        {podeAba.demandas && (
+          <TabsContent value="demandas" className="flex-1 min-h-0 p-4 pt-3">
+            <DemandTypesPanel />
+          </TabsContent>
+        )}
+        {podeAba.treinos && (
+          <TabsContent value="treinos" className="flex-1 min-h-0 p-4 pt-3">
+            <TrainingTypesPanel />
+          </TabsContent>
+        )}
+        {podeAba.papeis && (
+          <TabsContent value="papeis" className="flex-1 min-h-0 p-4 pt-3">
+            <ParticipantRolesPanel />
+          </TabsContent>
+        )}
+        {podeAba.retornos && (
+          <TabsContent value="retornos" className="flex-1 min-h-0 p-4 pt-3">
+            <VendorReturnReasonsPanel />
+          </TabsContent>
+        )}
+        {podeAba.contabilidade && (
+          <TabsContent value="contabilidade" className="flex-1 min-h-0 p-4 pt-3">
+            <AccountingFieldsPanel />
+          </TabsContent>
+        )}
+        {podeAba.indicadores && (
+          <TabsContent value="indicadores" className="flex-1 min-h-0 overflow-y-auto p-4 pt-3">
+            <IndicatorsPanel />
+          </TabsContent>
+        )}
 
 
 

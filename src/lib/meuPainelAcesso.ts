@@ -31,9 +31,21 @@ export interface AcessoInput {
 /** Regra única de acesso ao módulo. Isolada aqui para o teste conseguir
  *  cobrir as combinações sem montar React. */
 export function podeVerMeuPainel({ tenantId, role, isSuperAdmin }: AcessoInput): boolean {
-  const papelOk = isSuperAdmin || PAPEIS_LIBERADOS.includes(role as "admin" | "head");
-  if (!papelOk) return false;
+  return papelPadraoDoMeuPainel({ role, isSuperAdmin }) && empresaNoPiloto(tenantId);
+}
 
+/** O papel que HOJE abre o painel. Separado porque o RBAC substitui esta
+ *  parte da regra (o grupo passa a decidir), enquanto o piloto por empresa
+ *  continua valendo em série — permissão não libera módulo não entregue. */
+export function papelPadraoDoMeuPainel({
+  role,
+  isSuperAdmin,
+}: Omit<AcessoInput, "tenantId">): boolean {
+  return isSuperAdmin || PAPEIS_LIBERADOS.includes(role as "admin" | "head");
+}
+
+/** A empresa recebeu o módulo? */
+export function empresaNoPiloto(tenantId: string | null): boolean {
   if (TENANTS_LIBERADOS === null) return true;
 
   /** Super admin em "Todos os tenants" (tenantId null) fica de fora: o painel

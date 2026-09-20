@@ -1,4 +1,5 @@
 import { useMemo, useState, type DragEvent } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
@@ -278,6 +279,9 @@ export default function ImplantacaoBoard({
   agrupado, onOpenJourney,
 }: Props) {
   const queryClient = useQueryClient();
+  // Quadro de treinos: hoje qualquer um arrasta. O portão é o mesmo do kanban
+  // de jornadas, porque para quem usa é o mesmo gesto.
+  const podeMover = usePortao("onb.mover");
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -519,7 +523,7 @@ export default function ImplantacaoBoard({
                         etapaFinalId={etapaFinalId}
                         draggingId={draggingId}
                         onOpen={() => onOpenJourney(g.journeyId)}
-                        onDragStartFilho={(e, f) => {
+                        onDragStartFilho={!podeMover ? undefined : (e, f) => {
                           e.dataTransfer.setData("trainingId", f.training_id);
                           e.dataTransfer.setData("fromStageId", f.current_stage_id ?? "");
                           setDraggingId(f.training_id);
@@ -541,7 +545,7 @@ export default function ImplantacaoBoard({
                       return (
                         <div
                           key={t.training_id}
-                          draggable
+                          draggable={podeMover}
                           onDragStart={(e) => {
                             e.dataTransfer.setData("trainingId", t.training_id);
                             e.dataTransfer.setData("fromStageId", t.current_stage_id ?? "");

@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, lazy, Suspense } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import PropostaVendaSection, { useTemProposta } from "./PropostaVendaSection";
@@ -1273,7 +1274,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
       .sort((a, b) => a.order - b.order);
   }, [journeyChecklistAllQ.data, stages]);
 
-  const canScheduleTraining = useMemo(() => {
+  const regraDeDadoDoTreino = useMemo(() => {
     if (!journey) return false;
     if (journey.situacao === "concluido") return false;
     // Na primeira jornada só depois da etapa final; nas seguintes, a qualquer momento.
@@ -1337,8 +1338,26 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   // de modo que ninguém conseguia encerrar uma jornada.
   // O Acompanhamento segue como estava (só admin): ninguém reclamou dele e liberar
   // por tabela mudaria comportamento que não foi decidido.
-  const canGoLive =
-    ((faseSlug === "implantacao" || faseSlug === "onboarding") && etapaFinal) || isAdmin;
+  // Go-live tem duas portas e elas NÃO se misturam: a saída normal (estar na
+  // etapa final) continua livre, senão o time de onboarding — que é todo head —
+  // perderia o encerramento de novo (DEM-0269). O que a permissão governa é o
+  // ATALHO: encerrar fora da etapa final ou no Acompanhamento, hoje só de admin.
+  const saidaNormal = (faseSlug === "implantacao" || faseSlug === "onboarding") && etapaFinal;
+  const podeEncerrarForaDaEtapa = usePortao("onb.golive", isAdmin);
+  const canGoLive = saidaNormal || podeEncerrarForaDaEtapa;
+
+  // Os demais portões da ficha. A regra de hoje de cada um vai no 2º argumento:
+  // "Editar" já é só de admin; os outros são livres para quem abre a jornada.
+  const podeEditarJornada = usePortao("onb.editar_jornada", isAdmin);
+  const podeCancelarJornada = usePortao("onb.cancelar");
+  const podeReabrirJornada = usePortao("onb.reabrir");
+  const podeTransferir = usePortao("onb.transferir");
+  const podeTreinos = usePortao("onb.treinos");
+  // "Avançar" é a segunda porta do arrasto entre etapas: mesma chave.
+  const podeMover = usePortao("onb.mover");
+
+  // Agendar treino = regra de dado (etapa/situação) E permissão, nessa ordem.
+  const canScheduleTraining = regraDeDadoDoTreino && podeTreinos;
 
   // Ao agendar na fase de onboarding, o usuário escolhe concluir (→ implantação) ou manter.
   const isOnbPhase = faseSlug === "onboarding";
@@ -2362,7 +2381,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Correção de cadastro: só admin, e só enquanto a jornada está aberta. */}
-                  {isAdmin && !isTerminal && (
+                  {podeEditarJornada && !isTerminal && (
                     <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditInfoOpen(true)}>
                       <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                     </Button>
@@ -2431,18 +2450,22 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                       <span className="text-[11px] text-muted-foreground">
                         {isCancelled ? "Cancelada" : "Concluída"} em {formatDate(journey.concluido_em ?? null)}
                       </span>
-                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReopen}>
-                        <Play className="h-3.5 w-3.5 mr-1" /> Reabrir
-                      </Button>
+                      {podeReabrirJornada && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleReopen}>
+                          <Play className="h-3.5 w-3.5 mr-1" /> Reabrir
+                        </Button>
+                      )}
                     </>
                   ) : isPaused ? (
                     <>
                       <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleResume}>
                         <Play className="h-3.5 w-3.5 mr-1" /> Retomar
                       </Button>
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
-                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
-                      </Button>
+                      {podeCancelarJornada && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                          <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
+                        </Button>
+                      )}
                       {canGoLive && (
                         <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={handleGoLiveClick}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
@@ -2476,9 +2499,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <Button size="sm" className="w-full" onClick={handlePause}>Confirmar pausa</Button>
                         </PopoverContent>
                       </Popover>
-                      <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
-                        <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
-                      </Button>
+                      {podeCancelarJornada && (
+                        <Button size="sm" variant="outline" className="h-8 text-xs border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setCancelOpen(true)}>
+                          <Ban className="h-3.5 w-3.5 mr-1" /> Cancelar jornada
+                        </Button>
+                      )}
                       {canGoLive && (
                         <Button size="sm" className="h-8 text-xs text-white border-0" style={{ background: "#22C55E" }} onClick={handleGoLiveClick}>
                           <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Go-live
@@ -2741,7 +2766,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                 ))}
                             </SelectContent>
                           </Select>
-                          <Button size="sm" onClick={handleAdvance} disabled={isPaused || isConcluded}>
+                          <Button size="sm" onClick={handleAdvance} disabled={!podeMover || isPaused || isConcluded}>
                             Avançar <ArrowRight className="h-3.5 w-3.5 ml-1" />
                           </Button>
                         </div>
@@ -3161,14 +3186,16 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                           <Users className="h-4 w-4" /> Responsável & participantes
                         </h3>
                         <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-7 text-xs"
-                          onClick={() => setTransferOpen(true)}
-                        >
-                          <ArrowRight className="h-3.5 w-3.5 mr-1" /> Transferir
-                        </Button>
+                        {podeTransferir && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => setTransferOpen(true)}
+                          >
+                            <ArrowRight className="h-3.5 w-3.5 mr-1" /> Transferir
+                          </Button>
+                        )}
                         <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
                           <PopoverTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 text-xs">
@@ -3207,9 +3234,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                         {!journey?.responsavel_user_id && (
                           <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border px-2.5 py-2">
                             <span className="text-xs text-muted-foreground">Sem responsável definido.</span>
-                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTransferOpen(true)}>
-                              Definir responsável
-                            </Button>
+                            {podeTransferir && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setTransferOpen(true)}>
+                                Definir responsável
+                              </Button>
+                            )}
                           </div>
                         )}
                         {(participantsQ.data ?? []).length === 0 ? (

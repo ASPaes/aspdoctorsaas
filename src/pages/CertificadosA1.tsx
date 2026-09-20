@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,6 +49,9 @@ const statusBadgeClasses: Record<string, string> = {
 const formatBRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function CertificadosA1() {
+  // Hoje a aba Dashboard aparece para quem abre Certificados A1.
+  const podeVerDashboard = usePortao("certificados.dashboard");
+
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const lookups = useLookups();
@@ -261,12 +265,14 @@ export default function CertificadosA1() {
       <Tabs defaultValue="lista">
         <TabsList>
           <TabsTrigger value="lista">Lista</TabsTrigger>
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          {podeVerDashboard && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
         </TabsList>
 
-        <TabsContent value="dashboard" className="mt-4">
-          <CertA1Dashboard />
-        </TabsContent>
+        {podeVerDashboard && (
+          <TabsContent value="dashboard" className="mt-4">
+            <CertA1Dashboard />
+          </TabsContent>
+        )}
 
         <TabsContent value="lista" className="mt-4 space-y-4">
 

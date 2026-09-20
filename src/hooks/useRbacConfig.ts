@@ -56,18 +56,8 @@ export interface RbacConfig {
  */
 export const RECURSOS_SEM_PORTAO = new Set<string>([
   "clientes.oem_aprovacao", "super_monitor", "cfg.whatsapp",
-  "nav.onboarding", "nav.super", "dash.meu_painel",
-  "dash.valores_financeiros", "clientes.financeiro", "fin.bridge",
-  "atend.macros", "onb.mover", "onb.criar_jornada",
-  "onb.editar_jornada", "onb.golive", "onb.cancelar",
-  "onb.reabrir", "onb.transferir", "onb.treinos",
-  "onb.dashboard", "onb.cfg.pipelines", "onb.cfg.checklists",
-  "onb.cfg.papeis", "onb.cfg.distribuicao", "onb.cfg.motivos",
-  "onb.cfg.templates", "usuarios.desativar", "usuarios.auditoria",
-  "super.tenants", "super.templates", "super.limpeza_uras",
-  "onb.cfg.jornadas", "onb.cfg.demandas", "onb.cfg.tipos_treino",
-  "onb.cfg.retornos", "onb.cfg.contabilidade", "onb.cfg.indicadores",
-  "certificados.dashboard",
+  "nav.super", "dash.valores_financeiros", "super.tenants",
+  "super.templates", "super.limpeza_uras",
 ]);
 /** Quais ações a tela mostra em cada nível de controle. */
 export const ACOES_POR_NIVEL: Record<Nivel, Acao[]> = {

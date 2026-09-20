@@ -18,6 +18,7 @@ import { useCrescimentoExtras } from '../hooks/useCrescimentoExtras';
 import { computeDiagnostico, type DiagnosticoInput } from '@/lib/diagnostico';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePortao } from '@/hooks/usePortao';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 
 import type { KPIMetrics, TimeSeriesData, DashboardFilters } from '../types';
@@ -70,6 +71,10 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
   const { effectiveTenantId } = useTenantFilter();
   const isAdmin = profile?.role === 'admin' || profile?.is_super_admin === true;
   const isAdminOrHead = isAdmin || profile?.role === 'head';
+
+  // A ponte (waterfall) abre o quanto cada movimento pesou no MRR. Hoje quem
+  // chega no Dashboard vê; o portão nasce com essa mesma regra.
+  const podeVerPonte = usePortao('fin.bridge');
 
   const { data: ueData } = useUnitEconomicsSeries(filters);
   const { data: extras } = useCrescimentoExtras({ filters, metrics, unitEconomics: ueData, mcData });
@@ -284,7 +289,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
         />
 
         {/* Breakdown waterfall (full width) */}
-        <NetNewMrrStackedChart
+        {podeVerPonte && <NetNewMrrStackedChart
           newMrr={bdNew}
           upsellMrr={bdUpsell}
           crossSellMrr={bdCross}
@@ -295,7 +300,7 @@ export function CrescimentoTab({ metrics, timeSeries, tvMode, mcData, filters }:
           netNewMrr={netNew}
           historico={extras?.netNewHistorico}
           tvMode={tvMode}
-        />
+        />}
 
         {/* 5 cards de qualidade do growth + Reativações */}
         <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5'}`}>
