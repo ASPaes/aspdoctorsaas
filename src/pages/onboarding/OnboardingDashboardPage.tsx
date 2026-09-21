@@ -102,6 +102,8 @@ export default function OnboardingDashboardPage() {
     to: endOfMonth(new Date()),
   });
   const [desistenciasAbertas, setDesistenciasAbertas] = useState(false);
+  /** Drill-down da tabela por tipo: cada número abre a lista de sessões que ele conta. */
+  const [drillTreinos, setDrillTreinos] = useState<{ titulo: string; regra: string; linhas: TrainingRow[] } | null>(null);
 
   const journeysQ = useQuery({
     queryKey: ["onboarding-dash-journeys", effectiveTenantId, viewKey],
@@ -433,23 +435,50 @@ export default function OnboardingDashboardPage() {
       .sort((a, b) => b.total - a.total);
   }, [trainings, names]);
 
-  // Tabela por tipo de treino
+  // Tabela por tipo de treino. Guarda as SESSÕES, não só o contador: cada número da
+  // tabela abre a lista do que ele conta.
+  //
+  // "Em aberto" (ex-"Previstos") não é o total planejado — é o que ainda não teve
+  // desfecho. A conta que fecha é `emAberto + realizados + desistências + cancelados
+  // = total`, e por isso a coluna Total existe. As FALTAS ficam fora dessa soma: o
+  // contador sobe a cada remarcação, então a mesma sessão aparece várias vezes ali e
+  // pode ainda acabar realizada — em set/26 foram 37 faltas em 32 sessões do Segundo
+  // Treinamento, 2 delas realizadas depois.
   const byTipo = useMemo(() => {
-    const m: Record<string, { nome: string; previstos: number; realizados: number; no_show: number; desistencias: number; cancelados: number }> = {};
+    type Balde = {
+      nome: string;
+      emAberto: TrainingRow[];
+      realizados: TrainingRow[];
+      desistencias: TrainingRow[];
+      cancelados: TrainingRow[];
+      /** Sessões que registraram ao menos uma falta — o número exibido é a soma delas. */
+      comFalta: TrainingRow[];
+      faltas: number;
+    };
+    const m: Record<string, Balde> = {};
     trainings.forEach((t) => {
       const key = t.training_type_id || "__sem__";
       const nome = t.tipo_nome || "Sem tipo";
-      if (!m[key]) m[key] = { nome, previstos: 0, realizados: 0, no_show: 0, desistencias: 0, cancelados: 0 };
+      if (!m[key]) m[key] = { nome, emAberto: [], realizados: [], desistencias: [], cancelados: [], comFalta: [], faltas: 0 };
       switch (desfechoTreino(t.status)) {
-        case "em_aberto": m[key].previstos += 1; break;
-        case "realizado": m[key].realizados += 1; break;
-        case "no_show": m[key].previstos += 1; break; // desfecho residual: segue em aberto
-        case "desistencia": m[key].desistencias += 1; break;
-        case "cancelado": m[key].cancelados += 1; break;
+        case "em_aberto": m[key].emAberto.push(t); break;
+        case "realizado": m[key].realizados.push(t); break;
+        case "no_show": m[key].emAberto.push(t); break; // desfecho residual: segue em aberto
+        case "desistencia": m[key].desistencias.push(t); break;
+        case "cancelado": m[key].cancelados.push(t); break;
       }
-      m[key].no_show += faltasDe(t);
+      const f = faltasDe(t);
+      if (f > 0) {
+        m[key].comFalta.push(t);
+        m[key].faltas += f;
+      }
     });
-    return Object.values(m).sort((a, b) => (b.realizados + b.previstos) - (a.realizados + a.previstos));
+    return Object.values(m)
+      .map((b) => ({
+        ...b,
+        total: b.emAberto.length + b.realizados.length + b.desistencias.length + b.cancelados.length,
+      }))
+      .sort((a, b) => b.total - a.total);
   }, [trainings]);
 
 
@@ -659,28 +688,48 @@ export default function OnboardingDashboardPage() {
                   <thead className="bg-muted/30 text-muted-foreground">
                     <tr className="text-left">
                       <th className="px-3 py-2 font-medium">Tipo</th>
-                      <th className="px-3 py-2 font-medium text-right">Previstos</th>
+                      <th className="px-3 py-2 font-medium text-right">Em aberto</th>
                       <th className="px-3 py-2 font-medium text-right">Realizados</th>
-                      <th className="px-3 py-2 font-medium text-right">No-show</th>
                       <th className="px-3 py-2 font-medium text-right">Desistência</th>
                       <th className="px-3 py-2 font-medium text-right">Cancelados</th>
+                      <th className="px-3 py-2 font-medium text-right text-foreground">Total</th>
+                      <th className="px-3 py-2 font-medium text-right">Faltas</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {byTipo.map((row) => (
-                      <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
-                        <td className="px-3 py-2 font-medium">{row.nome}</td>
-                        <td className="px-3 py-2 text-right">{row.previstos}</td>
-                        <td className="px-3 py-2 text-right text-[hsl(142_71%_45%)] font-medium">{row.realizados}</td>
-                        <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
-                          {row.no_show}
+                    {byTipo.map((row) => {
+                      const cel = (linhas: TrainingRow[], valor: number, classe: string, rotulo: string, regra: string) => (
+                        <td className={`px-3 py-2 text-right ${classe}`}>
+                          {linhas.length === 0 ? (
+                            valor
+                          ) : (
+                            <button
+                              type="button"
+                              className="cursor-pointer hover:underline underline-offset-2"
+                              onClick={() => setDrillTreinos({ titulo: `${row.nome} · ${rotulo}`, regra, linhas })}
+                            >
+                              {valor}
+                            </button>
+                          )}
                         </td>
-                        <td className={`px-3 py-2 text-right ${row.desistencias > 0 ? "text-[hsl(25_95%_53%)] font-medium" : ""}`}>
-                          {row.desistencias}
-                        </td>
-                        <td className="px-3 py-2 text-right text-muted-foreground">{row.cancelados}</td>
-                      </tr>
-                    ))}
+                      );
+                      return (
+                        <tr key={row.nome} className="border-t border-border hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium">{row.nome}</td>
+                          {cel(row.emAberto, row.emAberto.length, "", "em aberto",
+                            "Sessões que ainda não tiveram desfecho — inclui as que estão esperando remarcação.")}
+                          {cel(row.realizados, row.realizados.length, "text-[hsl(142_71%_45%)] font-medium", "realizados",
+                            "Sessões concluídas no período.")}
+                          {cel(row.desistencias, row.desistencias.length, row.desistencias.length > 0 ? "text-[hsl(25_95%_53%)] font-medium" : "", "desistências",
+                            "O cliente recusou o treinamento e o sub-ticket foi encerrado.")}
+                          {cel(row.cancelados, row.cancelados.length, "text-muted-foreground", "cancelados",
+                            "Sessões canceladas — não contam como falta do cliente.")}
+                          <td className="px-3 py-2 text-right font-semibold">{row.total}</td>
+                          {cel(row.comFalta, row.faltas, row.faltas > 0 ? "text-destructive font-medium" : "", "faltas",
+                            `${row.faltas} ${row.faltas === 1 ? "falta" : "faltas"} em ${row.comFalta.length} ${row.comFalta.length === 1 ? "sessão" : "sessões"}. O contador sobe a cada remarcação, então a mesma sessão pode aparecer com mais de uma — e ainda acabar realizada.`)}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -944,6 +993,47 @@ export default function OnboardingDashboardPage() {
                 </div>
               ))
             )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Drill-down da tabela por tipo de treino. */}
+      <Sheet open={drillTreinos != null} onOpenChange={(o) => !o && setDrillTreinos(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="text-base">{drillTreinos?.titulo ?? ""}</SheetTitle>
+            <SheetDescription className="text-xs">{drillTreinos?.regra ?? ""}</SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-4 space-y-2">
+            {(drillTreinos?.linhas ?? []).map((t) => {
+              const quando = t.realizado_em || t.agendado_para || t.cancelado_em;
+              const faltas = faltasDe(t);
+              return (
+                <div key={t.id ?? `${t.journey_id}-${quando}`} className="rounded-md border border-border p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-xs font-medium">
+                      {t.journey_id ? nomes.cliente(t.journey_id) : "—"}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">
+                      {quando ? new Date(quando).toLocaleDateString("pt-BR") : "sem data"}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">{t.titulo || "Sem título"}</p>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    {t.conduzido_por ? (
+                      <>Conduzido por <span className="text-foreground">{names[t.conduzido_por] || "—"}</span></>
+                    ) : (
+                      "Sem condutor definido"
+                    )}
+                    {faltas > 0 && (
+                      <span className="text-destructive"> · {faltas} {faltas === 1 ? "falta" : "faltas"}</span>
+                    )}
+                    {t.is_retreinamento && <span> · retreinamento</span>}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </SheetContent>
       </Sheet>
