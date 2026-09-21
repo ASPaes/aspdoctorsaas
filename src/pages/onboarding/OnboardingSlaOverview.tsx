@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
@@ -257,7 +257,7 @@ function EmptyNote({ children }: { children: React.ReactNode }) {
 /* ---------- componente ---------- */
 
 export default function OnboardingSlaOverview({
-  journeys, tenantId, nomes, pipelineIds, responsavelIds, recorteResponsavel,
+  journeys, tenantId, nomes, pipelineIds, responsavelIds, recorteResponsavel, permanencia,
 }: {
   journeys: SlaJourneyRow[];
   tenantId: string | null;
@@ -267,6 +267,9 @@ export default function OnboardingSlaOverview({
   responsavelIds: string[];
   /** A janela medida é de alguém do filtro? Recorta a MEDIDA, como `pipelineSelecionado`. */
   recorteResponsavel: (journeyId: string, de: string | null | undefined, ate: string | null | undefined) => boolean;
+  /** Conteúdo da aba "Permanência". Vem pronto da página, que é quem tem os treinos e
+   *  os períodos de responsável. Ausente = a aba não aparece. */
+  permanencia?: ReactNode;
 }) {
   const [areaDim, setAreaDim] = useState<"demanda" | "setor">("demanda");
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
@@ -689,6 +692,7 @@ export default function OnboardingSlaOverview({
             <TabsTrigger value="area" className="gap-1.5">
               Por Área <span className="text-[10px] rounded-full bg-border px-1.5 leading-4">{areaAgg.length}</span>
             </TabsTrigger>
+            {permanencia && <TabsTrigger value="permanencia">Permanência</TabsTrigger>}
           </TabsList>
 
           {/* Pipeline */}
@@ -805,6 +809,9 @@ export default function OnboardingSlaOverview({
               </div>
             )}
           </TabsContent>
+
+          {/* Permanência */}
+          {permanencia && <TabsContent value="permanencia">{permanencia}</TabsContent>}
         </Tabs>
       </section>
 

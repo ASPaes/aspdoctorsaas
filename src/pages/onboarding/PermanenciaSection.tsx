@@ -115,14 +115,9 @@ export default function PermanenciaSection({
   return (
     <section>
       <div className="flex items-center justify-between gap-3 mb-2">
-        <div>
-          <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Permanência pós-implantação
-          </h2>
-          <p className="text-[11px] text-muted-foreground">
-            Quantos dos clientes entregues continuam na base. M6 é o marco de 180 dias.
-          </p>
-        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Quantos dos clientes entregues continuam na base. M6 é o marco de 180 dias.
+        </p>
         <div className="flex items-center gap-2">
           <Select value={tipoTreinoId} onValueChange={setTipoTreinoId}>
             <SelectTrigger className="w-[190px] h-8 text-xs"><SelectValue /></SelectTrigger>

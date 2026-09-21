@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 21/09
+
+- ⬆️ **A Permanência pós-implantação virou aba no Dashboard de Implantação** — Em **Implantação › Dashboard**, o bloco **Permanência pós-implantação** deixou de ficar solto no meio da página e passou a ser a aba **Permanência**, ao lado de **Por Pipeline**, **Por Etapa**, **Por Responsável** e **Por Área**. Dentro dela está tudo o que já estava: a matriz de M0 a M6, o **Quando saíram** e o **Implantador × permanência**, com os mesmos seletores de tipo de treino e de janela de meses. Como o quadro agora só é montado quando você abre a aba, o dashboard carrega mais leve para quem não usa esse indicador.
+
 ### 20/09
 
 - 🔧 **O Custo Hiper da Visão geral escondia o custo das contas sem cliente** — Em **Configurações › Integrações › Hiper › Visão geral**, o card **Custo Hiper** somava só as contas que já estão vinculadas a um cliente daqui, e por isso ficava abaixo do custo real que o portal da Hiper mostra conta a conta — na Liberty, R$ 8.250,90 contra R$ 9.239,05. O que faltava eram justamente as contas ativas **sem cliente aqui**: custo que você paga e não cobra de ninguém, que era o número mais importante de enxergar e o único que não aparecia. Agora o card soma **todas as contas ativas** e mostra a quebra embaixo — quanto vem das vinculadas e quanto vem das sem cliente, com a quantidade de cada. A tabela por tipo ganhou a linha vermelha **Sem cliente aqui** e a linha **Total ativas**. A **Margem bruta** continua saindo só das vinculadas, porque é onde existe mensalidade para comparar, e agora diz isso na legenda. Nas duas abas, **Visão geral** e **Custos**, a legenda deixou de dizer "último lote fechado": o valor mostrado é o que está vigente no cadastro do portal, e o extrato só entra quando o cadastro não traz custo.

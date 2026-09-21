@@ -502,6 +502,22 @@ export default function OnboardingDashboardPage() {
             pipelineIds={dashFilters.pipelineIds}
             responsavelIds={dashFilters.responsavelIds}
             recorteResponsavel={dashFilters.recorteResponsavel}
+            /* Permanência pós-implantação. Usa `ativas` pelo mesmo motivo do bloco
+               abaixo — a coorte é a data de CONCLUSÃO — e ignora o `dateRange` do topo
+               de propósito: a janela de coortes é escolhida dentro da própria seção.
+               Vive como ABA daqui: fora da aba ativa o Radix desmonta o nó, então a
+               query de cancelamentos só sai quando alguém abre a aba. */
+            permanencia={
+              <PermanenciaSection
+                journeys={ativas}
+                treinos={trainingsAllQ.data ?? []}
+                tenantId={effectiveTenantId}
+                nomes={nomes}
+                periodosResponsavel={dashFilters.periodosResponsavel}
+                nomePorUsuario={dashFilters.nomePorUsuario}
+                recorteResponsavelExato={dashFilters.recorteResponsavelExato}
+              />
+            }
           />
 
           {/* Tempo de entrega. Usa `ativas`, não `periodo`: a coorte destes cards é a
@@ -517,19 +533,6 @@ export default function OnboardingDashboardPage() {
             pipelineIds={dashFilters.pipelineIds}
             fasePorPipeline={dashFilters.fasePorPipeline}
             recorteResponsavel={dashFilters.recorteResponsavel}
-            recorteResponsavelExato={dashFilters.recorteResponsavelExato}
-          />
-
-          {/* Permanência pós-implantação. Usa `ativas` pelo mesmo motivo do bloco
-              acima — a coorte é a data de CONCLUSÃO — e ignora o `dateRange` do topo
-              de propósito: a janela de coortes é escolhida dentro da própria seção. */}
-          <PermanenciaSection
-            journeys={ativas}
-            treinos={trainingsAllQ.data ?? []}
-            tenantId={effectiveTenantId}
-            nomes={nomes}
-            periodosResponsavel={dashFilters.periodosResponsavel}
-            nomePorUsuario={dashFilters.nomePorUsuario}
             recorteResponsavelExato={dashFilters.recorteResponsavelExato}
           />
 
