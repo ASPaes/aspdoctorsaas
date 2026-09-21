@@ -1,4 +1,4 @@
-import { addMonths, differenceInCalendarDays, subMonths } from "date-fns";
+import { addMonths, differenceInCalendarDays, subDays, subMonths } from "date-fns";
 import { responsaveisNaJanela, type PeriodoResponsavel } from "./responsavelNaJanela";
 
 /**
@@ -15,6 +15,22 @@ import { responsaveisNaJanela, type PeriodoResponsavel } from "./responsavelNaJa
 
 /** Marcos em MESES desde a entrega. M6 é o marco de 180 dias que o tenant remunera. */
 export const MARCOS = [0, 1, 2, 3, 4, 5, 6] as const;
+
+/**
+ * Até quando as saídas contam para o marco `k`.
+ *
+ * M0 é o PRIMEIRO MÊS, não o instante da entrega. Enquanto foi "entrega + 0 meses" ele
+ * era 100% por construção — quem cancela antes da entrega já sai como cadastro
+ * inconsistente, e cancelar no mesmo dia não acontece. Uma turma de set/26 com um
+ * cliente perdido em 6 dias lia "M0 100%", verde, e o churn não aparecia em coluna
+ * nenhuma até M1 maturar, um mês depois. M0 agora fecha um dia ANTES de completar o
+ * primeiro mês, que é onde M1 começa a medir: a régua não se sobrepõe e a linha
+ * continua monotônica (M0 ≥ M1 ≥ … ≥ M6).
+ */
+export function limiteDoMarco(entrega: string, marco: number): string {
+  const umMes = addMonths(dataLocal(entrega), 1);
+  return marco === 0 ? diaIso(subDays(umMes, 1)) : diaIso(addMonths(dataLocal(entrega), marco));
+}
 
 export interface JourneyPermanencia {
   journey_id: string;
@@ -63,10 +79,16 @@ export interface Coorte {
   /** yyyy-MM */
   mes: string;
   tamanho: number;
-  /** Índice = marco em meses. % retido (0..100), ou null quando a coorte não chegou lá. */
+  /** Índice = marco em meses. % da coorte ainda na base naquele marco (0..100).
+   *  null SÓ quando o mês não teve entrega nenhuma — aí não há o que medir. */
   celulas: (number | null)[];
-  /** Índice = marco em meses. Quantos já haviam saído, ou null quando imaturo. */
+  /** Índice = marco em meses. Quantos já haviam saído até ali. */
   saidas: (number | null)[];
+  /** O calendário já alcançou este marco para a coorte INTEIRA? Quando `false` o número
+   *  é real mas provisório: ninguém pode ter saído num futuro que não chegou. */
+  maduros: boolean[];
+  /** yyyy-MM-dd em que o último cliente da coorte completa o marco. null em mês vazio. */
+  marcoEm: (string | null)[];
 }
 
 export interface EntradaPermanencia {
@@ -313,28 +335,48 @@ export function calcularPermanencia(e: EntradaPermanencia): ResultadoPermanencia
     porMes.set(c.coorte, lista);
   });
 
+  // A janela inteira vira linha, inclusive mês SEM entrega: "não entregamos nada em
+  // maio" é resposta, e o usuário que escolhe "últimos 6 meses" espera seis linhas.
+  const mesesDaJanela: string[] = [];
+  for (let i = e.mesesJanela - 1; i >= 0; i--) {
+    const d = new Date(e.hoje.getFullYear(), e.hoje.getMonth() - i, 1);
+    mesesDaJanela.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+
   const hojeIso = diaIso(e.hoje);
-  const coortes: Coorte[] = Array.from(porMes.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([mes, lista]) => {
-      const celulas: (number | null)[] = [];
-      const saidas: (number | null)[] = [];
-      for (const marco of MARCOS) {
-        // A coorte inteira só está madura quando a ÚLTIMA entrega dela alcançou o marco.
-        const madura = lista.every((c) => diaIso(addMonths(dataLocal(c.entrega), marco)) <= hojeIso);
-        if (!madura) {
-          celulas.push(null);
-          saidas.push(null);
-          continue;
-        }
-        const saiu = lista.filter(
-          (c) => c.saida != null && c.saida <= diaIso(addMonths(dataLocal(c.entrega), marco)),
-        ).length;
-        saidas.push(saiu);
-        celulas.push(Math.round(((lista.length - saiu) / lista.length) * 1000) / 10);
-      }
-      return { mes, tamanho: lista.length, celulas, saidas };
-    });
+  const coortes: Coorte[] = mesesDaJanela.map((mes) => {
+    const lista = porMes.get(mes) ?? [];
+    if (lista.length === 0) {
+      return {
+        mes,
+        tamanho: 0,
+        celulas: MARCOS.map(() => null),
+        saidas: MARCOS.map(() => null),
+        maduros: MARCOS.map(() => false),
+        marcoEm: MARCOS.map(() => null),
+      };
+    }
+    const celulas: (number | null)[] = [];
+    const saidas: (number | null)[] = [];
+    const maduros: boolean[] = [];
+    const marcoEm: (string | null)[] = [];
+    for (const marco of MARCOS) {
+      const datas = lista.map((c) => limiteDoMarco(c.entrega, marco));
+      // O marco da COORTE é a data em que o último cliente dela o alcança.
+      const ultima = datas.reduce((a, b) => (a > b ? a : b));
+      // Curva de sobrevivência: a saída derruba o marco em que ocorreu e TODOS os
+      // seguintes, e o denominador é fixo no tamanho da coorte. Sem entrega futura
+      // possível, marco não alcançado repete o último valor conhecido — é isso que
+      // faz a linha "só descer". Quem ainda não maturou vai marcado em `maduros`,
+      // para a tela poder separar "cumpriu 180 dias" de "está cumprindo".
+      const saiu = lista.filter((c, i) => c.saida != null && c.saida <= datas[i]).length;
+      saidas.push(saiu);
+      celulas.push(Math.round(((lista.length - saiu) / lista.length) * 1000) / 10);
+      maduros.push(ultima <= hojeIso);
+      marcoEm.push(ultima);
+    }
+    return { mes, tamanho: lista.length, celulas, saidas, maduros, marcoEm };
+  });
 
   return {
     clientes: naJanela,

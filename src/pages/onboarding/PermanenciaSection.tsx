@@ -6,14 +6,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle } from "lucide-react";
 import { getRetentionColor } from "@/components/dashboard/retentionColor";
 import PermanenciaDrilldown from "./PermanenciaDrilldown";
+import { differenceInCalendarDays } from "date-fns";
 import {
-  calcularPermanencia, MARCOS,
+  calcularPermanencia, MARCOS, dataLocal,
   type ClientePermanencia, type JourneyPermanencia, type TreinoPermanencia,
 } from "./permanencia";
 import type { JourneyNomes } from "./useJourneyNames";
 import type { PeriodoResponsavel } from "./responsavelNaJanela";
 
 const MES_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Dias corridos entre hoje e a data em que a coorte completa o marco. */
+const diasAte = (yyyyMmDd: string) =>
+  Math.max(0, differenceInCalendarDays(dataLocal(yyyyMmDd), new Date()));
 const rotuloMes = (yyyyMm: string) => {
   const [y, m] = yyyyMm.split("-");
   return `${MES_CURTO[Number(m) - 1]}/${y.slice(2)}`;
@@ -165,10 +170,11 @@ export default function PermanenciaSection({
               <thead>
                 <tr className="text-muted-foreground">
                   <th className="text-left font-medium pr-3">Entrega</th>
-                  <th className="text-right font-medium pr-3">Clientes</th>
+                  <th className="text-right font-medium pr-3">Clientes entregues</th>
                   {MARCOS.map((m) => (
                     <th key={m} className={`text-center font-medium ${m === 6 ? "text-foreground" : ""}`}>
                       M{m}
+                      {m === 0 && <span className="block text-[10px] font-normal">1º mês</span>}
                       {m === 6 && <span className="block text-[10px] font-normal">180 dias</span>}
                     </th>
                   ))}
@@ -183,28 +189,35 @@ export default function PermanenciaSection({
                       <td className="pr-3 text-right tabular-nums text-muted-foreground">{c.tamanho}</td>
                       {MARCOS.map((m) => {
                         const v = c.celulas[m];
+                        // Mês sem entrega: não há coorte, logo não há percentual.
                         if (v == null) {
                           return (
-                            <td
-                              key={m}
-                              className="text-center text-muted-foreground/50 rounded"
-                              title={`A turma de ${rotuloMes(c.mes)} ainda não chegou a M${m}.`}
-                            >
+                            <td key={m} className="text-center text-muted-foreground/40 rounded">
                               —
                             </td>
                           );
                         }
+                        const maduro = c.maduros[m];
+                        const faltam = maduro || !c.marcoEm[m]
+                          ? 0
+                          : diasAte(c.marcoEm[m] as string);
                         return (
                           <td
                             key={m}
-                            className={`text-center rounded py-1 cursor-pointer tabular-nums ${getRetentionColor(v)}`}
+                            className={`text-center rounded py-1 cursor-pointer tabular-nums ${
+                              maduro
+                                ? getRetentionColor(v)
+                                : "outline outline-1 outline-dashed outline-muted-foreground/40 -outline-offset-1 text-muted-foreground"
+                            }`}
+                            title={
+                              maduro
+                                ? undefined
+                                : `Ainda em curso: a turma de ${rotuloMes(c.mes)} só completa M${m} em ${faltam} ${faltam === 1 ? "dia" : "dias"}.`
+                            }
                             onClick={() =>
                               setDrill({
-                                titulo: `${rotuloMes(c.mes)} · M${m}`,
-                                regra:
-                                  m === 0
-                                    ? `${c.tamanho} clientes entregues em ${rotuloMes(c.mes)}; ${c.saidas[m]} já haviam saído no momento da entrega.`
-                                    : `${c.tamanho} clientes entregues em ${rotuloMes(c.mes)}; ${c.saidas[m]} já haviam saído ${m} ${m === 1 ? "mês" : "meses"} depois da própria entrega.`,
+                                titulo: `${rotuloMes(c.mes)} · M${m}${maduro ? "" : " (em curso)"}`,
+                                regra: `${c.tamanho} clientes entregues em ${rotuloMes(c.mes)}; ${c.saidas[m]} ${c.saidas[m] === 1 ? "saiu" : "saíram"} até ${m} ${m === 1 ? "mês" : "meses"} depois da própria entrega.${maduro ? "" : ` A turma só completa M${m} em ${faltam} ${faltam === 1 ? "dia" : "dias"} — até lá o número pode cair.`}`,
                                 linhas: daCoorte,
                               })
                             }
@@ -219,7 +232,16 @@ export default function PermanenciaSection({
               </tbody>
             </table>
             <p className="text-[11px] text-muted-foreground mt-2">
-              "—" é coorte que ainda não alcançou o marco — não é 100%.
+              A linha só desce: a saída derruba o marco em que aconteceu e todos os seguintes,
+              sempre sobre o total entregue no mês. Marco com{" "}
+              <span className="outline outline-1 outline-dashed outline-muted-foreground/40 rounded px-1">contorno</span>{" "}
+              é o que a turma ainda não completou — o número é real, mas ainda pode cair. "—" é mês sem entrega.
+            </p>
+            {/* Este aviso existe porque o número daqui não fecha com "Treinos realizados"
+                e nunca vai fechar: lá a unidade é a SESSÃO, e no período do topo. */}
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Cada linha conta CLIENTE com a implantação concluída, uma vez só — não sessão de
+              treino. A janela é a do seletor aqui de cima, não a do filtro de data do topo.
             </p>
             {/* A coluna "Clientes" é a mitigação do risco de coorte pequena (§10 do
                 spec): "1 de 1 saiu" e "50 de 50 saíram" leem 0% igual, e sem o `n`

@@ -72,14 +72,58 @@ describe("calcularPermanencia — entrada na coorte", () => {
 });
 
 describe("calcularPermanencia — matriz de retenção", () => {
-  it("célula imatura é null, nunca 100%", () => {
-    // Entrega há 24 dias: M0 está maduro, M1 em diante não.
+  it("marco que a turma ainda não completou traz o número real, marcado como imaturo", () => {
+    // Entrega há 24 dias: nenhum marco além de M0 foi alcançado pelo calendário.
     const r = calcularPermanencia(entrada([jc("j1", "c1", "2026-08-20")]));
     const coorte = r.coortes.find((c) => c.mes === "2026-08")!;
     expect(coorte.tamanho).toBe(1);
-    expect(coorte.celulas[0]).toBe(100);
-    expect(coorte.celulas[1]).toBeNull();
-    expect(coorte.celulas[6]).toBeNull();
+    expect(coorte.celulas[6]).toBe(100);
+    // M0 fecha um dia antes de completar 1 mês: 19/09, que ainda não chegou.
+    expect(coorte.maduros[0]).toBe(false);
+    expect(coorte.marcoEm[0]).toBe("2026-09-19");
+    expect(coorte.maduros[6]).toBe(false);
+    expect(coorte.marcoEm[6]).toBe("2027-02-20");
+  });
+
+  it("saída dentro do primeiro mês derruba M0 e TODOS os marcos seguintes", () => {
+    // O caso que motivou a régua: 11 entregues em set/26, um sai 6 dias depois.
+    const entregas = Array.from({ length: 11 }, (_, i) =>
+      jc(`j${i}`, `c${i}`, "2026-09-01"),
+    );
+    const r = calcularPermanencia(entrada(entregas, { c0: "2026-09-07" }));
+    const coorte = r.coortes.find((c) => c.mes === "2026-09")!;
+    expect(coorte.tamanho).toBe(11);
+    expect(coorte.celulas.every((v) => v === 90.9)).toBe(true);
+    expect(coorte.saidas[0]).toBe(1);
+    expect(coorte.saidas[6]).toBe(1);
+  });
+
+  it("saída depois do primeiro mês não derruba M0, só de M1 em diante", () => {
+    const r = calcularPermanencia(
+      entrada([jc("j1", "c1", "2026-01-10")], { c1: "2026-02-08" }), // 29 dias: ainda em M0
+    );
+    const jan = r.coortes.find((c) => c.mes === "2026-01")!;
+    expect(jan.celulas[0]).toBe(0);
+
+    const r2 = calcularPermanencia(
+      entrada([jc("j1", "c1", "2026-01-10")], { c1: "2026-02-10" }), // 31 dias: fora de M0
+    );
+    const jan2 = r2.coortes.find((c) => c.mes === "2026-01")!;
+    expect(jan2.celulas[0]).toBe(100);
+    expect(jan2.celulas[1]).toBe(0);
+  });
+
+  it("mês da janela sem nenhuma entrega vira linha vazia, não some da matriz", () => {
+    const r = calcularPermanencia({
+      ...entrada([jc("j1", "c1", "2026-09-01")]),
+      mesesJanela: 6 as const,
+    });
+    expect(r.coortes.map((c) => c.mes)).toEqual([
+      "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09",
+    ]);
+    const vazio = r.coortes.find((c) => c.mes === "2026-05")!;
+    expect(vazio.tamanho).toBe(0);
+    expect(vazio.celulas[0]).toBeNull();
   });
 
   it("saída em D+45 ainda está na base em M1 e some em M2", () => {
@@ -133,7 +177,9 @@ describe("calcularPermanencia — matriz de retenção", () => {
       ]),
       mesesJanela: 3 as const,
     });
-    expect(r.coortes.map((c) => c.mes)).toEqual(["2026-07", "2026-08"]);
+    // set/26 entra vazio: a janela é de meses, não das coortes que existem.
+    expect(r.coortes.map((c) => c.mes)).toEqual(["2026-07", "2026-08", "2026-09"]);
+    expect(r.coortes.find((c) => c.mes === "2025-01")).toBeUndefined();
   });
 });
 
