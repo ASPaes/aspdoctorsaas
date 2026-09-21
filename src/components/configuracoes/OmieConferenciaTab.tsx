@@ -151,6 +151,12 @@ function formatCNPJ(v?: string | null): string {
   return v;
 }
 
+function formatDataBR(iso: string | null | undefined): string {
+  if (!iso) return "data anterior";
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00");
+  return isNaN(d.getTime()) ? String(iso) : d.toLocaleDateString("pt-BR");
+}
+
 function formatBRL(v: number | string | null | undefined): string {
   if (v === null || v === undefined || v === "") return "—";
   const n = typeof v === "number" ? v : Number(v);
@@ -619,6 +625,17 @@ function CandidatosLinha({
   );
 }
 
+// O supabase-js lanca excecao em QUALQUER resposta nao-2xx e descarta o corpo: sobrava
+// "Edge Function returned a non-2xx status code" para toda trava desta tela. O motivo real, e o
+// `dispensavel` da data de ativacao, so existem no corpo.
+async function corpoDoErro(e: any): Promise<any | null> {
+  try {
+    return (await e?.context?.json?.()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | null | undefined }) {
   const [open, setOpen] = useState(false);
   const [confirmVincular, setConfirmVincular] = useState(false);
@@ -628,6 +645,14 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
   const [confirmEnviarOpen, setConfirmEnviarOpen] = useState(false);
   const [enviarLoading, setEnviarLoading] = useState(false);
   const [dryRun, setDryRun] = useState<any | null>(null);
+  // So a data de ativacao volta com `dispensavel: true` (e com as duas datas). As outras travas
+  // nao tem saida e nem deveriam ter: continuam saindo como toast.
+  const [bloqueio, setBloqueio] = useState<
+    { msg: string; data_do_contrato?: string | null; data_de_corte?: string | null } | null
+  >(null);
+  const [dispensaCiente, setDispensaCiente] = useState(false);
+  // A dispensa vale para as DUAS chamadas: sem guarda-la, o dry_run passaria e o criar seria barrado.
+  const [corteDispensado, setCorteDispensado] = useState(false);
   const queryClient = useQueryClient();
   const { contaBody } = useOmieConta();
   const bucket = row.acao_sugerida as Bucket;
@@ -770,12 +795,19 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     }
   }
 
-  async function handleEnviarOmieClick() {
+  async function handleEnviarOmieClick(dispensarCorte = false) {
     if (!tid || !row.ds_contract_id) return;
+    if (dispensarCorte) setCorteDispensado(true);
     setEnviarLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "dry_run" },
+        body: {
+          ...contaBody,
+          tenant_id: tid,
+          ds_contract_id: row.ds_contract_id,
+          modo: "dry_run",
+          ...(dispensarCorte || corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+        },
       });
       if (error) throw error;
       const res = data as any;
@@ -790,7 +822,19 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       }
       toast.error("Resposta inesperada do servidor");
     } catch (e: any) {
-      toast.error(e?.message || "Falha ao preparar envio");
+      const corpo = await corpoDoErro(e);
+      const msg = corpo?.error || e?.message || "Falha ao preparar envio";
+      // Unica trava com saida: contrato anterior a data de ativacao. As outras viram toast.
+      if (corpo?.dispensavel === true) {
+        setDispensaCiente(false);
+        setBloqueio({
+          msg,
+          data_do_contrato: corpo?.data_do_contrato ?? null,
+          data_de_corte: corpo?.data_de_corte ?? null,
+        });
+        return;
+      }
+      toast.error(msg);
     } finally {
       setEnviarLoading(false);
     }
@@ -801,7 +845,13 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
     setEnviarLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("recon-omie-escrever", {
-        body: { ...contaBody, tenant_id: tid, ds_contract_id: row.ds_contract_id, modo: "criar" },
+        body: {
+          ...contaBody,
+          tenant_id: tid,
+          ds_contract_id: row.ds_contract_id,
+          modo: "criar",
+          ...(corteDispensado ? { permitir_anterior_ao_corte: true } : {}),
+        },
       });
       if (error) throw error;
       const res = data as any;
@@ -830,7 +880,8 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
         toast.error(res?.error || res?.bloqueado || "Falha ao enviar ao Omie");
       }
     } catch (e: any) {
-      toast.error(e?.message || "Falha ao enviar ao Omie");
+      const corpo = await corpoDoErro(e);
+      toast.error(corpo?.error || e?.message || "Falha ao enviar ao Omie");
     } finally {
       setEnviarLoading(false);
     }
@@ -841,7 +892,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       size="sm"
       variant="outline"
       className="gap-1"
-      onClick={handleEnviarOmieClick}
+      onClick={() => handleEnviarOmieClick()}
       disabled={enviarLoading || !tid || !row.ds_contract_id}
     >
       <ArrowRight className="h-3 w-3" />
@@ -1239,6 +1290,51 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
             >
               {enviarLoading ? "Enviando..." : "Confirmar envio ao Omie"}
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={bloqueio != null} onOpenChange={(v) => { if (!v && !enviarLoading) setBloqueio(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Contrato anterior à data de ativação</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>{bloqueio?.msg}</p>
+                <div className="space-y-2 rounded border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5">
+                  <div className="text-xs text-amber-800 dark:text-amber-300">
+                    A data de ativação é uma regra desta casa, não uma limitação do Omie: ela existe para a
+                    integração não levar a base antiga junto quando é ligada. Contrato antigo que já está no
+                    Omie, ou lançado agora com data retroativa, é caso legítimo e pode ser enviado assim mesmo.
+                  </div>
+                  <label className="flex items-start gap-2 text-xs cursor-pointer text-amber-800 dark:text-amber-300">
+                    <Checkbox
+                      checked={dispensaCiente}
+                      onCheckedChange={(v) => setDispensaCiente(v === true)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Confirmo que este contrato deve ir ao Omie mesmo sendo de{" "}
+                      <strong>{formatDataBR(bloqueio?.data_do_contrato)}</strong>. A decisão fica registrada no
+                      histórico com meu nome.
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-amber-400 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+              disabled={!dispensaCiente || enviarLoading}
+              onClick={() => { setBloqueio(null); void handleEnviarOmieClick(true); }}
+            >
+              {enviarLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Enviar mesmo assim
+            </Button>
+            <AlertDialogAction disabled={enviarLoading}>Entendi</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
