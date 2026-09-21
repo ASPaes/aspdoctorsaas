@@ -25,6 +25,8 @@ export interface FiltroDash {
   responsavelIds: string[];
   participanteIds: string[];
   demandTypeIds: string[];
+  /** "a jornada TEVE treino deste tipo" — mesma régua de `pipelineIds`. */
+  tipoTreinoIds: string[];
 }
 
 export const FILTRO_VAZIO: FiltroDash = {
@@ -32,6 +34,7 @@ export const FILTRO_VAZIO: FiltroDash = {
   responsavelIds: [],
   participanteIds: [],
   demandTypeIds: [],
+  tipoTreinoIds: [],
 };
 
 export interface JourneyFiltravel {
@@ -45,7 +48,8 @@ export function filtroAtivo(f: FiltroDash): boolean {
     f.pipelineIds.length > 0 ||
     f.responsavelIds.length > 0 ||
     f.participanteIds.length > 0 ||
-    f.demandTypeIds.length > 0
+    f.demandTypeIds.length > 0 ||
+    f.tipoTreinoIds.length > 0
   );
 }
 
@@ -75,6 +79,7 @@ export function filtrarJornadas(
   pipelinesPorJornada: Record<string, string[]>,
   participantesPorJornada: Record<string, string[]>,
   responsaveisPorJornada: Record<string, string[]> = {},
+  tiposTreinoPorJornada: Record<string, string[]> = {},
 ): Set<string> {
   const out = new Set<string>();
   journeys.forEach((j) => {
@@ -82,6 +87,7 @@ export function filtrarJornadas(
     if (!bate(filtro.demandTypeIds, [j.demand_type_id])) return;
     if (!bate(filtro.pipelineIds, pipelinesPorJornada[j.journey_id] ?? [])) return;
     if (!bate(filtro.participanteIds, participantesPorJornada[j.journey_id] ?? [])) return;
+    if (!bate(filtro.tipoTreinoIds, tiposTreinoPorJornada[j.journey_id] ?? [])) return;
     out.add(j.journey_id);
   });
   return out;

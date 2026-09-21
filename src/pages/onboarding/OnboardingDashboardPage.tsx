@@ -188,7 +188,7 @@ export default function OnboardingDashboardPage() {
 
   const journeys = useMemo(() => journeysQ.data ?? [], [journeysQ.data]);
 
-  const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess);
+  const dashFilters = useOnboardingDashFilters(journeys, effectiveTenantId, canAccess, trainingsAllQ.data ?? []);
 
   /** Um mapa só de nomes para os dois blocos que abrem drill-down. */
   const nomes = useJourneyNames(journeys, dashFilters.periodosResponsavel, dashFilters.nomePorUsuario);
@@ -341,6 +341,7 @@ export default function OnboardingDashboardPage() {
   // Treinos no período: usa realizado_em quando existe, senão agendado_para.
   // A desistência não tem `realizado_em` e pode nem ter chegado a ser agendada — para
   // ela o que aconteceu no período foi o encerramento.
+  const tipoTreinoIds = dashFilters.tipoTreinoIds;
   const trainings = useMemo(() => {
     const from = dateRange.from.getTime();
     const to = dateRange.to.getTime() + 24 * 60 * 60 * 1000 - 1;
@@ -350,9 +351,16 @@ export default function OnboardingDashboardPage() {
         || t.agendado_para;
       if (!ref) return false;
       const d = new Date(ref).getTime();
-      return d >= from && d <= to && t.journey_id != null && allowedJourneyIds.has(t.journey_id);
+      if (d < from || d > to) return false;
+      if (t.journey_id == null || !allowedJourneyIds.has(t.journey_id)) return false;
+      // O filtro de tipo recorta a MEDIDA: escolher "Treinamento PDV" e continuar
+      // somando as sessões de Estoque da mesma jornada seria responder outra pergunta.
+      if (tipoTreinoIds.length > 0) {
+        return t.training_type_id != null && tipoTreinoIds.includes(t.training_type_id);
+      }
+      return true;
     });
-  }, [trainingsAllQ.data, dateRange, allowedJourneyIds]);
+  }, [trainingsAllQ.data, dateRange, allowedJourneyIds, tipoTreinoIds]);
 
   // Resolver nomes via profiles → funcionarios. Entra quem conduziu o treino e também
   // quem encerrou o sub-ticket: a lista de desistências mostra os dois.
@@ -513,6 +521,7 @@ export default function OnboardingDashboardPage() {
                 treinos={trainingsAllQ.data ?? []}
                 tenantId={effectiveTenantId}
                 nomes={nomes}
+                tipoTreinoIds={tipoTreinoIds}
                 periodosResponsavel={dashFilters.periodosResponsavel}
                 nomePorUsuario={dashFilters.nomePorUsuario}
                 recorteResponsavelExato={dashFilters.recorteResponsavelExato}

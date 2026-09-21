@@ -17,15 +17,33 @@ const participantesPorJornada: Record<string, string[]> = { j1: ["u1", "u9"], j2
 /** j2 está hoje com u2, mas quem fez o onboarding dela foi u7. */
 const responsaveisPorJornada: Record<string, string[]> = { j2: ["u7", "u2"] };
 
+/** j1 teve PDV e Estoque; j2 só PDV; j3 só Estoque; j4 nenhum treino. */
+const tiposTreinoPorJornada: Record<string, string[]> = { j1: ["tPdv", "tEst"], j2: ["tPdv"], j3: ["tEst"] };
+
 function filtrar(f: Partial<typeof FILTRO_VAZIO>, hist: Record<string, string[]> = {}) {
   return [
-    ...filtrarJornadas(jornadas, { ...FILTRO_VAZIO, ...f }, pipelinesPorJornada, participantesPorJornada, hist),
+    ...filtrarJornadas(
+      jornadas, { ...FILTRO_VAZIO, ...f }, pipelinesPorJornada, participantesPorJornada, hist,
+      tiposTreinoPorJornada,
+    ),
   ].sort();
 }
 
 describe("filtrarJornadas", () => {
   it("filtro vazio não restringe nada", () => {
     expect(filtrar({})).toEqual(["j1", "j2", "j3", "j4"]);
+  });
+
+  it("tipo de treino: entra a jornada que TEVE aquele treino, e jornada sem treino fica fora", () => {
+    expect(filtrar({ tipoTreinoIds: ["tPdv"] })).toEqual(["j1", "j2"]);
+    expect(filtrar({ tipoTreinoIds: ["tEst"] })).toEqual(["j1", "j3"]);
+    // Dentro da mesma dimensão é OU.
+    expect(filtrar({ tipoTreinoIds: ["tPdv", "tEst"] })).toEqual(["j1", "j2", "j3"]);
+  });
+
+  it("tipo de treino cruza com as outras dimensões por E", () => {
+    expect(filtrar({ tipoTreinoIds: ["tPdv"], demandTypeIds: ["d1"] })).toEqual(["j1", "j2"]);
+    expect(filtrar({ tipoTreinoIds: ["tEst"], demandTypeIds: ["d1"] })).toEqual(["j1"]);
   });
 
   it("dentro da mesma dimensão é OU", () => {
@@ -72,6 +90,8 @@ describe("filtroAtivo", () => {
   });
   it("é verdadeiro com qualquer dimensão preenchida", () => {
     expect(filtroAtivo({ ...FILTRO_VAZIO, pipelineIds: ["p1"] })).toBe(true);
+    // Sem esta linha, escolher só tipo de treino não acendia o botão "Limpar".
+    expect(filtroAtivo({ ...FILTRO_VAZIO, tipoTreinoIds: ["tPdv"] })).toBe(true);
   });
 });
 

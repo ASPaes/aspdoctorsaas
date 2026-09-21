@@ -29,7 +29,7 @@ function entrada(
     cancelamentoPorCliente,
     periodosResponsavel: {},
     treinos: [] as TreinoPermanencia[],
-    tipoTreinoId: null as string | null,
+    tipoTreinoIds: [] as string[],
     hoje: HOJE,
     mesesJanela: 12 as const,
   };
@@ -331,7 +331,7 @@ describe("calcularPermanencia — crédito pelo treino", () => {
         tr("t1", "j1", "condutor-pdv", "2026-01-08T13:00:00.000Z", "tipo-pdv"),
         tr("t2", "j2", "condutor-estoque", "2026-01-08T13:00:00.000Z", "tipo-estoque"),
       ],
-      tipoTreinoId: "tipo-pdv",
+      tipoTreinoIds: ["tipo-pdv"],
     });
     expect(r.clientes.map((c) => c.clienteId)).toEqual(["c1"]);
     expect(r.clientes[0].implantadorId).toBe("condutor-pdv");
@@ -344,7 +344,7 @@ describe("calcularPermanencia — crédito pelo treino", () => {
         tr("t1", "j1", "condutor-estoque", "2026-01-05T13:00:00.000Z", "tipo-estoque"),
         tr("t2", "j1", "condutor-pdv", "2026-01-09T13:00:00.000Z", "tipo-pdv"),
       ],
-      tipoTreinoId: "tipo-pdv",
+      tipoTreinoIds: ["tipo-pdv"],
     });
     expect(r.clientes[0].implantadorId).toBe("condutor-pdv");
   });

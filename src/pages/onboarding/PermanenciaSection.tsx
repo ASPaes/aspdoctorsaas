@@ -34,46 +34,25 @@ const rotuloMes = (yyyyMm: string) => {
  * porque `journeys` já chega recortado por eles.
  */
 export default function PermanenciaSection({
-  journeys, treinos, tenantId, nomes, periodosResponsavel, nomePorUsuario, recorteResponsavelExato,
+  journeys, treinos, tenantId, nomes, tipoTreinoIds, periodosResponsavel, nomePorUsuario,
+  recorteResponsavelExato,
 }: {
   journeys: JourneyPermanencia[];
   /** Já carregados pela página (`trainingsAllQ`). É deles que sai o implantador. */
   treinos: TreinoPermanencia[];
   tenantId: string | null;
   nomes: JourneyNomes;
+  /** Tipos escolhidos no filtro do topo. Vazio = todos. Era um seletor próprio aqui
+   *  dentro; com o filtro global existindo, dois campos para a mesma pergunta só
+   *  produziriam a combinação que devolve tela vazia sem explicar por quê. */
+  tipoTreinoIds: string[];
   periodosResponsavel: Record<string, PeriodoResponsavel[]>;
   nomePorUsuario: Record<string, string>;
   /** Vem do hook de filtros da página. Sem filtro ativo, devolve `true` para tudo. */
   recorteResponsavelExato?: (userId: string | null) => boolean;
 }) {
   const [mesesJanela, setMesesJanela] = useState<3 | 6 | 12>(12);
-  const [tipoTreinoId, setTipoTreinoId] = useState<string>("todos");
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: ClientePermanencia[] } | null>(null);
-
-  /** As jornadas que entram na coorte — é contra elas que o seletor de tipo se limita. */
-  const journeyIdsDaCoorte = useMemo(
-    () =>
-      new Set(
-        journeys
-          .filter((j) => j.situacao === "concluido" && j.cliente_id)
-          .map((j) => j.journey_id),
-      ),
-    [journeys],
-  );
-
-  /** Tipos que existem nos treinos DESTAS jornadas — não o catálogo inteiro do tenant.
-   *  `treinos` chega da página sem recorte de unidade/pipeline/responsável; sem este
-   *  cruzamento o seletor ofereceria tipo que devolve coorte vazia. */
-  const tiposDisponiveis = useMemo(() => {
-    const m = new Map<string, string>();
-    treinos.forEach((t) => {
-      if (!t.journey_id || !journeyIdsDaCoorte.has(t.journey_id)) return;
-      if (t.training_type_id && t.tipo_nome) m.set(t.training_type_id, t.tipo_nome);
-    });
-    return Array.from(m.entries())
-      .map(([id, nome]) => ({ id, nome }))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [treinos, journeyIdsDaCoorte]);
 
   /** Só quem tem cancelamento registrado. Cliente ausente da resposta = ainda na base.
    *  Buscar por `.in("id", ...)` fazia a URL crescer com a coorte e estourar o gateway. */
@@ -99,13 +78,13 @@ export default function PermanenciaSection({
       cancelamentoPorCliente,
       periodosResponsavel,
       treinos,
-      tipoTreinoId: tipoTreinoId === "todos" ? null : tipoTreinoId,
+      tipoTreinoIds,
       hoje: new Date(),
       mesesJanela,
       filtroImplantador: recorteResponsavelExato,
     });
   }, [
-    journeys, cancelamentosQ.data, periodosResponsavel, treinos, tipoTreinoId, mesesJanela,
+    journeys, cancelamentosQ.data, periodosResponsavel, treinos, tipoTreinoIds, mesesJanela,
     recorteResponsavelExato,
   ]);
 
@@ -124,15 +103,6 @@ export default function PermanenciaSection({
           Quantos dos clientes entregues continuam na base. M6 é o marco de 180 dias.
         </p>
         <div className="flex items-center gap-2">
-          <Select value={tipoTreinoId} onValueChange={setTipoTreinoId}>
-            <SelectTrigger className="w-[190px] h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os tipos de treino</SelectItem>
-              {tiposDisponiveis.map((t) => (
-                <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select value={String(mesesJanela)} onValueChange={(v) => setMesesJanela(Number(v) as 3 | 6 | 12)}>
             <SelectTrigger className="w-[150px] h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -246,7 +216,7 @@ export default function PermanenciaSection({
             {/* A coluna "Clientes" é a mitigação do risco de coorte pequena (§10 do
                 spec): "1 de 1 saiu" e "50 de 50 saíram" leem 0% igual, e sem o `n`
                 ao lado a Consysa (3 jornadas) viraria percentual sem sentido. */}
-            {tipoTreinoId !== "todos" ? (
+            {tipoTreinoIds.length > 0 ? (
               <p className="text-[11px] text-muted-foreground mt-1">
                 Recorte por tipo de treino: só entram clientes que passaram por este treino, e o
                 crédito é de quem o conduziu.

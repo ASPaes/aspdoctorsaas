@@ -98,8 +98,8 @@ export interface EntradaPermanencia {
   /** Posse por jornada, vinda do hook de filtros. */
   periodosResponsavel: Record<string, PeriodoResponsavel[]>;
   treinos: TreinoPermanencia[];
-  /** `training_type_id` escolhido no filtro. null = todos os tipos. */
-  tipoTreinoId: string | null;
+  /** `training_type_id`s escolhidos no filtro do topo. Vazio = todos os tipos. */
+  tipoTreinoIds: string[];
   hoje: Date;
   mesesJanela: 3 | 6 | 12;
   /** Filtro de Responsável aplicado ao CRÉDITO, não à jornada. Ausente = tudo passa.
@@ -191,13 +191,14 @@ function responsavelNaConclusao(
  */
 function treinoQueCredita(
   treinosDaJornada: TreinoPermanencia[],
-  tipoTreinoId: string | null,
+  tipoTreinoIds: string[],
 ): TreinoPermanencia | null {
   const elegiveis = treinosDaJornada.filter(
     (t) =>
       t.cancelado_em == null &&
       t.conduzido_por != null &&
-      (tipoTreinoId == null || t.training_type_id === tipoTreinoId),
+      (tipoTreinoIds.length === 0 ||
+        (t.training_type_id != null && tipoTreinoIds.includes(t.training_type_id))),
   );
   if (elegiveis.length === 0) return null;
   return [...elegiveis].sort((a, b) => {
@@ -292,10 +293,10 @@ export function calcularPermanencia(e: EntradaPermanencia): ResultadoPermanencia
   // 2. Cruza com a saída.
   const todos: ClientePermanencia[] = [];
   primeira.forEach(({ j, entrega }, clienteId) => {
-    const treino = treinoQueCredita(treinosPorJornada.get(j.journey_id) ?? [], e.tipoTreinoId);
+    const treino = treinoQueCredita(treinosPorJornada.get(j.journey_id) ?? [], e.tipoTreinoIds);
     // Com tipo filtrado, quem não tem aquele treino não está no recorte — e NÃO cai
     // no fallback: o recorte é "clientes que passaram por este treino".
-    if (e.tipoTreinoId != null && !treino) return;
+    if (e.tipoTreinoIds.length > 0 && !treino) return;
 
     const implantadorId = treino ? treino.conduzido_por : responsavelNaConclusao(j, entrega, e.periodosResponsavel);
     // Filtro de Responsável recorta a MEDIDA: o cliente sai da coorte inteira

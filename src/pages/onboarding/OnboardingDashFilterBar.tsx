@@ -14,6 +14,7 @@ interface Props {
     demandTypes: OpcaoFiltro[];
     responsaveis: OpcaoFiltro[];
     participantes: OpcaoFiltro[];
+    tiposTreino: OpcaoFiltro[];
   };
 }
 
@@ -41,6 +42,13 @@ export default function OnboardingDashFilterBar({ filtro, setFiltro, limpar, ati
         options={opcoes.participantes}
         selected={filtro.participanteIds}
         onChange={set("participanteIds")}
+        className="min-w-[150px]"
+      />
+      <MultiSelectFilter<string>
+        label="Tipo de treino"
+        options={opcoes.tiposTreino}
+        selected={filtro.tipoTreinoIds}
+        onChange={set("tipoTreinoIds")}
         className="min-w-[150px]"
       />
       <MultiSelectFilter<string>

@@ -15,7 +15,20 @@ export interface OpcaoFiltro {
  * que passou. Uma fonte só de "quais jornadas contam" — todas as seções da página
  * derivam desse Set.
  */
-export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId: string | null, enabled: boolean) {
+export interface TreinoFiltravel {
+  journey_id: string | null;
+  training_type_id: string | null;
+  tipo_nome: string | null;
+}
+
+export function useOnboardingDashFilters(
+  journeys: JourneyFiltravel[],
+  tenantId: string | null,
+  enabled: boolean,
+  /** Os treinos que a página já carregou. Vêm por parâmetro de propósito: uma query
+   *  própria aqui seria a segunda varredura da mesma tabela de volume no mesmo load. */
+  treinos: TreinoFiltravel[] = [],
+) {
   const [filtro, setFiltro] = useState<FiltroDash>(FILTRO_VAZIO);
 
   const pipelinesQ = useQuery({
@@ -132,6 +145,25 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     return m;
   }, [phasesQ.data]);
 
+  /** Tipos de treino por jornada, e o catálogo do filtro tirado dos próprios treinos:
+   *  tipo cadastrado que ninguém usou não vira opção que devolve tela vazia. */
+  const { tiposTreinoPorJornada, tiposTreino } = useMemo(() => {
+    const porJornada: Record<string, string[]> = {};
+    const nomesTipo = new Map<string, string>();
+    treinos.forEach((t) => {
+      if (!t.journey_id || !t.training_type_id) return;
+      const arr = (porJornada[t.journey_id] ||= []);
+      if (!arr.includes(t.training_type_id)) arr.push(t.training_type_id);
+      if (t.tipo_nome) nomesTipo.set(t.training_type_id, t.tipo_nome);
+    });
+    return {
+      tiposTreinoPorJornada: porJornada,
+      tiposTreino: Array.from(nomesTipo.entries())
+        .map(([id, nome]) => ({ id, nome }))
+        .sort((a, b) => a.nome.localeCompare(b.nome)),
+    };
+  }, [treinos]);
+
   const pipelinesPorJornada = useMemo(() => phasesQ.data?.porJornada ?? {}, [phasesQ.data]);
   const participantesPorJornada = useMemo(() => participantsQ.data ?? {}, [participantsQ.data]);
   const responsaveisPorJornada = useMemo(() => responsaveisQ.data?.porJornada ?? {}, [responsaveisQ.data]);
@@ -182,8 +214,9 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
       demandTypes: demandTypesQ.data ?? [],
       responsaveis: paraOpcao(responsavelIds),
       participantes: paraOpcao(participanteIds),
+      tiposTreino,
     };
-  }, [journeys, responsaveisPorJornada, participantesPorJornada, nomes, pipelinesQ.data, demandTypesQ.data]);
+  }, [journeys, responsaveisPorJornada, participantesPorJornada, nomes, pipelinesQ.data, demandTypesQ.data, tiposTreino]);
 
   const recorteResponsavel = useMemo(
     () => criarRecorteResponsavel(periodosResponsavel, filtro.responsavelIds),
@@ -199,8 +232,12 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
   );
 
   const allowedByFilter = useMemo(
-    () => filtrarJornadas(journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada),
-    [journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada],
+    () =>
+      filtrarJornadas(
+        journeys, filtro, pipelinesPorJornada, participantesPorJornada,
+        responsaveisPorJornada, tiposTreinoPorJornada,
+      ),
+    [journeys, filtro, pipelinesPorJornada, participantesPorJornada, responsaveisPorJornada, tiposTreinoPorJornada],
   );
 
   return {
@@ -211,6 +248,8 @@ export function useOnboardingDashFilters(journeys: JourneyFiltravel[], tenantId:
     opcoes,
     allowedByFilter,
     pipelineIds: filtro.pipelineIds,
+    /** Recorta também a MEDIDA: os cards de treino contam só estes tipos. */
+    tipoTreinoIds: filtro.tipoTreinoIds,
     fasePorPipeline,
     /** Posse por jornada, com datas — é o que o drill-down usa para nomear quem fez. */
     periodosResponsavel,
