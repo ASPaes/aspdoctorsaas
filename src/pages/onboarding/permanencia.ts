@@ -119,8 +119,12 @@ export interface LinhaImplantador {
   saidas: number;
   /** Média de dias até a saída, entre quem saiu. null quando ninguém saiu. */
   diasMedio: number | null;
-  /** % que chegou a M6 ainda na base. null enquanto nenhuma entrega dele maturou. */
+  /** % da carteira dele ainda na base no marco de 180 dias, sobre TUDO que entregou.
+   *  Mesma régua da matriz: a saída derruba o marco, e o número aparece antes do marco
+   *  fechar. null só quando a pessoa não tem entrega nenhuma. */
   pctM6: number | null;
+  /** Todas as entregas dele já completaram os 180 dias? `false` = número provisório. */
+  m6Maduro: boolean;
   clientes: ClientePermanencia[];
 }
 
@@ -239,15 +243,17 @@ function montarImplantadores(clientes: ClientePermanencia[], hojeIso: string): L
   return Array.from(porUser.entries())
     .map(([userId, lista]) => {
       const saidos = lista.filter((c) => c.dias != null);
-      // Maturidade é POR CLIENTE aqui: a linha do implantador não é uma coorte única.
-      // Um só cálculo de M6 por cliente, reusado nos dois filtros abaixo.
+      // Um só cálculo de M6 por cliente, reusado nos dois usos abaixo.
       const marcoM6DoCliente = new Map(
-        lista.map((c) => [c.clienteId, diaIso(addMonths(dataLocal(c.entrega), marcoM6))]),
+        lista.map((c) => [c.clienteId, limiteDoMarco(c.entrega, marcoM6)]),
       );
-      const maduros = lista.filter((c) => marcoM6DoCliente.get(c.clienteId)! <= hojeIso);
-      const retidosM6 = maduros.filter(
+      // Denominador = TUDO que a pessoa entregou, como na matriz. Medir só sobre quem
+      // já completou 180 dias deixava a coluna vazia enquanto ninguém maturava — e
+      // escondia justamente o implantador cuja única entrega já tinha ido embora.
+      const retidosM6 = lista.filter(
         (c) => c.saida == null || c.saida > marcoM6DoCliente.get(c.clienteId)!,
       );
+      const m6Maduro = lista.every((c) => marcoM6DoCliente.get(c.clienteId)! <= hojeIso);
       return {
         userId,
         entregues: lista.length,
@@ -257,7 +263,8 @@ function montarImplantadores(clientes: ClientePermanencia[], hojeIso: string): L
             ? Math.round(saidos.reduce((s, c) => s + (c.dias as number), 0) / saidos.length)
             : null,
         pctM6:
-          maduros.length > 0 ? Math.round((retidosM6.length / maduros.length) * 1000) / 10 : null,
+          lista.length > 0 ? Math.round((retidosM6.length / lista.length) * 1000) / 10 : null,
+        m6Maduro,
         clientes: lista,
       };
     })

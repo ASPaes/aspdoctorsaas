@@ -51,7 +51,7 @@ export default function PermanenciaSection({
   /** Vem do hook de filtros da página. Sem filtro ativo, devolve `true` para tudo. */
   recorteResponsavelExato?: (userId: string | null) => boolean;
 }) {
-  const [mesesJanela, setMesesJanela] = useState<3 | 6 | 12>(12);
+  const [mesesJanela, setMesesJanela] = useState<3 | 6 | 12>(6);
   const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: ClientePermanencia[] } | null>(null);
 
   /** Só quem tem cancelamento registrado. Cliente ausente da resposta = ainda na base.
@@ -286,24 +286,26 @@ export default function PermanenciaSection({
                     <td className="py-2 text-right tabular-nums">{l.entregues}</td>
                     <td className="py-2 text-right tabular-nums">{l.saidas}</td>
                     <td className="py-2 text-right tabular-nums">{l.diasMedio ?? "—"}</td>
-                    <td className="py-2 text-right tabular-nums">
-                      {l.pctM6 == null ? (
-                        <span className="text-muted-foreground" title="Nenhuma entrega desta pessoa completou 180 dias.">—</span>
-                      ) : (
-                        `${l.pctM6}%`
-                      )}
+                    <td
+                      className={`py-2 text-right tabular-nums ${l.m6Maduro ? "" : "text-muted-foreground"}`}
+                      title={
+                        l.m6Maduro
+                          ? undefined
+                          : "Nem toda entrega desta pessoa completou 180 dias — o número ainda pode cair."
+                      }
+                    >
+                      {l.pctM6 == null ? "—" : `${l.pctM6}%`}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {resultado.porImplantador.length > 0 &&
-              resultado.porImplantador.every((l) => l.pctM6 == null) && (
-                <p className="text-[11px] text-muted-foreground mt-2">
-                  Nenhuma entrega completou 180 dias ainda — a coluna "% em M6" fica vazia até a
-                  primeira turma alcançar o marco.
-                </p>
-              )}
+            {resultado.porImplantador.some((l) => !l.m6Maduro) && (
+              <p className="text-[11px] text-muted-foreground mt-2">
+                "% em M6" é sobre tudo o que a pessoa entregou, não só sobre quem já fez 180 dias.
+                Em cinza é quem ainda tem entrega a caminho do marco — o número pode cair até lá.
+              </p>
+            )}
           </div>
 
           {resultado.inconsistentes.length > 0 && (

@@ -251,10 +251,24 @@ describe("calcularPermanencia — por implantador", () => {
     expect(u2.pctM6).toBe(100);
   });
 
-  it("pctM6 é null quando nenhuma entrega do implantador chegou ao marco", () => {
+  it("pctM6 aparece antes do marco fechar, marcado como provisório", () => {
+    // Entrega de 24 dias: ninguém chegou aos 180, mas a pessoa entregou e ninguém saiu.
     const r = calcularPermanencia(entrada([jc("j1", "c1", "2026-08-20", "u1")]));
-    expect(r.porImplantador[0].pctM6).toBeNull();
+    expect(r.porImplantador[0].pctM6).toBe(100);
+    expect(r.porImplantador[0].m6Maduro).toBe(false);
     expect(r.porImplantador[0].entregues).toBe(1);
+  });
+
+  it("única entrega perdida cedo zera o M6 da pessoa, em vez de deixar a coluna vazia", () => {
+    // O caso do Matheus: 1 entregue, 1 saída em 6 dias.
+    const r = calcularPermanencia(
+      entrada([jc("j1", "c1", "2026-09-01", "u1")], { c1: "2026-09-07" }),
+    );
+    const l = r.porImplantador[0];
+    expect(l.entregues).toBe(1);
+    expect(l.saidas).toBe(1);
+    expect(l.pctM6).toBe(0);
+    expect(l.m6Maduro).toBe(false);
   });
 
   it("filtroImplantador recorta a MEDIDA: cliente creditado a quem não passa no filtro sai da coorte inteira", () => {
