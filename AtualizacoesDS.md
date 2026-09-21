@@ -5,8 +5,13 @@ Serve de base para montar o comunicado mensal de novidades.
 
 **Tipos:** 🆕 Novidade · ⬆️ Melhoria · 🔧 Correção
 
-**Como manter:** a cada publicação, acrescente a entrada no dia correspondente, no topo.
+**Como manter:** use o comando **`/publicar`**. Ele sincroniza com o GitHub, escreve a entrada no dia certo, commita e empurra — nessa ordem, que é o que importa.
+
+Se for editar à mão: **`git pull --rebase` antes, `git push` logo depois.** Duas pessoas escrevem neste arquivo, cada uma na sua máquina. Em 20/09/2026 as duas cópias locais estavam atrás do GitHub — uma parada em 13/09, outra em 17/09, enquanto a versão real já tinha 20/09. Quem edita sem puxar antes está escrevendo numa cópia morta, e quem não empurra na hora deixa o outro na mesma situação.
+
 Só entra o que o usuário percebe — refatoração, teste, migration e ajuste interno ficam no histórico do Git.
+
+> Este arquivo se chamava `CHANGELOG.md` até 20/09/2026. O histórico do Git acompanhou o rename.
 
 ---
 

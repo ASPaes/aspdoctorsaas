@@ -320,7 +320,8 @@ Regra do Alexandre: toda mudança avaliada por latência/egress/carga **antes** 
 - **Tolerância zero a problema visual óbvio.** Revisar mentalmente o resultado visual antes de entregar. Padrão Spatial UI: tilt 3D, spotlight gradient, pulse dots, mesh gradient bg, `cubic-bezier(0.16,1,0.3,1)`.
 - Se a mudança vier do Lovable, **validar via GitHub API** — false-success é real e recorrente. Arquivos >20KB: comparar SHA + size.
 - **Deploy só quando ele pedir.** Testar no local e mostrar; publicar em `app.doctorsaas.com.br` (Lovable, domínio customizado) é decisão dele.
-- **Publicou? Registra no `CHANGELOG.md`.** Uma linha por entrega, em linguagem de cliente, classificada em 🆕 Novidade / ⬆️ Melhoria / 🔧 Correção, no dia da publicação. Só o que o usuário percebe — refactor, teste e migration ficam no Git. É desse arquivo que sai o relatório mensal que o Alexandre publica no DoctorDev (**não** mexer no `useReleasesNovidade`, que só lê o release de lá).
+- **Publicou? Registra no `AtualizacoesDS.md`** (era `CHANGELOG.md` até 20/09/2026). Uma linha por entrega, em linguagem de cliente, classificada em 🆕 Novidade / ⬆️ Melhoria / 🔧 Correção, no dia da publicação. Só o que o usuário percebe — refactor, teste e migration ficam no Git. É desse arquivo que sai o relatório mensal que o Alexandre publica no DoctorDev (**não** mexer no `useReleasesNovidade`, que só lê o release de lá).
+  **Use `/publicar`.** Duas pessoas escrevem nesse arquivo (Alexandre e Vinicius), cada uma na sua máquina, e em 20/09/2026 as duas cópias locais estavam atrás do GitHub — uma em 13/09, outra em 17/09, enquanto a real já tinha 20/09. Ler ou editar o arquivo sem `git pull --rebase` antes é editar uma cópia morta. O comando `/publicar` (`.claude/commands/publicar.md`) faz sincronizar → escrever a entrada → commitar → push numa tacada; ele existe justamente para que ninguém precise lembrar da ordem.
 
 ---
 

@@ -41,3 +41,8 @@ supabase/.temp
 
 # Scratch do subagent-driven-development (briefs, relatorios, pacotes de review)
 .superpowers/
+
+# Claude Code: comandos do projeto sao versionados (.claude/commands/).
+# O resto e por maquina e nao deve ser compartilhado.
+.claude/settings.local.json
+.claude/worktrees/
