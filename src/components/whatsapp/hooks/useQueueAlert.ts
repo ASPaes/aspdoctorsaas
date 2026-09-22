@@ -9,6 +9,7 @@ import { usePresenceRow } from "@/hooks/usePresenceRow";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { playQueueBeep, primeQueueBeep } from "@/lib/queueBeep";
+import { resolveTone } from "@/lib/tones";
 import { usePillCounts } from "./usePillCounts";
 
 /** Só um lembrete por episódio de fila cheia (DEM-0203). */
@@ -96,6 +97,9 @@ export function useQueueAlert(): QueueAlertState {
   canAlertRef.current = canAlert;
   const volumeRef = useRef(0.7);
   volumeRef.current = Math.max(0, Math.min(1, (preferences.queue_sound_volume ?? 70) / 100));
+  // Toque escolhido para a fila; sem escolha, o bip de dois tons de sempre.
+  const toneRef = useRef(resolveTone("queue", null));
+  toneRef.current = resolveTone("queue", preferences.sound_by_event);
 
   // Destrava o AudioContext no primeiro gesto do usuário na sessão.
   useEffect(() => {
@@ -182,7 +186,7 @@ export function useQueueAlert(): QueueAlertState {
 
     if (!canAlertRef.current) return;
 
-    playQueueBeep(volumeRef.current);
+    playQueueBeep(volumeRef.current, toneRef.current);
 
     setJustArrived(true);
     if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
@@ -207,7 +211,7 @@ export function useQueueAlert(): QueueAlertState {
       const startedAt = episodeStartedAtRef.current;
       if (!startedAt || Date.now() - startedAt < REMINDER_MS) return;
       reminderDoneRef.current = true;
-      playQueueBeep(volumeRef.current);
+      playQueueBeep(volumeRef.current, toneRef.current);
       toast.warning("Fila ainda com clientes aguardando", {
         id: "queue-alert",
         description: `${waiting} ${waiting === 1 ? "pessoa aguardando" : "pessoas aguardando"} atendimento.`,

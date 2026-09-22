@@ -16,6 +16,8 @@ import { Loader2, Save, Volume2 } from "lucide-react";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { playQueueBeep } from "@/lib/queueBeep";
 import { AccentColorPicker } from "@/components/preferences/AccentColorPicker";
+import { SoundByEventPicker } from "@/components/preferences/SoundByEventPicker";
+import { resolveTone, type SoundEvent } from "@/lib/tones";
 import {
   MIN_CONTRAST,
   applyAccentColor,
@@ -39,6 +41,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
   const [queueSoundEnabled, setQueueSoundEnabled] = useState(true);
   const [queueVolume, setQueueVolume] = useState(70);
   const [accentColor, setAccentColor] = useState<string | null>(null);
+  const [soundByEvent, setSoundByEvent] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open && !isLoading) {
@@ -48,6 +51,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
       setQueueSoundEnabled(preferences.queue_sound_enabled);
       setQueueVolume(preferences.queue_sound_volume);
       setAccentColor(preferences.theme_primary_color);
+      setSoundByEvent(preferences.sound_by_event ?? {});
     }
   }, [open, isLoading, preferences]);
 
@@ -81,6 +85,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
         queue_sound_enabled: queueSoundEnabled,
         queue_sound_volume: queueVolume,
         theme_primary_color: accentToSave,
+        sound_by_event: soundByEvent,
       });
       storeAccent(accentToSave);
       applyAccentColor(accentToSave);
@@ -166,7 +171,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
                     variant="outline"
                     size="sm"
                     className="h-8 gap-1.5 shrink-0"
-                    onClick={() => playQueueBeep(queueVolume / 100)}
+                    onClick={() => playQueueBeep(queueVolume / 100, resolveTone("queue", soundByEvent))}
                   >
                     <Volume2 className="h-3.5 w-3.5" />
                     Testar
@@ -178,6 +183,16 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
               </div>
             )}
           </div>
+
+          <Separator />
+
+          <SoundByEventPicker
+            value={soundByEvent}
+            onChange={setSoundByEvent}
+            // O aviso da fila tem volume próprio nesta mesma tela; os outros
+            // seguem o volume das notificações, em Configurações.
+            volumeFor={(evt: SoundEvent) => (evt === "queue" ? queueVolume / 100 : 0.7)}
+          />
 
           <Separator />
 

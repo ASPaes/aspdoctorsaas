@@ -15,9 +15,8 @@ import { toast as sonnerToast } from "sonner";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
-
-const SOUND_URL =
-  "https://vbngjzovjhkmietztffo.supabase.co/storage/v1/object/public/notification-sounds/padrao.mp3";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
+import { playTone, primeTones, resolveTone, type SoundEvent } from "@/lib/tones";
 
 const SOUND_THROTTLE_MS = 500;
 
@@ -105,6 +104,46 @@ function isInDoNotDisturbWindow(settings: NotificationSettings): boolean {
   return cur >= startMin || cur < endMin;
 }
 
+/**
+ * `is_group` não vem no payload da notificação e `notifications.conversation_id`
+ * não tem FK, então não dá para embutir a conversa no mesmo select. A leitura
+ * extra só acontece quando o usuário escolheu um toque de grupo DIFERENTE do
+ * toque de mensagem — quem não personalizou nada não paga nada.
+ */
+const groupCache = new Map<string, boolean>();
+
+async function isGroupConversation(convId: string): Promise<boolean> {
+  const emCache = groupCache.get(convId);
+  if (emCache !== undefined) return emCache;
+  const { data } = await (supabase.from("whatsapp_conversations") as any)
+    .select("is_group")
+    .eq("id", convId)
+    .maybeSingle();
+  const ehGrupo = !!data?.is_group;
+  // Sessão longa com muito chat não pode virar vazamento de memória.
+  if (groupCache.size > 500) groupCache.clear();
+  groupCache.set(convId, ehGrupo);
+  return ehGrupo;
+}
+
+/**
+ * Tipo de aviso para escolha do toque. `null` = evento sem toque próprio
+ * (alerta de ticket, integração, etc.), que segue no som padrão.
+ */
+async function soundEventFor(
+  type: string,
+  convId: string | null,
+  map: Record<string, string> | null
+): Promise<SoundEvent | null> {
+  if (type === "chat_assignment") return "assignment";
+  if (type === "chat_awaiting_reply") return "awaiting";
+  if (type !== "whatsapp_new_message") return null;
+  if (!convId) return "message";
+  const toqueGrupo = resolveTone("group", map);
+  if (toqueGrupo === resolveTone("message", map)) return "message";
+  return (await isGroupConversation(convId)) ? "group" : "message";
+}
+
 function extractConversationId(pathname: string, search: string): string | null {
   if (!pathname.startsWith("/whatsapp")) return null;
   const params = new URLSearchParams(search);
@@ -130,7 +169,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   );
 
   // Refs for stable values inside realtime handler
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastSoundAtRef = useRef<number>(0);
   const settingsRef = useRef<NotificationSettings>(DEFAULT_SETTINGS);
   const locationRef = useRef(location);
@@ -161,16 +199,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const settings = useMemo(() => settingsData ?? DEFAULT_SETTINGS, [settingsData]);
   settingsRef.current = settings;
 
-  // Preload audio
+  // Toque por tipo de aviso. Fica num ref porque quem lê é o handler de
+  // Realtime, que tem dependências estáveis e guardaria o valor do 1º render.
+  const { preferences } = useUserPreferences();
+  const soundMapRef = useRef<Record<string, string> | null>(null);
+  soundMapRef.current = preferences.sound_by_event;
+
+  // Preload do áudio do toque de arquivo.
   useEffect(() => {
     if (!uid) return;
-    if (!audioRef.current) {
-      const a = new Audio(SOUND_URL);
-      a.preload = "auto";
-      audioRef.current = a;
-    }
-    audioRef.current.volume = Math.max(0, Math.min(1, settings.volume / 100));
-  }, [uid, settings.volume]);
+    primeTones();
+  }, [uid]);
 
   // Initial unread count
   const refreshUnreadCount = useCallback(async () => {
@@ -192,27 +231,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [uid, refreshUnreadCount]);
 
   // Play sound with throttle
-  const playSound = useCallback((volumeOverride?: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const playSound = useCallback((event: SoundEvent | null, volumeOverride?: number) => {
     const now = Date.now();
     if (now - lastSoundAtRef.current < SOUND_THROTTLE_MS) return;
     lastSoundAtRef.current = now;
-    try {
-      audio.volume =
-        volumeOverride !== undefined
-          ? Math.max(0, Math.min(1, volumeOverride))
-          : Math.max(0, Math.min(1, settingsRef.current.volume / 100));
-      audio.currentTime = 0;
-      const p = audio.play();
-      if (p && typeof p.catch === "function") {
-        p.catch((err) => {
-          console.warn("[notifications] autoplay blocked", err);
-        });
-      }
-    } catch (err) {
-      console.warn("[notifications] play error", err);
-    }
+    const vol =
+      volumeOverride !== undefined
+        ? volumeOverride
+        : Math.max(0, Math.min(1, settingsRef.current.volume / 100));
+    playTone(event ? resolveTone(event, soundMapRef.current) : "padrao", vol);
   }, []);
 
   // Handler de chegada de notificação (extraído para reuso entre INSERT e UPDATE coalescido)
@@ -318,7 +345,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       if (wantsSound) {
         const vol = mode === "tick" ? 0.3 : undefined;
-        playSound(vol);
+        const evt = await soundEventFor(
+          (notif as any).type,
+          notifConvId,
+          soundMapRef.current
+        );
+        playSound(evt, vol);
       }
 
       if (wantsToast) {

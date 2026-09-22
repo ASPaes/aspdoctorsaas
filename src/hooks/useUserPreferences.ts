@@ -14,6 +14,12 @@ export interface UserPreferences {
   queue_sound_volume: number;
   /** Hex da cor de destaque; `null` = verde padrão da marca (DEM-0103) */
   theme_primary_color: string | null;
+  /**
+   * Toque escolhido por tipo de aviso: `{ "group": "grave" }`. Chave ausente =
+   * toque padrão daquele evento (ver `DEFAULT_TONE` em `lib/tones.ts`), então o
+   * objeto guarda SÓ o que o usuário personalizou.
+   */
+  sound_by_event: Record<string, string> | null;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -23,17 +29,30 @@ const DEFAULT_PREFS: UserPreferences = {
   queue_sound_enabled: true,
   queue_sound_volume: 70,
   theme_primary_color: null,
+  sound_by_event: null,
 };
 
 /**
- * `theme_primary_color` é novo (DEM-0103) e o banco local roda com a estrutura
- * congelada da produção do dia em que foi clonado. Se a coluna não existir,
- * PostgREST devolve 42703 — a gente relê sem ela e desliga a escrita, em vez de
- * derrubar TODAS as preferências do usuário por causa de uma.
+ * `theme_primary_color` (DEM-0103) e `sound_by_event` são colunas novas, e o
+ * banco local roda com a estrutura congelada da produção do dia em que foi
+ * clonado. Se a coluna não existir, PostgREST devolve 42703 — a gente relê sem
+ * ela e desliga a escrita, em vez de derrubar TODAS as preferências do usuário
+ * por causa de uma.
  */
 let themeColumnAvailable = true;
+let soundMapColumnAvailable = true;
 
 const QUEUE_COLS = "queue_sound_enabled, queue_sound_volume";
+
+function selectCols(): string {
+  return [
+    QUEUE_COLS,
+    themeColumnAvailable ? "theme_primary_color" : null,
+    soundMapColumnAvailable ? "sound_by_event" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
 
 /**
  * As colunas da fila são lidas direto da tabela, não pela RPC `get_my_preferences`
@@ -49,13 +68,30 @@ async function fetchTablePrefs(tid: string, userId: string) {
       .is("department_id", null)
       .maybeSingle();
 
-  let { data, error } = themeColumnAvailable
-    ? await run(`${QUEUE_COLS}, theme_primary_color`)
-    : await run(QUEUE_COLS);
+  let data: any = null;
+  let error: any = null;
 
-  if (error?.code === "42703") {
-    themeColumnAvailable = false;
-    ({ data, error } = await run(QUEUE_COLS));
+  // Duas colunas opcionais: o 42703 não diz sozinho qual delas faltou, então a
+  // mensagem do erro é quem decide. Se ela não citar nenhuma conhecida, cai
+  // para o mínimo garantido em vez de girar em falso.
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    ({ data, error } = await run(selectCols()));
+    if (error?.code !== "42703") break;
+
+    const msg = `${error.message ?? ""} ${error.details ?? ""}`;
+    let tratou = false;
+    if (themeColumnAvailable && msg.includes("theme_primary_color")) {
+      themeColumnAvailable = false;
+      tratou = true;
+    }
+    if (soundMapColumnAvailable && msg.includes("sound_by_event")) {
+      soundMapColumnAvailable = false;
+      tratou = true;
+    }
+    if (!tratou) {
+      themeColumnAvailable = false;
+      soundMapColumnAvailable = false;
+    }
   }
   if (error) throw error;
 
@@ -67,6 +103,9 @@ async function fetchTablePrefs(tid: string, userId: string) {
     theme_primary_color: themeColumnAvailable
       ? (data?.theme_primary_color ?? DEFAULT_PREFS.theme_primary_color)
       : readStoredAccent(),
+    sound_by_event: soundMapColumnAvailable
+      ? ((data?.sound_by_event as Record<string, string> | null) ?? null)
+      : null,
   };
 }
 
@@ -127,6 +166,12 @@ export function useUserPreferences() {
       // Só entra no payload se a coluna existir no ambiente (ver `themeColumnAvailable`).
       if (themeColumnAvailable && "theme_primary_color" in prefs) {
         payload.theme_primary_color = prefs.theme_primary_color ?? null;
+      }
+      if (soundMapColumnAvailable && "sound_by_event" in prefs) {
+        const mapa = prefs.sound_by_event ?? null;
+        // Objeto vazio vira null: "nenhuma personalização" e "tudo no padrão"
+        // são a mesma coisa, e guardar `{}` faria a leitura parecer customizada.
+        payload.sound_by_event = mapa && Object.keys(mapa).length > 0 ? mapa : null;
       }
 
       // `as any`: `theme_primary_color` ainda não está no types.ts gerado.
