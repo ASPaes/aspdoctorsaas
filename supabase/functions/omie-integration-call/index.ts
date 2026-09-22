@@ -352,8 +352,15 @@ Deno.serve(async (req)=>{
       // (situacao 99 -> 10) so quando o vinculo e UNICO e NAO ambiguo. Ambiguo (MR. ROLLS) =>
       // false => o guard do DoctorOMIE mantem o bloqueio.
       let permitirReativacao = false;
+      // v18 (21/09/2026): o contrato ja existe no Omie? A resposta sai da reconciliacao, sem
+      // gastar um ConsultarContrato. Ver o bloco da prova a seco abaixo.
+      let contratoJaNoOmie = false;
       {
-        const { data: rec } = await serviceClient.from("reconciliacao_cadastro").select("estado_match, multi_contrato, qtd_candidatos_omie").eq("tenant_id", tenantEfetivo).eq("ds_contract_id", contratoId).maybeSingle();
+        const { data: rec } = await serviceClient.from("reconciliacao_cadastro").select("estado_match, multi_contrato, qtd_candidatos_omie, codigo_contrato_omie").eq("tenant_id", tenantEfetivo).eq("ds_contract_id", contratoId).maybeSingle();
+        contratoJaNoOmie = [
+          "CASADO",
+          "CASADO_INATIVO"
+        ].indexOf(rec?.estado_match ?? "") !== -1 && rec?.codigo_contrato_omie != null && String(rec.codigo_contrato_omie) !== "";
         permitirReativacao = [
           "CASADO",
           "CASADO_INATIVO"
@@ -470,8 +477,43 @@ Deno.serve(async (req)=>{
       // destravar. Ali o cliente vai primeiro, o de/para passa a ser o novo, e o contrato e
       // avaliado contra o cadastro certo logo abaixo.
       // ====================================================================
-      if (!criarCadastroProprio) {
+      // ====================================================================
+      // v18 (21/09/2026): A PROVA A SECO CUSTA UMA CONSULTA, E O OMIE COBRA POR ISSO.
+      // O Omie recusa leitura identica repetida ("Consumo redundante detectado. Aguarde N
+      // segundos"). Desde a v17, contrato QUE JA EXISTE no Omie fazia DUAS consultas com ~2s de
+      // diferenca -- a da prova e a do alterar de verdade -- e a segunda voltava recusada. A
+      // recusa da consulta nao e um 'bloqueado', entao passava batido: o cliente era escrito no
+      // Omie e o contrato morria em seguida, sem nem uma linha no integrations_log (a saida
+      // 'fase: consultar' da ds-omie-contrato-alterar e a unica que nao registra). Medido no
+      // CT-2026-0379 da Digi Office em 21/09; os dois ultimos envios que completaram um alterar
+      // sao de 30/07 e 11/08, ANTES da v17.
+      //
+      // Quando a reconciliacao ja diz que o contrato esta casado, a prova nao acrescenta nada: o
+      // proprio alterar tem as travas (de/para apontando para cancelado, produto sem mapeamento,
+      // situacao invalida) e todas recusam ANTES de escrever no Omie. O que a v17 protege -- o
+      // cadastro do cliente escrito antes de um contrato recusado -- continua valendo no ramo que
+      // motivou a v17: o de CRIAR contrato (caso YOUR COFFEE), onde a prova segue rodando.
+      // ====================================================================
+      if (!criarCadastroProprio && !contratoJaNoOmie) {
         const prova = await decidirContrato("dry_run");
+        // A prova que FALHA (nao 'bloqueado': erro de leitura, rede, faultstring do Omie) tambem
+        // para tudo. Ate a v17 ela era ignorada, e a promessa de "nao tocar o cliente sem o
+        // contrato passar" valia so para a recusa formal.
+        if (prova.operacao !== "bloqueado" && prova.ok === false) {
+          return json({
+            ok: false,
+            modo: "criar",
+            acao,
+            etapa: "contrato",
+            error: "Nao consegui conferir o contrato no Omie antes de escrever. Nada foi enviado; tente de novo em um minuto.",
+            detalhe: prova.body ?? null,
+            cliente: {
+              ok: true,
+              nao_enviado: true,
+              motivo: "Conferencia previa do contrato falhou; o cadastro do Omie nao foi tocado."
+            }
+          }, 502);
+        }
         if (prova.operacao === "bloqueado") {
           return json({
             ok: false,
@@ -582,6 +624,9 @@ Deno.serve(async (req)=>{
           aviso: "Contrato OK no Omie, mas a marca\u00e7\u00e3o no DoctorSaaS falhou \u2014 a tela pode continuar mostrando 'Enviar ao Omie'. Reenviar \u00e9 seguro."
         } : {},
         ...contratoOk ? {} : {
+          // Sem isto a raiz do 502 nao trazia motivo nenhum, so o aviso, e a tela caia no
+          // "Edge Function returned a non-2xx status code" do supabase-js.
+          error: dec.body?.error ?? `O contrato (${dec.operacao}) falhou no Omie.`,
           aviso: `Cliente OK, mas o contrato (${dec.operacao}) falhou. Reexecutar \u00e9 seguro.`
         }
       }, contratoOk ? 200 : 502);
