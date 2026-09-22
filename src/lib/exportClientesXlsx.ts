@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useLookups } from "@/hooks/useLookups";
+import { dataCell, hojeISO } from "@/lib/xlsxExport";
 
 type UseLookupsReturn = ReturnType<typeof useLookups>;
 
@@ -46,16 +47,25 @@ function pctCell(v: any): number | undefined {
   return round2(n * 100);
 }
 
-function dateCell(v: any): Date | undefined {
-  if (!v) return undefined;
-  const s = String(v).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? undefined : d;
-  }
-  const [y, mo, da] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, mo - 1, da));
-}
+/**
+ * Cabeçalhos que carregam data. A data vai como serial numérico, então o
+ * formato precisa ser aplicado por coluna: varrer a planilha por `cell.t === "n"`
+ * carimbaria de data também "Imposto (%)", "MRR Atual" e as outras numéricas.
+ * Lista explícita, e não regex, porque "Prod_Dia Vencimento" e "Prod_Prazo
+ * (meses)" casariam com qualquer padrão frouxo e não são datas.
+ */
+const COLUNAS_DATA = new Set([
+  "Data de Cadastro",
+  "Aniversário do Contato",
+  "Data Cancelamento",
+  "Vencimento Cert. A1",
+  "Última Venda Cert. A1",
+  "Prod_Data da Venda",
+  "Prod_Data de Ativação",
+  "Prod_Data de Cancelamento",
+  "Prod_Data Próximo Reajuste",
+  "Prod_Data Fim",
+]);
 
 function boolCell(v: any): string {
   if (v === null || v === undefined) return "";
@@ -181,7 +191,7 @@ export async function exportClientesXlsx({
     c.telefone_contato ?? "",
     c.telefone_whatsapp_contato ?? "",
     resolve(mUnidade, c.unidade_base_id),
-    dateCell(c.data_cadastro) ?? "",
+    dataCell(c.data_cadastro),
     resolve(mArea, c.area_atuacao_id),
     resolve(mSegmento, c.segmento_id),
     c.observacao_cliente ?? "",
@@ -195,15 +205,15 @@ export async function exportClientesXlsx({
     c.contato_nome ?? "",
     c.contato_cpf ?? "",
     c.contato_fone ?? "",
-    dateCell(c.contato_aniversario) ?? "",
+    dataCell(c.contato_aniversario),
     pctCell(c.imposto_percentual) ?? "",
     pctCell(c.custo_fixo_percentual) ?? "",
     boolCell(c.cancelado),
-    dateCell(c.data_cancelamento) ?? "",
+    dataCell(c.data_cancelamento),
     resolve(mMotivo, c.motivo_cancelamento_id),
     c.observacao_cancelamento ?? "",
-    dateCell(c.cert_a1_vencimento) ?? "",
-    dateCell(c.cert_a1_ultima_venda_em) ?? "",
+    dataCell(c.cert_a1_vencimento),
+    dataCell(c.cert_a1_ultima_venda_em),
     numCell(c.matriz_codigo_sequencial) ?? "",
     numCell(mrrAtual(c.id)) ?? "",
   ];
@@ -215,13 +225,13 @@ export async function exportClientesXlsx({
     numCell(p.vlr_custo) ?? "",
     numCell(p.vlr_ativacao) ?? "",
     p.recorrencia ?? "",
-    dateCell(p.data_venda) ?? "",
-    dateCell(p.data_ativacao) ?? "",
-    dateCell(p.data_cancelamento) ?? "",
-    dateCell(p.data_proximo_reajuste) ?? "",
+    dataCell(p.data_venda),
+    dataCell(p.data_ativacao),
+    dataCell(p.data_cancelamento),
+    dataCell(p.data_proximo_reajuste),
     numCell(p.dia_vencimento) ?? "",
     numCell(p.prazo_meses) ?? "",
-    dateCell(p.data_fim) ?? "",
+    dataCell(p.data_fim),
     resolve(mOrigem, p.origem_venda_id),
     resolve(mFuncionario, p.funcionario_id),
     resolve(mModelo, p.modelo_contrato_id),
@@ -247,7 +257,7 @@ export async function exportClientesXlsx({
     }
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   ws["!cols"] = header.map((h) => {
     if (/CNPJ|CPF/i.test(h)) return { wch: 18 };
@@ -258,21 +268,24 @@ export async function exportClientesXlsx({
     return { wch: 16 };
   });
 
+  const colsData = header
+    .map((h, i) => (COLUNAS_DATA.has(h) ? i : -1))
+    .filter((i) => i >= 0);
+
   const range = XLSX.utils.decode_range(ws["!ref"]!);
   for (let R = 1; R <= range.e.r; R++) {
-    for (let C = 0; C <= range.e.c; C++) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: C });
-      const cell = ws[addr];
-      if (cell && cell.t === "d") {
-        cell.z = "yyyy-mm-dd";
-      }
+    for (const C of colsData) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell) cell.z = "yyyy-mm-dd";
     }
   }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Clientes");
 
-  const today = new Date().toISOString().slice(0, 10);
+  // `toISOString()` e UTC: exportando a noite em America/Sao_Paulo o arquivo
+  // saia carimbado com o dia seguinte.
+  const today = hojeISO();
   XLSX.writeFile(wb, `clientes_export_${today}.xlsx`);
 
   return { totalLinhas: aoa.length - 1, totalClientes: clientes.length };

@@ -609,8 +609,11 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         // Clientes vendidos no mês (ativação do faturamento e tooltip do gráfico de faturamento)
         const novosNoMes = (allClientes || []).filter(c => {
           if (!c.data_venda_efetiva) return false;
-          const dc = format(new Date(c.data_venda_efetiva), 'yyyy-MM');
-          if (dc !== m.yearMonth) return false;
+          // `data_venda_efetiva` e `date` ('YYYY-MM-DD'). `new Date(s)` a lia como
+          // meia-noite UTC e, em America/Sao_Paulo, jogava toda venda do dia 1o
+          // para o mes anterior — 1.256 clientes hoje. Comparar a string resolve
+          // e dispensa fuso.
+          if (String(c.data_venda_efetiva).slice(0, 7) !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;
@@ -651,8 +654,8 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
         const canceladosNoMes = (allClientes || []).filter(c => {
           if (!c.data_cancelamento) return false;
-          const dc = format(new Date(c.data_cancelamento), 'yyyy-MM');
-          if (dc !== m.yearMonth) return false;
+          // Mesma armadilha de fuso da venda, acima: `data_cancelamento` e `date`.
+          if (String(c.data_cancelamento).slice(0, 7) !== m.yearMonth) return false;
           if (filters.unidadeBaseId && c.unidade_base_id !== filters.unidadeBaseId) return false;
           if (fornecedorClientIds && !fornecedorClientIds.has(c.id)) return false;
           return true;

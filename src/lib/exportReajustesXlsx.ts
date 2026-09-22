@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { format, parseISO } from "date-fns";
+import { dataCell, hojeISO } from "@/lib/xlsxExport";
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
@@ -12,16 +13,8 @@ function numCell(v: any): number | undefined {
   return round2(n);
 }
 
-function dateOnlyCell(v: any): Date | undefined {
-  if (!v) return undefined;
-  const s = String(v).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? undefined : d;
-  }
-  const [y, mo, da] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, mo - 1, da));
-}
+/** Índices de "Período Início" e "Período Fim" no cabeçalho abaixo. */
+const COLS_DATA = [2, 3];
 
 function formatLancamento(v: any): string {
   if (!v) return "";
@@ -54,8 +47,8 @@ export function exportReajustesXlsx(params: { rows: any[] }): void {
     aoa.push([
       formatLancamento(r.data_lancamento),
       r.usuario_nome ?? "",
-      dateOnlyCell(r.periodo_inicio) ?? "",
-      dateOnlyCell(r.periodo_fim) ?? "",
+      dataCell(r.periodo_inicio),
+      dataCell(r.periodo_fim),
       numCell(r.percentual_padrao) ?? "",
       r.qtd_contratos ?? "",
       numCell(r.vlr_mensal_total_antes) ?? "",
@@ -65,7 +58,7 @@ export function exportReajustesXlsx(params: { rows: any[] }): void {
     ]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   ws["!cols"] = [
     { wch: 18 },
@@ -80,20 +73,21 @@ export function exportReajustesXlsx(params: { rows: any[] }): void {
     { wch: 12 },
   ];
 
+  // A data é um serial numérico, então o formato vai POR COLUNA. Varrer por
+  // `cell.t === "n"` carimbaria de data as colunas de valor também.
   const range = XLSX.utils.decode_range(ws["!ref"]!);
   for (let R = 1; R <= range.e.r; R++) {
-    for (let C = 0; C <= range.e.c; C++) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: C });
-      const cell = ws[addr];
-      if (cell && cell.t === "d") {
-        cell.z = "dd/mm/yyyy";
-      }
+    for (const C of COLS_DATA) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell) cell.z = "dd/mm/yyyy";
     }
   }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Reajustes");
 
-  const today = new Date().toISOString().slice(0, 10);
+  // `toISOString()` e UTC: exportando a noite em America/Sao_Paulo o arquivo
+  // saia carimbado com o dia seguinte.
+  const today = hojeISO();
   XLSX.writeFile(wb, `reajustes_export_${today}.xlsx`);
 }

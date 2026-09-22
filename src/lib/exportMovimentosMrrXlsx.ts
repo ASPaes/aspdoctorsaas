@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { dataCell, hojeISO } from "@/lib/xlsxExport";
 
 const tipoLabels: Record<string, string> = {
   upsell: "Upsell",
@@ -28,16 +29,8 @@ function numCellAlways(v: any): number | undefined {
   return round2(n);
 }
 
-function dateCell(v: any): Date | undefined {
-  if (!v) return undefined;
-  const s = String(v).slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const d = new Date(v);
-    return isNaN(d.getTime()) ? undefined : d;
-  }
-  const [y, mo, da] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, mo - 1, da));
-}
+/** Índice da coluna "Data" no cabeçalho abaixo. Só ela leva formato de data. */
+const COL_DATA = 0;
 
 export interface ClienteInfo {
   razao: string;
@@ -75,7 +68,7 @@ export function exportMovimentosMrrXlsx(params: {
     const valor = m.tipo === "venda_avulsa" ? m.valor_venda_avulsa : m.valor_delta;
     const cli = clientesMap[m.cliente_id];
     aoa.push([
-      dateCell(m.data_movimento) ?? "",
+      dataCell(m.data_movimento),
       tipoLabels[m.tipo] || m.tipo || "",
       cli?.razao ?? "",
       cli?.fantasia ?? "",
@@ -94,7 +87,7 @@ export function exportMovimentosMrrXlsx(params: {
     ]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   ws["!cols"] = [
     { wch: 12 },  // Data
@@ -111,20 +104,19 @@ export function exportMovimentosMrrXlsx(params: {
     { wch: 40 },  // Descrição
   ];
 
+  // A data é um serial numérico, então o formato vai POR COLUNA. Varrer por
+  // `cell.t === "n"` carimbaria de data as colunas de valor também.
   const range = XLSX.utils.decode_range(ws["!ref"]!);
   for (let R = 1; R <= range.e.r; R++) {
-    for (let C = 0; C <= range.e.c; C++) {
-      const addr = XLSX.utils.encode_cell({ r: R, c: C });
-      const cell = ws[addr];
-      if (cell && cell.t === "d") {
-        cell.z = "dd/mm/yyyy";
-      }
-    }
+    const cell = ws[XLSX.utils.encode_cell({ r: R, c: COL_DATA })];
+    if (cell) cell.z = "dd/mm/yyyy";
   }
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Movimentos MRR");
 
-  const today = new Date().toISOString().slice(0, 10);
+  // `toISOString()` e UTC: exportando a noite em America/Sao_Paulo o arquivo
+  // saia carimbado com o dia seguinte.
+  const today = hojeISO();
   XLSX.writeFile(wb, `movimentos_mrr_export_${today}.xlsx`);
 }
