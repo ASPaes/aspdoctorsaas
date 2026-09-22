@@ -59,6 +59,17 @@ Regras:
 - Não crie item genérico que valeria para qualquer conversa ("acionar a equipe se precisar", "acompanhar o cliente"). Na dúvida, deixe de fora.
 - Seção sem conteúdo fica como lista vazia.`;
 
+// DEM-0277 (22/09/2026): o mesmo periodo pode render um resumo enxuto ou o
+// detalhado. So muda a instrucao; as 7 secoes e o "ref" continuam iguais.
+const DETAIL_LEVELS = ["resumido", "detalhado"] as const;
+type DetailLevel = typeof DETAIL_LEVELS[number];
+const LEVEL_PROMPT: Record<DetailLevel, string> = {
+  detalhado:
+    `NÍVEL: DETALHADO. Registre cada assunto tratado no período, um item por assunto, com o detalhe que a mensagem der.`,
+  resumido:
+    `NÍVEL: RESUMIDO. Entregue só o essencial, para quem tem um minuto: no máximo 4 itens por seção, cada um numa frase curta de até 120 caracteres. Junte num item só o que for do mesmo assunto e deixe de fora o detalhe operacional que não muda decisão de ninguém. Melhor uma seção vazia do que um item sem peso. Pendência em aberto e próximo passo nunca ficam de fora.`,
+};
+
 const itemSchema = {
   type: "array",
   items: {
@@ -99,6 +110,7 @@ Deno.serve(async (req) => {
     const action: string = body.action ?? "preview";
     const conversationId: string | undefined = body.conversationId;
     const filterType = body.filterType as FilterType;
+    const detailLevel: DetailLevel = body.detailLevel === "resumido" ? "resumido" : "detalhado";
     if (!conversationId) return json({ error: "bad_request", message: "conversationId é obrigatório" }, 400);
     if (!["last_24h", "period", "attendance"].includes(filterType)) {
       return json({ error: "bad_request", message: "Filtro inválido" }, 400);
@@ -188,28 +200,34 @@ Deno.serve(async (req) => {
     };
 
     // Resumo igual ja salvo e sem mensagem nova depois dele? (24h anda sozinho, nao entra)
+    // Por nivel: um resumido do mesmo periodo nao substitui o detalhado ja salvo.
+    const duplicates: Record<DetailLevel, unknown> = { resumido: null, detalhado: null };
     let duplicate: unknown = null;
     if (filterType !== "last_24h" && lastMessageAt) {
       let q = supabase
         .from("whatsapp_group_summaries")
-        .select("id, created_at, created_by, last_message_at")
+        .select("id, created_at, created_by, last_message_at, detail_level")
         .eq("conversation_id", conversationId)
         .eq("filter_type", filterType)
         .eq("status", "ready")
         .gte("last_message_at", lastMessageAt)
         .order("created_at", { ascending: false })
-        .limit(1);
+        .limit(10);
       q = filterType === "attendance"
         ? q.eq("attendance_id", attendanceId)
         : q.eq("period_start", periodStart.toISOString()).eq("period_end", periodEnd.toISOString());
-      const { data: dup } = await q.maybeSingle();
-      if (dup) {
-        const names = await loadStaffNames(supabase, [dup.created_by]);
-        duplicate = { ...dup, created_by_name: names.get(dup.created_by) ?? null };
+      const { data: dups } = await q;
+      const rows = (dups ?? []) as any[];
+      const names = await loadStaffNames(supabase, [...new Set(rows.map((d) => d.created_by))]);
+      for (const lvl of DETAIL_LEVELS) {
+        const d = rows.find((r) => (r.detail_level ?? "detalhado") === lvl);
+        if (d) duplicates[lvl] = { ...d, created_by_name: names.get(d.created_by) ?? null };
       }
+      // A tela antiga so conhece "duplicate": mantido ate o frontend novo subir.
+      duplicate = duplicates.detalhado ?? duplicates.resumido;
     }
 
-    if (action === "preview") return json({ ...stats, duplicate });
+    if (action === "preview") return json({ ...stats, duplicate, duplicates });
     if (action !== "generate") return json({ error: "bad_request", message: "Ação inválida" }, 400);
 
     if (lines.length === 0) return json({ error: "empty", message: "Nenhuma mensagem com conteúdo no período." }, 400);
@@ -246,6 +264,7 @@ Deno.serve(async (req) => {
       tenant_id: conv.tenant_id,
       conversation_id: conversationId,
       filter_type: filterType,
+      detail_level: detailLevel,
       attendance_id: attendanceId,
       period_start: periodStart.toISOString(),
       period_end: periodEnd.toISOString(),
@@ -261,7 +280,7 @@ Deno.serve(async (req) => {
     if (insErr?.code === "23505") return json({ error: "busy", message: "Já existe um resumo sendo gerado neste grupo." }, 409);
     if (insErr) throw insErr;
 
-    const work = runSummary(supabase, { ...aiConfig, systemPrompt: null }, conv.tenant_id, row.id, lines);
+    const work = runSummary(supabase, { ...aiConfig, systemPrompt: null }, conv.tenant_id, row.id, lines, detailLevel);
     // @ts-ignore EdgeRuntime existe no runtime do Supabase
     if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(work);
     else await work;
@@ -288,9 +307,11 @@ async function loadStaffNames(supabase: any, userIds: string[]): Promise<Map<str
   return out;
 }
 
-async function callAndLog(supabase: any, aiConfig: any, tenantId: string, user: string): Promise<string> {
+async function callAndLog(supabase: any, aiConfig: any, tenantId: string, user: string, level: DetailLevel): Promise<string> {
   const ai = await callAI(aiConfig, [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: `${SYSTEM_PROMPT}
+
+${LEVEL_PROMPT[level]}` },
     { role: "user", content: user },
   ], TOOL, { maxTokens: maxTokensFor(aiConfig.model) });
   try {
@@ -319,7 +340,7 @@ function friendlyError(e: unknown): string {
   return "Não foi possível gerar o resumo. Tente de novo.";
 }
 
-async function runSummary(supabase: any, aiConfig: any, tenantId: string, id: string, lines: Line[]) {
+async function runSummary(supabase: any, aiConfig: any, tenantId: string, id: string, lines: Line[], level: DetailLevel) {
   try {
     const byRef = new Map(lines.map((l) => [l.ref, l]));
     const chunks = chunkLines(lines, CHUNK_CHARS);
@@ -328,7 +349,7 @@ async function runSummary(supabase: any, aiConfig: any, tenantId: string, id: st
       const header = chunks.length > 1
         ? `Parte ${i + 1} de ${chunks.length} das mensagens do grupo.\n\n`
         : "Mensagens do grupo:\n\n";
-      const raw = await callAndLog(supabase, aiConfig, tenantId, header + chunks[i].map((l) => l.text).join("\n"));
+      const raw = await callAndLog(supabase, aiConfig, tenantId, header + chunks[i].map((l) => l.text).join("\n"), level);
       partials.push(parseSections(raw, byRef));
     }
 
@@ -341,6 +362,7 @@ async function runSummary(supabase: any, aiConfig: any, tenantId: string, id: st
         `O grupo foi lido em ${partials.length} partes. Abaixo, os itens de cada seção de todas as partes, em ordem.\n` +
           `Junte num resumo só: una itens repetidos, e se uma pendência foi resolvida numa parte posterior, tire-a das pendências e registre em interações. Mantenha o "ref" do item que ficou.\n\n` +
           sectionsForMerge(partials, lines),
+        level,
       );
       sections = parseSections(raw, byRef);
     }

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { endOfDay, startOfDay, subDays } from "date-fns";
 import {
-  AlertTriangle, ArrowLeft, Check, Copy, History, Info, Loader2, RotateCcw, Save, Sparkles, Trash2, X,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, History, Info, Loader2, RotateCcw, Save, Sparkles, Trash2, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -15,12 +15,15 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { cn } from "@/lib/utils";
 import {
-  SECTIONS, countPending, useGroupSummaries, useGroupSummaryActions, useSummaryPreview,
-  type FilterType, type GroupSummary, type Sections, type SummaryFilter,
+  DETAIL_LEVELS, LEVEL_LABEL, SECTIONS, countPending, useGroupSummaries, useGroupSummaryActions, useSummaryPreview,
+  type DetailLevel, type FilterType, type GroupSummary, type Sections, type SummaryDuplicate, type SummaryFilter,
 } from "./useGroupSummaries";
 
 export type GroupSummaryStart = { view: "new" } | { view: "history" } | { view: "summary"; id: string };
@@ -118,10 +121,14 @@ export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupNa
   const [range, setRange] = useState(() => ({ from: startOfDay(subDays(new Date(), 6)), to: endOfDay(new Date()) }));
   const [attendanceId, setAttendanceId] = useState<string | null>(null);
   const [ignoreDuplicate, setIgnoreDuplicate] = useState(false);
+  // Nivel escolhido no menu do botao Gerar. Fica pendente quando ja existe um
+  // resumo daquele nivel no periodo: a tela pergunta antes de gastar IA.
+  const [pendingLevel, setPendingLevel] = useState<DetailLevel | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setIgnoreDuplicate(false);
+    setPendingLevel(null);
     if (start.view === "summary") { setCurrentId(start.id); setFrom("history"); setView("result"); }
     else if (start.view === "history") { setFrom("history"); setView("history"); }
     else { setFrom("new"); setView("filter"); }
@@ -139,7 +146,7 @@ export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupNa
   }, [mode, range, attendanceId]);
 
   const preview = useSummaryPreview(open && view === "filter" ? conversationId : null, filter);
-  useEffect(() => setIgnoreDuplicate(false), [filter]);
+  useEffect(() => { setIgnoreDuplicate(false); setPendingLevel(null); }, [filter]);
 
   const current = summaries.find((s) => s.id === currentId) ?? null;
 
@@ -151,10 +158,10 @@ export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupNa
     }
   }, [view, current]);
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (detailLevel: DetailLevel) => {
     if (!filter) return;
     try {
-      const r = await generate.mutateAsync(filter);
+      const r = await generate.mutateAsync({ ...filter, detailLevel });
       setCurrentId(r.id);
       setFrom("new");
       setView("progress");
@@ -220,6 +227,7 @@ export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupNa
             attendances={attendances.data ?? []} attendancesLoading={attendances.isLoading}
             summaries={summaries} preview={preview} timezone={timezone}
             ignoreDuplicate={ignoreDuplicate} setIgnoreDuplicate={setIgnoreDuplicate}
+            pendingLevel={pendingLevel} setPendingLevel={setPendingLevel}
             onOpenDuplicate={(id) => openSummary(id, "new")}
             onCancel={() => onOpenChange(false)} onGenerate={handleGenerate} generating={generate.isPending}
           />
@@ -274,14 +282,23 @@ function FilterView(p: {
   preview: ReturnType<typeof useSummaryPreview>;
   timezone: string;
   ignoreDuplicate: boolean; setIgnoreDuplicate: (v: boolean) => void;
+  pendingLevel: DetailLevel | null; setPendingLevel: (l: DetailLevel | null) => void;
   onOpenDuplicate: (id: string) => void;
-  onCancel: () => void; onGenerate: () => void; generating: boolean;
+  onCancel: () => void; onGenerate: (level: DetailLevel) => void; generating: boolean;
 }) {
   const { data: pv, isLoading, error } = p.preview;
   const summarizedAttendances = new Set(p.summaries.filter((s) => s.status === "ready" && s.attendance_id).map((s) => s.attendance_id));
-  const duplicate = pv?.duplicate && !p.ignoreDuplicate ? pv.duplicate : null;
+  const dupFor = (lvl: DetailLevel): SummaryDuplicate | null => pv?.duplicates?.[lvl] ?? null;
+  // So avisa depois que o nivel foi escolhido: o aviso e sobre aquele resumo.
+  const duplicate = p.pendingLevel && !p.ignoreDuplicate ? dupFor(p.pendingLevel) : null;
   const empty = pv && pv.message_count === 0;
-  const canGenerate = !!pv && !empty && !duplicate && !p.generating && !(p.mode === "attendance" && !p.attendanceId);
+  const canGenerate = !!pv && !empty && !p.generating && !(p.mode === "attendance" && !p.attendanceId);
+
+  const pick = (lvl: DetailLevel) => {
+    p.setPendingLevel(lvl);
+    if (!p.ignoreDuplicate && dupFor(lvl)) return;
+    p.onGenerate(lvl);
+  };
 
   return (
     <>
@@ -353,11 +370,11 @@ function FilterView(p: {
           <div className="flex gap-2 rounded-lg border border-sky-500/60 bg-sky-50 px-3 py-2.5 text-xs leading-relaxed dark:bg-sky-950/30">
             <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" />
             <div>
-              {p.mode === "attendance" ? "Este atendimento" : "Este período"} já foi resumido em <b>{fmt(duplicate.created_at, p.timezone)}</b>
+              {p.mode === "attendance" ? "Este atendimento" : "Este período"} já tem um resumo <b>{LEVEL_LABEL[p.pendingLevel!].toLowerCase()}</b>, de <b>{fmt(duplicate.created_at, p.timezone)}</b>
               {duplicate.created_by_name ? <> por {duplicate.created_by_name}</> : null}, e não chegou mensagem nova depois disso.
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => p.onOpenDuplicate(duplicate.id)}>Abrir o resumo salvo</Button>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => p.setIgnoreDuplicate(true)}>Gerar outro mesmo assim</Button>
+                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { p.setIgnoreDuplicate(true); p.onGenerate(p.pendingLevel!); }}>Gerar outro mesmo assim</Button>
               </div>
             </div>
           </div>
@@ -389,10 +406,27 @@ function FilterView(p: {
       <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
         <span className="mr-auto text-[11px] text-muted-foreground">O resumo fica salvo no histórico deste grupo.</span>
         <Button variant="outline" size="sm" onClick={p.onCancel}>Cancelar</Button>
-        <Button size="sm" className="gap-1.5 bg-green-600 text-white hover:bg-green-700" disabled={!canGenerate} onClick={p.onGenerate}>
-          {p.generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-          Gerar resumo
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" className="gap-1.5 bg-green-600 text-white hover:bg-green-700" disabled={!canGenerate}>
+              {p.generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Gerar resumo
+              <ChevronDown className="h-3.5 w-3.5 opacity-80" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-64">
+            {DETAIL_LEVELS.map((lvl) => {
+              const ja = dupFor(lvl.key);
+              return (
+                <DropdownMenuItem key={lvl.key} onSelect={() => pick(lvl.key)} className="flex-col items-start gap-0.5 py-2">
+                  <span className="flex items-center gap-1.5 text-[13px] font-medium"><Sparkles className="h-3.5 w-3.5 text-green-600" />{lvl.label}</span>
+                  <span className="pl-5 text-[11px] text-muted-foreground">{lvl.hint}</span>
+                  {ja && <span className="pl-5 text-[11px] text-sky-600 dark:text-sky-400">já gerado em {fmt(ja.created_at, p.timezone)}</span>}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </>
   );
@@ -455,7 +489,7 @@ function ResultView(p: {
   };
 
   const copy = async () => {
-    const lines = [`Resumo do grupo: ${p.label} (${fmt(s.period_start, p.timezone, true)} a ${fmt(s.period_end, p.timezone, true)})`];
+    const lines = [`Resumo do grupo: ${p.label} (${fmt(s.period_start, p.timezone, true)} a ${fmt(s.period_end, p.timezone, true)}) · ${LEVEL_LABEL[s.detail_level ?? "detalhado"]}`];
     for (const sec of SECTIONS) {
       const items = (draft[sec.key] ?? []).filter((it) => it.texto.trim());
       if (!items.length) continue;
@@ -490,6 +524,7 @@ function ResultView(p: {
         <div className="flex flex-wrap gap-1.5 text-[11px] tabular-nums">
           {p.fresh && <span className="flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 font-semibold text-green-800 dark:bg-green-950 dark:text-green-300"><Check className="h-3 w-3" />Salvo no histórico</span>}
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">{p.label} · {fmt(s.period_start, p.timezone)} a {fmt(s.period_end, p.timezone)}</span>
+          <span className="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">{LEVEL_LABEL[s.detail_level ?? "detalhado"]}</span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">{s.message_count} mensagens</span>
           <span className="rounded-full bg-muted px-2.5 py-0.5 text-muted-foreground">Gerado por {author} em {fmt(s.created_at, p.timezone)}</span>
         </div>
@@ -636,6 +671,7 @@ function HistoryView(p: {
                   <div className="min-w-0 text-xs leading-snug">
                     <div className="truncate">
                       <span className="mr-1 rounded bg-muted px-1 py-px text-[9.5px] font-bold uppercase tracking-wide text-muted-foreground">{TYPE_TAG[s.filter_type]}</span>
+                      <span className="mr-1 rounded border px-1 py-px text-[9.5px] font-bold uppercase tracking-wide text-muted-foreground">{LEVEL_LABEL[s.detail_level ?? "detalhado"]}</span>
                       <span className="font-semibold">{summaryLabel(s, p.timezone, s.attendance_id ? p.codeById.get(s.attendance_id) : null)}</span>
                     </div>
                     <div className="truncate text-[11px] text-muted-foreground">

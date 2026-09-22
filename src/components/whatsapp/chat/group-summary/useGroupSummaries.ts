@@ -26,10 +26,19 @@ export type Sections = Partial<Record<SectionKey, SummaryItem[]>>;
 
 export type FilterType = "last_24h" | "period" | "attendance";
 
+// Nivel de detalhe do resumo. O que existia antes de 22/09/2026 e "detalhado".
+export type DetailLevel = "resumido" | "detalhado";
+export const DETAIL_LEVELS: { key: DetailLevel; label: string; hint: string }[] = [
+  { key: "resumido", label: "Resumido", hint: "O essencial, poucos itens por seção" },
+  { key: "detalhado", label: "Detalhado", hint: "Tudo que foi tratado no período" },
+];
+export const LEVEL_LABEL: Record<DetailLevel, string> = { resumido: "Resumido", detalhado: "Detalhado" };
+
 export interface GroupSummary {
   id: string;
   conversation_id: string;
   filter_type: FilterType;
+  detail_level: DetailLevel;
   attendance_id: string | null;
   period_start: string;
   period_end: string;
@@ -52,6 +61,12 @@ export interface SummaryFilter {
   attendanceId?: string | null;
 }
 
+export interface SummaryDuplicate {
+  id: string;
+  created_at: string;
+  created_by_name: string | null;
+}
+
 export interface SummaryPreview {
   message_count: number;
   participants: number;
@@ -60,7 +75,9 @@ export interface SummaryPreview {
   parts: number;
   period_start: string;
   period_end: string;
-  duplicate: { id: string; created_at: string; created_by_name: string | null } | null;
+  duplicate: SummaryDuplicate | null;
+  /** Um por nivel: gerar resumido nao esbarra no detalhado do mesmo periodo. */
+  duplicates?: Partial<Record<DetailLevel, SummaryDuplicate | null>>;
 }
 
 async function invokeSummarize<T>(body: Record<string, unknown>): Promise<T> {
@@ -89,7 +106,7 @@ export function useGroupSummaries(conversationId: string | null) {
     queryFn: async () =>
       fetchAllRows<GroupSummary>(() =>
         (supabase.from("whatsapp_group_summaries" as any) as any)
-          .select("id, conversation_id, filter_type, attendance_id, period_start, period_end, status, error_message, message_count, parts, sections, created_by, created_at, finished_at, edited_by, edited_at")
+          .select("id, conversation_id, filter_type, detail_level, attendance_id, period_start, period_end, status, error_message, message_count, parts, sections, created_by, created_at, finished_at, edited_by, edited_at")
           .eq("conversation_id", conversationId)
           .order("created_at", { ascending: false })
       ),
@@ -147,8 +164,8 @@ export function useGroupSummaryActions(conversationId: string | null) {
   const refresh = () => qc.invalidateQueries({ queryKey: ["group-summaries", conversationId] });
 
   const generate = useMutation({
-    mutationFn: (filter: SummaryFilter) =>
-      invokeSummarize<{ id: string }>({ action: "generate", conversationId, ...filter }),
+    mutationFn: ({ detailLevel, ...filter }: SummaryFilter & { detailLevel: DetailLevel }) =>
+      invokeSummarize<{ id: string }>({ action: "generate", conversationId, detailLevel, ...filter }),
     onSettled: refresh,
   });
 
