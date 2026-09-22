@@ -24,6 +24,8 @@ import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { ShieldAlert } from "lucide-react";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { usePortao } from "@/hooks/usePortao";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
 import { hasOpenEscLayer } from "@/lib/escapeLayers";
 import {
   AlertDialog,
@@ -51,6 +53,8 @@ type DeleteMode = 'panel_only' | 'everyone';
 
 export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, onDepartmentTransferred, highlightMessageId, onHighlightShown, pendingAction, onPendingActionConsumed }: Props) {
   const [showDetails, setShowDetails] = useState(false);
+  // Mesma regra da lista: o endereço do chat é sempre formato de celular.
+  const emCelular = useIsMobile() || isChatHost();
   // Nota clicada na barra de Detalhes: o chat rola até ela
   const [noteToFocus, setNoteToFocus] = useState<ConversationNote | null>(null);
   // Origem de um item do resumo do grupo por IA: o chat rola até a mensagem
@@ -267,7 +271,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const hasHardBlock = hardBlocks.length > 0;
 
   return (
-    <div className="h-full flex min-h-0 overflow-hidden">
+    <div className="h-full flex min-h-0 overflow-hidden relative">
       <div
         className={`flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden relative ${presenceBlocked ? "opacity-60 grayscale-[30%]" : ""}`}
         onDragOver={(e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); setIsDraggingFile(true); } }}
@@ -299,6 +303,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           onDepartmentTransferred={onDepartmentTransferred}
           pendingAction={pendingAction}
           onPendingActionConsumed={onPendingActionConsumed}
+          variant={emCelular ? "mobile" : "desktop"}
         />
         <ClientAlertBanner
           contactId={conversation.contact_id ?? conversation.contact?.id}
@@ -420,14 +425,29 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
       </div>
 
       {showDetails && (
-        <DetailsSidebar
-          conversation={conversation}
-          onClose={() => setShowDetails(false)}
-          onNavigateToConversation={onNavigateToConversation}
-          onConversationClosed={onClose}
-          onGoToNote={setNoteToFocus}
-          onGoToMessage={setMessageToFocus}
-        />
+        emCelular ? (
+          // Sobreposta, não ao lado: a coluna de 320px deixaria o chat com 70px.
+          <div className="absolute inset-0 z-40 bg-background">
+            <DetailsSidebar
+              conversation={conversation}
+              onClose={() => setShowDetails(false)}
+              onNavigateToConversation={onNavigateToConversation}
+              onConversationClosed={onClose}
+              onGoToNote={setNoteToFocus}
+              onGoToMessage={setMessageToFocus}
+              variant="mobile"
+            />
+          </div>
+        ) : (
+          <DetailsSidebar
+            conversation={conversation}
+            onClose={() => setShowDetails(false)}
+            onNavigateToConversation={onNavigateToConversation}
+            onConversationClosed={onClose}
+            onGoToNote={setNoteToFocus}
+            onGoToMessage={setMessageToFocus}
+          />
+        )
       )}
 
       <ForwardMessageDialog

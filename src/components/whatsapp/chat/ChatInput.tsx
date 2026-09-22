@@ -1554,7 +1554,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           )}
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">
+          {/* Dica de teclado não serve a quem digita no celular, e rouba uma linha do campo. */}
+          <p className="hidden sm:block text-xs text-muted-foreground">
             {isScheduleMode
               ? (editandoAgendadaId
                   ? "Enter para salvar a alteração, Shift+Enter para nova linha"

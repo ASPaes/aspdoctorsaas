@@ -58,6 +58,7 @@ import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
+import { MobileChatActionsSheet, type AcaoDoAtendimento } from "@/components/chat-mobile/MobileChatActionsSheet";
 import { useSupportConfig } from '@/hooks/useSupportConfig';
 import { useAuth } from "@/contexts/AuthContext";
 import { usePortao } from "@/hooks/usePortao";
@@ -71,9 +72,12 @@ interface Props {
   onDepartmentTransferred?: () => void;
   pendingAction?: string | null;
   onPendingActionConsumed?: () => void;
+  /** "mobile" troca a barra de oito ícones pela folha de ações; o resto é igual. */
+  variant?: "desktop" | "mobile";
 }
 
-export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred, pendingAction, onPendingActionConsumed }: Props) {
+export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose, onNavigateToConversation, onDepartmentTransferred, pendingAction, onPendingActionConsumed, variant = "desktop" }: Props) {
+  const isMobileVariant = variant === "mobile";
   const { archiveConversation, closeConversation, reopenConversation, markAsUnread, pauseAutoReply, isPausingAutoReply, deleteMessagesByIds, isDeletingMessages, resumeAutoReply, isResumingAutoReply, scheduleAttendance, isSchedulingAttendance, unscheduleAttendance, isUnschedulingAttendance } = useWhatsAppActions();
   const { sentiment, isAnalyzing, analyze } = useWhatsAppSentiment(conversation.id);
   const sentimentData = sentiment as any;
@@ -706,6 +710,132 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const statusLabel = computedStatusLabel;
   const statusVariant = computedStatusVariant;
 
+  // As MESMAS ações da barra do computador, em lista. Montadas aqui porque é
+  // aqui que vivem os estados e os diálogos delas — a folha só desenha.
+  const acoesDoCelular: AcaoDoAtendimento[] = isMobileVariant
+    ? [
+        {
+          chave: "detalhes",
+          rotulo: "Detalhes do contato",
+          icone: <PanelRightOpen className="h-[18px] w-[18px]" />,
+          onSelect: onToggleDetails,
+        },
+        ...(isGroupConv
+          ? [{
+              chave: "participantes",
+              rotulo: "Participantes do grupo",
+              icone: <Users className="h-[18px] w-[18px]" />,
+              onSelect: () => setShowParticipants(true),
+            }]
+          : []),
+        {
+          chave: "editar-contato",
+          rotulo: "Editar contato",
+          icone: <Pencil className="h-[18px] w-[18px]" />,
+          onSelect: () => setIsEditContactOpen(true),
+        },
+        {
+          chave: "buscar",
+          rotulo: "Buscar nesta conversa",
+          icone: <FileSearch className="h-[18px] w-[18px]" />,
+          onSelect: () => setShowInChatSearch(true),
+        },
+        {
+          chave: "email",
+          rotulo: "Enviar e-mail",
+          icone: <Mail className="h-[18px] w-[18px]" />,
+          onSelect: envioEmail.abrir,
+          desabilitada: envioEmail.verificando,
+        },
+        ...(canSchedule && !isGroupConv
+          ? [{
+              chave: "agendar",
+              rotulo: isScheduled ? "Editar agendamento" : "Agendar atendimento",
+              icone: <CalendarClock className="h-[18px] w-[18px]" />,
+              onSelect: () => setShowScheduleDialog(true),
+            }]
+          : []),
+        {
+          chave: "sentimento",
+          rotulo: "Analisar sentimento",
+          icone: <Brain className="h-[18px] w-[18px]" />,
+          onSelect: analyze,
+          desabilitada: isAnalyzing,
+        },
+        ...((conversation.status === "closed" || conversation.status === "archived") && !isGroupConv
+          ? [{
+              chave: "reabrir",
+              rotulo: "Reabrir conversa",
+              icone: <RotateCcw className="h-[18px] w-[18px]" />,
+              onSelect: () => reopenConversation(conversation.id),
+            }]
+          : []),
+        ...(conversation.status === "active" && !isGroupConv
+          ? [{
+              chave: "arquivar",
+              rotulo: "Arquivar conversa",
+              icone: <Archive className="h-[18px] w-[18px]" />,
+              onSelect: () => archiveConversation(conversation.id),
+            }]
+          : []),
+        ...(!conversation.auto_reply_disabled
+          ? [{
+              chave: "auto-respostas",
+              rotulo: "Interromper auto-respostas",
+              icone: <VolumeX className="h-[18px] w-[18px]" />,
+              onSelect: () => setShowInterruptDialog(true),
+              desabilitada: isPausingAutoReply,
+            }]
+          : []),
+        {
+          chave: "nao-lida",
+          rotulo: "Marcar como não lida",
+          icone: <BellOff className="h-[18px] w-[18px]" />,
+          onSelect: () => markAsUnread(conversation.id),
+        },
+        {
+          chave: "ticket-cs",
+          rotulo: "Abrir Ticket CS",
+          icone: <Ticket className="h-[18px] w-[18px]" />,
+          onSelect: () => setIsManualTicketOpen(true),
+        },
+        ...(!isGroupConv && (isAdmin || (!!user?.id && attendance?.assigned_to === user.id))
+          ? [{
+              chave: "ticket-atendimento",
+              rotulo: "Abrir Ticket do Atendimento",
+              icone: <FileText className="h-[18px] w-[18px]" />,
+              onSelect: handleOpenAttendanceTicket,
+            }]
+          : []),
+        ...(isAdmin && churnDescartado
+          ? [{
+              chave: "churn",
+              rotulo: "Reativar risco de churn",
+              icone: <AlertTriangle className="h-[18px] w-[18px]" />,
+              onSelect: () => setChurnDismissed(false),
+              desabilitada: isSavingChurn,
+            }]
+          : []),
+        ...(hasMultipleInstances
+          ? [{
+              chave: "instancia",
+              rotulo: "Trocar instância",
+              icone: <ArrowLeftRight className="h-[18px] w-[18px]" />,
+              onSelect: () => setIsChangeInstanceOpen(true),
+            }]
+          : []),
+        ...(isAdmin
+          ? [{
+              chave: "excluir",
+              rotulo: "Excluir conversa",
+              icone: <Trash2 className="h-[18px] w-[18px]" />,
+              onSelect: () => { setDeleteConfirmText(""); setShowDeleteDialog(true); },
+              perigo: true,
+            }]
+          : []),
+      ]
+    : [];
+
   return (
     <div className="shrink-0">
       <div className="border-b border-border bg-background px-3 py-1.5">
@@ -730,6 +860,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
               <p className="text-sm font-semibold truncate min-w-0">{name}</p>
+              {/* No celular estes três ícones de 12px comiam o nome do contato,
+                  que virava "Conta...". Editar e silenciar foram para a folha de
+                  ações; o vínculo com o cliente vira o item "Detalhes". */}
+              {!isMobileVariant && (
+              <>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0" onClick={() => setIsEditContactOpen(true)} aria-label="Editar contato">
@@ -759,6 +894,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
                 </TooltipContent>
               </Tooltip>
+              </>
+              )}
               {!isGroupConv && contact?.phone_number && (
                 <span className="text-[11px] text-muted-foreground truncate hidden sm:inline ml-1">
                   {formatBRPhone(contact.phone_number)}
@@ -871,6 +1008,39 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               nome={linkedClienteName || contact?.name || null}
             />
 
+            {/* No celular estes oito ícones não cabem lado a lado: viram lista
+                com nome dentro da folha de ações, logo abaixo. Encerrar fica de
+                fora dela porque é a ação que o atendente mais usa. */}
+            {isMobileVariant ? (
+              <>
+                {conversation.status === "active" && !isGroupConv && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => setShowConfirmCliente(true)}
+                    aria-label="Encerrar conversa"
+                  >
+                    <XCircle className="h-[18px] w-[18px]" />
+                  </Button>
+                )}
+                <MobileChatActionsSheet
+                  titulo={name || "Atendimento"}
+                  subtitulo={!isGroupConv && contact?.phone_number ? formatBRPhone(contact.phone_number) : null}
+                  acoes={acoesDoCelular}
+                  rodape={
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <ConversationMuteButton conversationId={conversation.id} />
+                        <span className="text-muted-foreground">Silenciar esta conversa</span>
+                      </div>
+                      <ChatQuickRuleToggles conversationId={conversation.id} />
+                    </div>
+                  }
+                />
+              </>
+            ) : (
+            <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={analyze} disabled={isAnalyzing} aria-label="Analisar sentimento">
@@ -1011,6 +1181,8 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
+            </>
+            )}
           </div>
         </div>
 

@@ -70,9 +70,14 @@ interface Props {
   onGoToNote?: (note: ConversationNote) => void;
   /** Clique na hora de um item do resumo do grupo: o chat rola até a mensagem */
   onGoToMessage?: (target: { id: string; at: string }) => void;
+  /**
+   * "mobile": ocupa a tela inteira em vez da coluna de 320px. Em 390px a coluna
+   * fixa deixaria o chat com pouco mais de 70px ao lado dela.
+   */
+  variant?: "desktop" | "mobile";
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote, onGoToMessage }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote, onGoToMessage, variant = "desktop" }: Props) {
   const { timezone } = useAppTimezone();
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
@@ -216,7 +221,13 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const summaryIsLong = sentiment?.summary?.length > 120;
 
   return (
-    <div className="w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink-0 overflow-hidden">
+    <div
+      className={
+        variant === "mobile"
+          ? "w-full flex flex-col h-full bg-background overflow-hidden"
+          : "w-80 min-w-[280px] max-w-[320px] border-l border-border flex flex-col h-full bg-background shrink-0 overflow-hidden"
+      }
+    >
       {/* Header */}
       <div className="h-14 border-b border-border flex items-center justify-between px-4 shrink-0">
         <h3 className="text-sm font-semibold">Detalhes</h3>
