@@ -213,7 +213,25 @@ export interface TreinoLite {
   tentativas: number | null;
 }
 
-export interface AgregadoTreinos {
+/**
+ * As sessões por trás de cada contador — mesmo contrato dos baldes da faixa de situação
+ * (`listarSituacao`) e da tabela por tipo de treino. Cada balde segue EXATAMENTE a regra
+ * do seu contador, inclusive o early-return do cancelado: enquanto fossem dois códigos,
+ * a lista podia discordar do número que ela explica.
+ */
+export interface BaldesTreinos<T> {
+  realizados: T[];
+  /** Realizadas cujo tipo conta como PDV. */
+  pdvFinalizados: T[];
+  /** Sessões com ao menos 1 falta. O contador `faltas` é MAIOR: sobe a cada remarcação. */
+  comFalta: T[];
+  retreinos: T[];
+  /** Realizadas em que ninguém respondeu se o proprietário estava — o acionável. */
+  semProprietario: T[];
+  desistencias: T[];
+}
+
+export interface AgregadoTreinos<T = unknown> {
   realizado: number;
   noShow: number;
   cancelado: number;
@@ -245,20 +263,26 @@ export interface AgregadoTreinos {
   /** null quando ninguém informou — sem cobertura não existe percentual */
   propPct: number | null;
   pdvFinalizados: number;
+  /** Quem está por trás de cada contador acima. */
+  listas: BaldesTreinos<T>;
 }
 
-export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
+export function agregarTreinos<T extends TreinoLite>(treinos: T[]): AgregadoTreinos<T> {
   let realizado = 0, noShow = 0, cancelado = 0, desistencia = 0, emAberto = 0;
   let comFalta = 0, faltas = 0, retreinos = 0;
   let propInformado = 0, propSim = 0, pdvFinalizados = 0;
+  const listas: BaldesTreinos<T> = {
+    realizados: [], pdvFinalizados: [], comFalta: [], retreinos: [], semProprietario: [], desistencias: [],
+  };
 
   treinos.forEach((t) => {
     const d = desfechoTreino(t.status);
     if (d === "realizado") realizado++;
     else if (d === "no_show") noShow++;
     else if (d === "cancelado") cancelado++;
-    else if (d === "desistencia") desistencia++;
+    else if (d === "desistencia") { desistencia++; listas.desistencias.push(t); }
     else emAberto++;
+    if (d === "realizado") listas.realizados.push(t);
 
     // A falta é contada mesmo em sessão cancelada: o cliente faltou de verdade.
     // O contador manda; a flag pegajosa cobre as linhas anteriores ao backfill de 11/08.
@@ -266,17 +290,20 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     if (faltasDoTreino > 0) {
       comFalta++;
       faltas += faltasDoTreino;
+      listas.comFalta.push(t);
     }
 
     if (d === "cancelado") return; // fora de todo o resto
 
-    if (t.is_retreinamento === true) retreinos++;
+    if (t.is_retreinamento === true) { retreinos++; listas.retreinos.push(t); }
     if (d === "realizado") {
       if (t.proprietario_presente === true || t.proprietario_presente === false) {
         propInformado++;
         if (t.proprietario_presente === true) propSim++;
+      } else {
+        listas.semProprietario.push(t);
       }
-      if (t.conta_como_pdv === true) pdvFinalizados++;
+      if (t.conta_como_pdv === true) { pdvFinalizados++; listas.pdvFinalizados.push(t); }
     }
   });
 
@@ -291,6 +318,7 @@ export function agregarTreinos(treinos: TreinoLite[]): AgregadoTreinos {
     propInformado, propSim,
     propPct: propInformado > 0 ? pct(propSim, propInformado) : null,
     pdvFinalizados,
+    listas,
   };
 }
 

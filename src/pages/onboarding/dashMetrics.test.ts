@@ -568,3 +568,56 @@ describe("contarSituacao com janela", () => {
     expect(c.total).toBe(8);
   });
 });
+
+describe("agregarTreinos · baldes", () => {
+  type Sessao = TreinoLite & { id: string };
+  const ss = (id: string, p: Partial<TreinoLite> = {}): Sessao => ({ ...t(p), id });
+  const ids = (xs: Sessao[]) => xs.map((x) => x.id).sort();
+
+  const sessoes: Sessao[] = [
+    ss("realizada-pdv", { status: "realizado", conta_como_pdv: true, proprietario_presente: true }),
+    ss("realizada-sem-prop", { status: "realizado", conta_como_pdv: true }),
+    ss("realizada-comum", { status: "realizado", proprietario_presente: false }),
+    ss("faltou", { status: "previsto", no_shows: 2 }),
+    ss("retreino", { status: "previsto", is_retreinamento: true }),
+    ss("cancelada-retreino", { status: "cancelado", is_retreinamento: true, conta_como_pdv: true }),
+    ss("desistiu", { status: "desistencia" }),
+  ];
+
+  it("a lista de realizados bate com o contador", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.realizados)).toEqual(["realizada-comum", "realizada-pdv", "realizada-sem-prop"]);
+    expect(a.listas.realizados.length).toBe(a.realizado);
+  });
+
+  it("a lista de PDV só traz sessão realizada que conta como PDV", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.pdvFinalizados)).toEqual(["realizada-pdv", "realizada-sem-prop"]);
+    expect(a.listas.pdvFinalizados.length).toBe(a.pdvFinalizados);
+  });
+
+  it("a lista de faltas traz a sessão, não a falta — o contador é maior que ela", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.comFalta)).toEqual(["faltou"]);
+    expect(a.listas.comFalta.length).toBe(a.comFalta);
+    expect(a.faltas).toBe(2);
+  });
+
+  it("a lista de retreinos ignora a sessão cancelada, como o contador", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.retreinos)).toEqual(["retreino"]);
+    expect(a.listas.retreinos.length).toBe(a.retreinos);
+  });
+
+  it("a lista de proprietário não informado traz os realizados sem a resposta", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.semProprietario)).toEqual(["realizada-sem-prop"]);
+    expect(a.listas.semProprietario.length).toBe(a.realizado - a.propInformado);
+  });
+
+  it("a lista de desistências bate com o contador", () => {
+    const a = agregarTreinos(sessoes);
+    expect(ids(a.listas.desistencias)).toEqual(["desistiu"]);
+    expect(a.listas.desistencias.length).toBe(a.desistencia);
+  });
+});

@@ -419,6 +419,10 @@ export default function OnboardingDashboardPage() {
   // KPIs treinos — desfecho vem do status; falta vem do contador `no_shows`.
   const tr = useMemo(() => agregarTreinos(trainings), [trainings]);
 
+  /** Card de treino vira botão só quando tem o que mostrar. */
+  const abrirTreinos = (titulo: string, regra: string, linhas: TrainingRow[]) =>
+    linhas.length > 0 ? () => setDrillTreinos({ titulo, regra, linhas }) : undefined;
+
   /** Lista do drill-down de desistências: quem desistiu, de qual treino e quem encerrou.
    *  Mais recente primeiro — é o que o gestor quer ver ao abrir. */
   const desistencias = useMemo(
@@ -436,25 +440,38 @@ export default function OnboardingDashboardPage() {
     return (t.no_shows ?? 0) > 0 ? (t.no_shows as number) : (t.no_show === true ? 1 : 0);
   }
 
-  // Tabela por implantador
+  // Tabela por implantador. Guarda as SESSÕES, não só o contador — cada número abre a
+  // lista do que ele conta, como na tabela por tipo de treino.
+  //
+  // A coluna No-show é a única que NÃO é o tamanho da sua lista: ela soma as faltas, e o
+  // contador sobe a cada remarcação. 14 faltas podem vir de 5 sessões, e é isso que o
+  // painel precisa dizer ao abrir.
   const byImplantador = useMemo(() => {
-    const m: Record<string, { total: number; realizado: number; no_show: number; retreino: number }> = {};
+    type Balde = { sessoes: TrainingRow[]; realizado: number; comFalta: TrainingRow[]; faltas: number; retreinos: TrainingRow[] };
+    const m: Record<string, Balde> = {};
     trainings.forEach((t) => {
       const id = t.conduzido_por || "__sem__";
-      if (!m[id]) m[id] = { total: 0, realizado: 0, no_show: 0, retreino: 0 };
+      if (!m[id]) m[id] = { sessoes: [], realizado: 0, comFalta: [], faltas: 0, retreinos: [] };
       const d = desfechoTreino(t.status);
       if (d === "cancelado") return; // cancelado não é performance de ninguém
-      m[id].total += 1;
+      m[id].sessoes.push(t);
       if (d === "realizado") m[id].realizado += 1;
-      m[id].no_show += faltasDe(t);
-      if (t.is_retreinamento) m[id].retreino += 1;
+      const f = faltasDe(t);
+      if (f > 0) {
+        m[id].comFalta.push(t);
+        m[id].faltas += f;
+      }
+      if (t.is_retreinamento) m[id].retreinos.push(t);
     });
     return Object.entries(m)
-      .map(([id, s]) => ({
+      .map(([id, b]) => ({
         id,
         nome: id === "__sem__" ? "Sem implantador" : (names[id] || "—"),
-        ...s,
-        pctRealizado: pct(s.realizado, s.total),
+        ...b,
+        total: b.sessoes.length,
+        no_show: b.faltas,
+        retreino: b.retreinos.length,
+        pctRealizado: pct(b.realizado, b.sessoes.length),
       }))
       .sort((a, b) => b.total - a.total);
   }, [trainings, names]);
@@ -605,6 +622,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={CheckCircle2}
                 label="Total PDV finalizados"
+                onClick={abrirTreinos(
+                  "Total PDV finalizados",
+                  "Treinos realizados cujo tipo está marcado como PDV no cadastro.",
+                  tr.listas.pdvFinalizados,
+                )}
                 value={semTipoPdv ? "—" : String(tr.pdvFinalizados)}
                 sub={
                   semTipoPdv
@@ -617,6 +639,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={GraduationCap}
                 label="% Realizado"
+                onClick={abrirTreinos(
+                  "Treinos realizados",
+                  `Sessões concluídas no período. O percentual é sobre os ${tr.validos} válidos.`,
+                  tr.listas.realizados,
+                )}
                 value={`${tr.realizadoPct}%`}
                 sub={`${tr.realizado} realiz. / ${tr.validos} válidos`}
                 tone={tr.realizadoPct >= 80 ? "success" : tr.realizadoPct >= 60 ? "warning" : "danger"}
@@ -625,6 +652,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={AlertTriangle}
                 label="Faltas"
+                onClick={abrirTreinos(
+                  "Sessões com falta",
+                  "Sessões que registraram ao menos uma falta. O contador sobe a cada remarcação, então a mesma sessão pode responder por mais de uma — e ainda acabar realizada.",
+                  tr.listas.comFalta,
+                )}
                 value={String(tr.faltas)}
                 sub={`${tr.comFalta} ${tr.comFalta === 1 ? "treino faltou" : "treinos faltaram"} ao menos 1x`}
                 tone={tr.faltas === 0 ? "success" : "warning"}
@@ -633,6 +665,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={RotateCcw}
                 label="% Retreinamento"
+                onClick={abrirTreinos(
+                  "Retreinamentos",
+                  `Sessões marcadas como retreinamento. O percentual é sobre os ${tr.validos} válidos.`,
+                  tr.listas.retreinos,
+                )}
                 value={`${tr.retreinosPct}%`}
                 sub={`${tr.retreinos} de ${tr.validos} treinos`}
                 tone={tr.retreinosPct < 15 ? "success" : tr.retreinosPct < 30 ? "warning" : "danger"}
@@ -658,6 +695,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={AlertTriangle}
                 label="Taxa de no-show"
+                onClick={abrirTreinos(
+                  "Sessões com falta",
+                  "Sessões que registraram ao menos uma falta. A taxa é sobre as sessões, não sobre o total de faltas.",
+                  tr.listas.comFalta,
+                )}
                 value={`${tr.noShowRate}%`}
                 sub={`${tr.comFalta} de ${tr.validos} treinos • meta < 20%`}
                 tone={tr.noShowRate < 20 ? "success" : tr.noShowRate < 30 ? "warning" : "danger"}
@@ -666,6 +708,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={UserCheck}
                 label="Proprietário presente"
+                onClick={abrirTreinos(
+                  "Realizados sem a resposta",
+                  "Treinos realizados em que ninguém respondeu se o proprietário estava presente — é o que falta preencher.",
+                  tr.listas.semProprietario,
+                )}
                 value={tr.propPct == null ? "—" : `${tr.propPct}%`}
                 sub={
                   tr.propPct == null
@@ -678,6 +725,11 @@ export default function OnboardingDashboardPage() {
               <KpiCard
                 icon={GraduationCap}
                 label="Treinos realizados"
+                onClick={abrirTreinos(
+                  "Treinos realizados",
+                  "Sessões concluídas no período.",
+                  tr.listas.realizados,
+                )}
                 value={String(tr.realizado)}
                 sub={`${tr.validos} válidos · ${tr.cancelado} cancelados`}
                 tone="info"
@@ -782,22 +834,41 @@ export default function OnboardingDashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {byImplantador.map((row) => (
-                      <tr key={row.id} className="border-t border-border hover:bg-muted/20">
-                        <td className="px-3 py-2 font-medium">{row.nome}</td>
-                        <td className="px-3 py-2 text-right">{row.total}</td>
-                        <td className={`px-3 py-2 text-right ${row.no_show > 0 ? "text-destructive font-medium" : ""}`}>
-                          {row.no_show}
+                    {byImplantador.map((row) => {
+                      const celImpl = (linhas: TrainingRow[], valor: number, classe: string, titulo: string, regra: string) => (
+                        <td className={`px-3 py-2 text-right ${classe}`}>
+                          {linhas.length === 0 ? (
+                            valor
+                          ) : (
+                            <button
+                              type="button"
+                              className="cursor-pointer hover:underline underline-offset-2"
+                              onClick={() => setDrillTreinos({ titulo, regra, linhas })}
+                            >
+                              {valor}
+                            </button>
+                          )}
                         </td>
-                        <td className="px-3 py-2 text-right">{row.retreino}</td>
-                        <td className="px-3 py-2">
-                          <div className="flex items-center gap-2">
-                            <Progress value={row.pctRealizado} className="h-1.5 flex-1" />
-                            <span className="text-[10px] text-muted-foreground w-10 text-right">{row.pctRealizado}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                      );
+                      return (
+                        <tr key={row.id} className="border-t border-border hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium">{row.nome}</td>
+                          {celImpl(row.sessoes, row.total, "", `${row.nome} · treinos`,
+                            "Sessões conduzidas por esta pessoa no período. Canceladas ficam de fora — não são performance de ninguém.")}
+                          {celImpl(row.comFalta, row.no_show, row.no_show > 0 ? "text-destructive font-medium" : "",
+                            `${row.nome} · no-show`,
+                            `${row.faltas} ${row.faltas === 1 ? "falta" : "faltas"} em ${row.comFalta.length} ${row.comFalta.length === 1 ? "sessão" : "sessões"}. O contador sobe a cada remarcação, então a mesma sessão pode responder por mais de uma.`)}
+                          {celImpl(row.retreinos, row.retreino, "", `${row.nome} · retreinos`,
+                            "Sessões marcadas como retreinamento.")}
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Progress value={row.pctRealizado} className="h-1.5 flex-1" />
+                              <span className="text-[10px] text-muted-foreground w-10 text-right">{row.pctRealizado}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
