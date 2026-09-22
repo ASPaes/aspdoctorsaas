@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useOmieConta } from "./OmieContaContext";
@@ -536,6 +536,63 @@ export default function OmieFilaSincronizacaoPanel({
     () => (resumo.pendente ?? 0) > 0 || (resumo.processando ?? 0) > 0,
     [resumo]
   );
+
+  // ========================================================================
+  // A fila para de esperar clique para o que nao tem decisao humana nenhuma.
+  //
+  // Ao abrir o painel, o omie_fila_auto_resolver FECHA as linhas em que nao ha nada a fazer no
+  // Omie (contrato apagado no DoctorSaaS depois de entrar na fila, linha superada por um envio
+  // posterior que chegou la, e cancelamento de contrato que nunca existiu no Omie) e DEVOLVE
+  // para a fila as que estavam paradas por uma validacao do DoctorSaaS ja corrigida.
+  //
+  // Antes, essas linhas ficavam vermelhas esperando um clique que so podia dar um resultado. As
+  // duas primeiras a propria tela ja sabia diagnosticar ("pode descartar") e mesmo assim pedia a
+  // acao. Cada fechamento automatico vira um audit_events, senao ninguem responderia depois por
+  // que a linha sumiu.
+  //
+  // Uma vez por conta aberta, nao a cada refresh: o auto-refresh de 30s nao repete isto.
+  // ========================================================================
+  const autoResolvido = useRef<string | null>(null);
+  useEffect(() => {
+    if (!tid || !conta?.id) return;
+    const chave = `${tid}|${conta.id}`;
+    if (autoResolvido.current === chave) return;
+    autoResolvido.current = chave;
+    (async () => {
+      const { data, error } = await (supabase.rpc as any)("omie_fila_auto_resolver", {
+        p_tenant_id: tid,
+        p_conta_integration_id: conta.id,
+      });
+      // Silencioso de proposito: isto e melhoria de bastidor. Se falhar, a tela continua a mesma
+      // de antes (com os botoes manuais) em vez de abrir um erro que o usuario nao pediu.
+      if (error) return;
+      const r = (data ?? {}) as { fechadas?: number; reenfileiradas?: number };
+      const fechadas = r.fechadas ?? 0;
+      const reenfileiradas = r.reenfileiradas ?? 0;
+      if (fechadas + reenfileiradas === 0) return;
+      const partes: string[] = [];
+      if (fechadas > 0) {
+        partes.push(
+          fechadas === 1
+            ? "1 linha fechada: nao havia nada a fazer no Omie"
+            : `${fechadas} linhas fechadas: nao havia nada a fazer no Omie`
+        );
+      }
+      if (reenfileiradas > 0) {
+        partes.push(
+          reenfileiradas === 1
+            ? "1 linha voltou para a fila: a causa ja tinha sido corrigida"
+            : `${reenfileiradas} linhas voltaram para a fila: a causa ja tinha sido corrigida`
+        );
+      }
+      toast.success("A fila resolveu sozinha o que dava.", {
+        description: partes.join(" · "),
+        duration: 9000,
+      });
+      query.refetch();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tid, conta?.id]);
 
   // Auto-refresh 30s enquanto houver pendente/processando
   useEffect(() => {
