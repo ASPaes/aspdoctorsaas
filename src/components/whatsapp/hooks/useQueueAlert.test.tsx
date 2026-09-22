@@ -70,10 +70,13 @@ vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => ({ can: () => true, isLoading: false }),
 }));
 
+let prefs: Record<string, unknown> = {
+  queue_sound_enabled: true,
+  queue_sound_volume: 70,
+};
+
 vi.mock("@/hooks/useUserPreferences", () => ({
-  useUserPreferences: () => ({
-    preferences: { queue_sound_enabled: true, queue_sound_volume: 70 },
-  }),
+  useUserPreferences: () => ({ preferences: prefs }),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -114,6 +117,7 @@ describe("useQueueAlert — o alerta de fila é do setor, não do tenant", () =>
     departmentLoading = false;
     waitingTotal = 0;
     lastPillOptions = undefined;
+    prefs = { queue_sound_enabled: true, queue_sound_volume: 70 };
     toastInfo.mockClear();
     toastWarning.mockClear();
     beep.mockClear();
@@ -196,5 +200,107 @@ describe("useQueueAlert — o alerta de fila é do setor, não do tenant", () =>
 
     expect(toastInfo).toHaveBeenCalledTimes(1);
     expect(beep).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Toque contínuo da fila (plantão): o técnico não está na frente da tela, então
+ * um bip só não resolve. O som repete enquanto houver gente aguardando e para
+ * quando a fila esvazia — inclusive quando quem assumiu foi outra pessoa.
+ */
+describe("useQueueAlert — toque contínuo", () => {
+  const REPETIR = { queue: { repetir: true } };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    departmentId = SETOR_A;
+    departmentLoading = false;
+    waitingTotal = 0;
+    lastPillOptions = undefined;
+    prefs = { queue_sound_enabled: true, queue_sound_volume: 70 };
+    toastInfo.mockClear();
+    toastWarning.mockClear();
+    beep.mockClear();
+  });
+
+  afterEach(() => {
+    if (root) act(() => root!.unmount());
+    container?.remove();
+    root = null;
+    container = null;
+    vi.useRealTimers();
+  });
+
+  it("sem o contínuo ligado, o toque é um só por entrada", () => {
+    render();
+    waitingTotal = 1;
+    rerender();
+    expect(beep).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(40_000);
+    });
+    expect(beep).toHaveBeenCalledTimes(1);
+  });
+
+  it("com o contínuo ligado, repete a cada 8 segundos enquanto há fila", () => {
+    prefs = { ...prefs, sound_by_event: REPETIR };
+    render();
+    waitingTotal = 1;
+    rerender();
+    expect(beep).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      vi.advanceTimersByTime(24_000);
+    });
+    expect(beep).toHaveBeenCalledTimes(4);
+  });
+
+  it("para assim que a fila zera", () => {
+    prefs = { ...prefs, sound_by_event: REPETIR };
+    render();
+    waitingTotal = 1;
+    rerender();
+    act(() => {
+      vi.advanceTimersByTime(16_000);
+    });
+    const antes = beep.mock.calls.length;
+
+    // O técnico (ou qualquer colega) puxou o cliente da fila.
+    waitingTotal = 0;
+    rerender();
+    act(() => {
+      vi.advanceTimersByTime(40_000);
+    });
+    expect(beep).toHaveBeenCalledTimes(antes);
+  });
+
+  it("silencia sozinho depois do teto, mesmo com a fila parada", () => {
+    prefs = { ...prefs, sound_by_event: REPETIR };
+    render();
+    waitingTotal = 1;
+    rerender();
+
+    act(() => {
+      vi.advanceTimersByTime(10 * 60 * 1000 + 3 * 8_000);
+    });
+    const noTeto = beep.mock.calls.length;
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(beep).toHaveBeenCalledTimes(noTeto);
+  });
+
+  it("agente pausado não ouve a repetição", () => {
+    prefs = { ...prefs, sound_by_event: REPETIR, queue_sound_enabled: false };
+    render();
+    waitingTotal = 1;
+    rerender();
+
+    act(() => {
+      vi.advanceTimersByTime(40_000);
+    });
+    expect(beep).not.toHaveBeenCalled();
   });
 });

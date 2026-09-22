@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { readStoredAccent } from "@/lib/accentColor";
+import type { ToneChoice } from "@/lib/tones";
 
 export interface UserPreferences {
   signature_name: string | null;
@@ -19,7 +20,7 @@ export interface UserPreferences {
    * toque padrão daquele evento (ver `DEFAULT_TONE` em `lib/tones.ts`), então o
    * objeto guarda SÓ o que o usuário personalizou.
    */
-  sound_by_event: Record<string, string> | null;
+  sound_by_event: Record<string, ToneChoice> | null;
 }
 
 const DEFAULT_PREFS: UserPreferences = {
@@ -104,7 +105,7 @@ async function fetchTablePrefs(tid: string, userId: string) {
       ? (data?.theme_primary_color ?? DEFAULT_PREFS.theme_primary_color)
       : readStoredAccent(),
     sound_by_event: soundMapColumnAvailable
-      ? ((data?.sound_by_event as Record<string, string> | null) ?? null)
+      ? ((data?.sound_by_event as Record<string, ToneChoice> | null) ?? null)
       : null,
   };
 }

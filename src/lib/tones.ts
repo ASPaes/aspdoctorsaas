@@ -64,6 +64,35 @@ export const DEFAULT_TONE: Record<SoundEvent, string> = {
   awaiting: "padrao",
 };
 
+/** Frase do "repetir" de cada evento: é ela que diz o que faz o toque parar. */
+export const REPEAT_LABEL: Record<SoundEvent, string> = {
+  queue: "Repetir até alguém assumir",
+  message: "Repetir até você abrir a conversa",
+  group: "Repetir até você abrir a conversa",
+  assignment: "Repetir até você abrir a conversa",
+  awaiting: "Repetir até você abrir a conversa",
+};
+
+/** Intervalo entre as repetições do toque contínuo. */
+export const REPEAT_MS = 8000;
+
+/**
+ * Teto do toque contínuo. Ele existe porque o som só para quando um estado muda
+ * no banco: se esse estado travar (aba sem rede, contagem da fila que não volta,
+ * bug), o alarme tocaria a noite inteira numa sala vazia. Passado o teto ele
+ * silencia sozinho e o aviso continua na tela.
+ */
+export const REPEAT_MAX_MS = 10 * 60 * 1000;
+
+/**
+ * O que fica salvo por evento em `user_preferences.sound_by_event`. Texto puro é
+ * o formato antigo (só o toque) e continua valendo: quem salvou antes do
+ * contínuo não precisa de migração de dado.
+ */
+export type ToneChoice = string | { toque?: string; repetir?: boolean };
+
+export type ToneMap = Record<string, ToneChoice> | null | undefined;
+
 type Note = {
   /** Frequência em Hz. */
   freq: number;
@@ -140,12 +169,16 @@ export const TONES: Tone[] = [
 const TONE_IDS = new Set(TONES.map((t) => t.id));
 
 /** Devolve o toque salvo se ele existir no catálogo; senão, o padrão do evento. */
-export function resolveTone(
-  event: SoundEvent,
-  map: Record<string, string> | null | undefined
-): string {
-  const chosen = map?.[event];
+export function resolveTone(event: SoundEvent, map: ToneMap): string {
+  const escolha = map?.[event];
+  const chosen = typeof escolha === "string" ? escolha : escolha?.toque;
   return chosen && TONE_IDS.has(chosen) ? chosen : DEFAULT_TONE[event];
+}
+
+/** True quando o evento está no modo contínuo. Padrão de todos é tocar uma vez. */
+export function resolveRepeat(event: SoundEvent, map: ToneMap): boolean {
+  const escolha = map?.[event];
+  return typeof escolha === "object" && escolha !== null && escolha.repetir === true;
 }
 
 export function toneLabel(id: string): string {

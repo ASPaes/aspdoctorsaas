@@ -9,7 +9,7 @@ import { usePresenceRow } from "@/hooks/usePresenceRow";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { playQueueBeep, primeQueueBeep } from "@/lib/queueBeep";
-import { resolveTone } from "@/lib/tones";
+import { REPEAT_MAX_MS, REPEAT_MS, resolveRepeat, resolveTone } from "@/lib/tones";
 import { usePillCounts } from "./usePillCounts";
 
 /** Só um lembrete por episódio de fila cheia (DEM-0203). */
@@ -100,6 +100,7 @@ export function useQueueAlert(): QueueAlertState {
   // Toque escolhido para a fila; sem escolha, o bip de dois tons de sempre.
   const toneRef = useRef(resolveTone("queue", null));
   toneRef.current = resolveTone("queue", preferences.sound_by_event);
+  const repetir = resolveRepeat("queue", preferences.sound_by_event);
 
   // Destrava o AudioContext no primeiro gesto do usuário na sessão.
   useEffect(() => {
@@ -220,6 +221,29 @@ export function useQueueAlert(): QueueAlertState {
     }, REMINDER_TICK_MS);
     return () => window.clearInterval(id);
   }, [waiting, navigate]);
+
+  // Toque contínuo da fila (opcional, por preferência do usuário).
+  //
+  // Repete enquanto houver alguém aguardando, para o plantão ouvir de longe. O
+  // que faz parar é a própria fila esvaziar: quando o técnico puxa o cliente, o
+  // Realtime de `support_attendances` derruba a contagem e o efeito se desmonta.
+  // Assumir por outra pessoa também para, e é assim que tem de ser.
+  //
+  // O `waiting` na dependência reinicia o ciclo a cada mudança de número, então
+  // cliente novo renova o teto de REPEAT_MAX_MS — é episódio novo.
+  useEffect(() => {
+    if (!repetir || !waiting || !canAlert) return;
+    const inicio = Date.now();
+    const id = window.setInterval(() => {
+      if (!canAlertRef.current) return;
+      if (Date.now() - inicio > REPEAT_MAX_MS) {
+        window.clearInterval(id);
+        return;
+      }
+      playQueueBeep(volumeRef.current, toneRef.current);
+    }, REPEAT_MS);
+    return () => window.clearInterval(id);
+  }, [repetir, waiting, canAlert]);
 
   return { waiting: waiting ?? 0, justArrived };
 }

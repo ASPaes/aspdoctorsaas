@@ -17,7 +17,7 @@ import { useUserPreferences } from "@/hooks/useUserPreferences";
 import { playQueueBeep } from "@/lib/queueBeep";
 import { AccentColorPicker } from "@/components/preferences/AccentColorPicker";
 import { SoundByEventPicker } from "@/components/preferences/SoundByEventPicker";
-import { resolveTone, type SoundEvent } from "@/lib/tones";
+import { resolveTone, type SoundEvent, type ToneChoice } from "@/lib/tones";
 import {
   MIN_CONTRAST,
   applyAccentColor,
@@ -41,7 +41,7 @@ export function UserPreferencesDialog({ open, onOpenChange }: Props) {
   const [queueSoundEnabled, setQueueSoundEnabled] = useState(true);
   const [queueVolume, setQueueVolume] = useState(70);
   const [accentColor, setAccentColor] = useState<string | null>(null);
-  const [soundByEvent, setSoundByEvent] = useState<Record<string, string>>({});
+  const [soundByEvent, setSoundByEvent] = useState<Record<string, ToneChoice>>({});
 
   useEffect(() => {
     if (open && !isLoading) {

@@ -16,7 +16,17 @@ import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
-import { playTone, primeTones, resolveTone, type SoundEvent } from "@/lib/tones";
+import {
+  REPEAT_MAX_MS,
+  REPEAT_MS,
+  playTone,
+  primeTones,
+  resolveRepeat,
+  resolveTone,
+  type SoundEvent,
+  type ToneChoice,
+  type ToneMap,
+} from "@/lib/tones";
 
 const SOUND_THROTTLE_MS = 500;
 
@@ -133,7 +143,7 @@ async function isGroupConversation(convId: string): Promise<boolean> {
 async function soundEventFor(
   type: string,
   convId: string | null,
-  map: Record<string, string> | null
+  map: ToneMap
 ): Promise<SoundEvent | null> {
   if (type === "chat_assignment") return "assignment";
   if (type === "chat_awaiting_reply") return "awaiting";
@@ -202,7 +212,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Toque por tipo de aviso. Fica num ref porque quem lê é o handler de
   // Realtime, que tem dependências estáveis e guardaria o valor do 1º render.
   const { preferences } = useUserPreferences();
-  const soundMapRef = useRef<Record<string, string> | null>(null);
+  const soundMapRef = useRef<Record<string, ToneChoice> | null>(null);
   soundMapRef.current = preferences.sound_by_event;
 
   // Preload do áudio do toque de arquivo.
@@ -241,6 +251,91 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         : Math.max(0, Math.min(1, settingsRef.current.volume / 100));
     playTone(event ? resolveTone(event, soundMapRef.current) : "padrao", vol);
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Toque contínuo
+  //
+  // Repete o toque enquanto o aviso continuar pendente, para o plantão ouvir de
+  // longe. O que faz parar é o próprio aviso deixar de estar pendente: abrir a
+  // conversa dispensa a notificação (`dismiss_conversation_notifications`), e o
+  // sino a marca como lida.
+  //
+  // Guardamos os `notification_recipients.id` que estão tocando e conferimos o
+  // estado deles a cada ciclo — uma consulta por chave primária a cada 8s, e só
+  // enquanto houver alarme tocando. Quem não usa o contínuo não paga nada.
+  // ---------------------------------------------------------------------------
+  const pendentesRef = useRef<
+    Map<string, { event: SoundEvent; convId: string | null; desde: number }>
+  >(new Map());
+  const cicloRef = useRef<number | null>(null);
+
+  const pararRepeticao = useCallback(() => {
+    if (cicloRef.current !== null) {
+      window.clearInterval(cicloRef.current);
+      cicloRef.current = null;
+    }
+    pendentesRef.current.clear();
+  }, []);
+
+  const ciclo = useCallback(async () => {
+    const pend = pendentesRef.current;
+
+    // Teto: ver REPEAT_MAX_MS em lib/tones.ts.
+    for (const [id, info] of pend) {
+      if (Date.now() - info.desde > REPEAT_MAX_MS) pend.delete(id);
+    }
+    if (pend.size === 0) return pararRepeticao();
+
+    const ids = [...pend.keys()];
+    const { data, error } = await supabase
+      .from("notification_recipients")
+      .select("id, read_at, dismissed_at")
+      .in("id", ids);
+
+    if (!error && data) {
+      const vistos = new Set<string>();
+      for (const row of data as any[]) {
+        vistos.add(row.id);
+        if (row.read_at || row.dismissed_at) pend.delete(row.id);
+      }
+      // Linha que sumiu (dispensada e apagada) também para de tocar.
+      for (const id of ids) if (!vistos.has(id)) pend.delete(id);
+    }
+    if (pend.size === 0) return pararRepeticao();
+
+    // Silencia sem encerrar o ciclo: passada a janela de não perturbe, o aviso
+    // que continua pendente volta a tocar.
+    const s = settingsRef.current;
+    if (!s.master_enabled || !s.sound_enabled || isInDoNotDisturbWindow(s)) return;
+
+    const maisRecente = [...pend.values()].sort((a, b) => b.desde - a.desde)[0];
+    playSound(maisRecente.event);
+  }, [pararRepeticao, playSound]);
+
+  const repetirAviso = useCallback(
+    (recipientId: string, event: SoundEvent, convId: string | null) => {
+      pendentesRef.current.set(recipientId, { event, convId, desde: Date.now() });
+      if (cicloRef.current === null) {
+        cicloRef.current = window.setInterval(() => {
+          void ciclo();
+        }, REPEAT_MS);
+      }
+    },
+    [ciclo]
+  );
+
+  useEffect(() => pararRepeticao, [pararRepeticao]);
+
+  // Abrir a conversa cala o alarme na hora, sem esperar o próximo ciclo: a
+  // dispensa no banco é assíncrona e o atendente não deve ouvir mais um toque
+  // depois de já estar olhando o chat.
+  const convAberta = extractConversationId(location.pathname, location.search);
+  useEffect(() => {
+    if (!convAberta) return;
+    const pend = pendentesRef.current;
+    for (const [id, info] of pend) if (info.convId === convAberta) pend.delete(id);
+    if (pend.size === 0) pararRepeticao();
+  }, [convAberta, pararRepeticao]);
 
   // Handler de chegada de notificação (extraído para reuso entre INSERT e UPDATE coalescido)
   const handleNotificationArrival = useCallback(
@@ -351,6 +446,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           soundMapRef.current
         );
         playSound(evt, vol);
+        if (evt && resolveRepeat(evt, soundMapRef.current)) {
+          repetirAviso(recipient.id, evt, notifConvId);
+        }
       }
 
       if (wantsToast) {
@@ -421,7 +519,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       }
     },
-    [navigate, queryClient, playSound]
+    [navigate, queryClient, playSound, repetirAviso]
   );
 
   // Realtime subscription (side-effects only — list/badge query is invalidated separately)
