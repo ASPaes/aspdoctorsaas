@@ -1,15 +1,13 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CalendarDays, Plus, Shield, Users, UserX, Zap } from "lucide-react";
+import { ArrowRightLeft, CalendarDays, HelpCircle, Plus, Shield, Users, UserX, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import {
   automationStatus,
   useAutomationRules,
@@ -41,8 +39,53 @@ function isoHoje(hora: number, minuto: number, somarDias = 0) {
   return d.toISOString();
 }
 
+/**
+ * DEM-0429: a explicação mora na tela, não no suporte. O "?" abre em clique
+ * (e não só no hover) porque o texto tem seis parágrafos e precisa funcionar no
+ * toque e no teclado.
+ */
+function AjudaTransferenciaChat() {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Como funciona a transferência de chat"
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[27rem] text-[13px] leading-relaxed space-y-2.5">
+        <p className="font-semibold text-foreground">Como funciona</p>
+        <p className="text-muted-foreground">
+          A regra troca o destino do chat: manda para a fila de outro setor ou direto para uma pessoa. Ela age em duas
+          situações, que você escolhe ao criar: <span className="text-foreground">quando o chat entra</span> no
+          atendimento, ou <span className="text-foreground">quando o setor fica sem ninguém conectado</span>. Vale
+          também para o chat que já está esperando na fila, não só para o que acabou de chegar.
+        </p>
+        <p className="text-muted-foreground">
+          Quando a regra desvia o chat, ele chega com uma <span className="text-foreground">nota interna</span> dizendo
+          de onde veio e qual automação mandou. A nota é só para a equipe: o cliente não vê.
+        </p>
+        <p className="text-muted-foreground">
+          Se duas regras pegarem o mesmo chat, vence a de menor prioridade. Cada chat é desviado uma vez só, para uma
+          regra não desfazer a transferência que outra (ou uma pessoa) acabou de fazer.
+        </p>
+        <p className="text-muted-foreground">
+          Independe do Motor de Distribuição: a regra criada aqui vale mesmo com a distribuição automática pausada em
+          Distribuição, aba Atribuição.
+        </p>
+        <p className="text-muted-foreground">
+          Não alcança chat que ainda não tem setor (URA aberta na tela do cliente, ou canal sem setor), grupo de
+          WhatsApp e número pessoal de atendente, que não passam pela fila.
+        </p>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function AutomacoesTab() {
-  const { effectiveTenantId: tid } = useTenantFilter();
   const { rules, isLoading, createRule, updateRule, toggleActive, encerrarAgora, deleteRule } =
     useAutomationRules();
 
@@ -52,22 +95,6 @@ export default function AutomacoesTab() {
   const [historicoAberto, setHistoricoAberto] = useState(false);
   const [historicoDaRegra, setHistoricoDaRegra] = useState<AutomationRule | null>(null);
   const [paraExcluir, setParaExcluir] = useState<AutomationRule | null>(null);
-
-  // A automação só tem efeito com o motor de distribuição ligado: sem ele o
-  // roteamento nem chega a consultar as regras.
-  const { data: motorLigado } = useQuery({
-    queryKey: ["automacoes-motor-ligado", tid],
-    enabled: !!tid,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("configuracoes")
-        .select("support_config")
-        .eq("tenant_id", tid!)
-        .maybeSingle();
-      const cfg = (data?.support_config ?? {}) as Record<string, unknown>;
-      return cfg.distribution_enabled_globally === true;
-    },
-  });
 
   const contagem = useMemo(() => {
     const agora = new Date();
@@ -124,43 +151,29 @@ export default function AutomacoesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-6">
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Regras que interceptam o chat na entrada e mudam para onde ele vai. Podem valer por um período (falta, férias,
-          plantão) ou ficar fixas.
-        </p>
+      {/* DEM-0429: por enquanto a única seção é a de chat. Ticket entra ao lado
+          desta, com o mesmo formato de cabeçalho. */}
+      <div className="border-b pb-3 flex flex-col sm:flex-row sm:items-start gap-3">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent shrink-0">
+          <ArrowRightLeft className="h-4 w-4" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-[15px] font-semibold">Transferência de Chat</h2>
+            <AjudaTransferenciaChat />
+          </div>
+          <p className="text-[13px] text-muted-foreground">
+            Troca o destino do chat na entrada, ou quando o setor fica sem ninguém conectado.
+          </p>
+        </div>
         <Button onClick={() => abrirNova()} className="shrink-0">
           <Plus className="h-4 w-4 mr-2" />
           Nova automação
         </Button>
       </div>
 
-      <div className="flex items-center gap-2.5 rounded-lg border bg-card px-3.5 py-2.5">
-        <span
-          className={cn(
-            "h-2 w-2 rounded-full shrink-0",
-            motorLigado ? "bg-success ring-[3px] ring-success/20" : "bg-destructive ring-[3px] ring-destructive/20",
-          )}
-        />
-        {motorLigado ? (
-          <>
-            <span className="text-[13px]">Motor de distribuição ligado.</span>
-            <span className="text-[13px] text-muted-foreground">
-              Se ele for desligado, nenhuma automação tem efeito.
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="text-[13px] font-medium">Motor de distribuição desligado.</span>
-            <span className="text-[13px] text-muted-foreground">
-              Enquanto estiver assim, as automações não fazem nada. Ligue em Distribuição, aba Atribuição.
-            </span>
-          </>
-        )}
-      </div>
-
       {rules.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card p-7 flex flex-col lg:flex-row items-start lg:items-center gap-8">
+        <div className="rounded-xl border border-dashed bg-card p-7 flex flex-col 2xl:flex-row items-start 2xl:items-center gap-8">
           <div className="max-w-md">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-success/15 text-success mb-3.5">
               <Zap className="h-[22px] w-[22px]" />

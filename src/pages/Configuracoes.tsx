@@ -98,7 +98,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   canais: { breadcrumb: ["Atendimento", "Canais"], title: "Canais", description: "Por onde a operação fala com o cliente: números de WhatsApp e contas de e-mail." },
   distribuicao: { breadcrumb: ["Atendimento", "Distribuição"], title: "Distribuição", description: "Para qual setor e agente cada atendimento é encaminhado." },
   operacao: { breadcrumb: ["Atendimento", "Operação"], title: "Operação", description: "CSAT, pausas, macros e grupos do atendimento." },
-  automacoes: { breadcrumb: ["Atendimento", "Automações"], title: "Automações", description: "Regras que interceptam o chat na entrada e mudam para onde ele vai." },
+  automacoes: { breadcrumb: ["Atendimento", "Automações"], title: "Automações", description: "Regras que agem sozinhas no atendimento, uma seção por tipo de automação." },
   seguranca: { breadcrumb: ["Equipe", "Segurança"], title: "Segurança", description: "Aprovação de novas contas e restrição de domínio de email." },
   "horario-acesso": { breadcrumb: ["Equipe", "Horário de acesso"], title: "Horário de acesso", description: "Em que horários cada setor ou pessoa pode usar o sistema." },
   duplicidades: { breadcrumb: ["Dados", "Duplicidades"], title: "Duplicidades", description: "Unificação de contatos duplicados." },

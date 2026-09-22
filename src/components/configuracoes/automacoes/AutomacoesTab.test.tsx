@@ -282,13 +282,34 @@ describe("AutomacoesTab", () => {
     expect(container.textContent).toContain("Encerrar agora");
   });
 
-  it("motor desligado avisa que nada tem efeito", async () => {
+  // DEM-0429: a aba deixou de ler o motor de distribuição. Ele é a tela
+  // Distribuição > Atribuição e não decide mais se a automação vale.
+  it("não fala do motor de distribuição, mesmo com ele desligado", async () => {
     dadosPorTabela.automation_rules = [base];
     dadosPorTabela.configuracoes = [{ support_config: { distribution_enabled_globally: false } }];
     await render();
 
-    expect(container.textContent).toContain("Motor de distribuição desligado");
-    expect(container.textContent).toContain("as automações não fazem nada");
+    const texto = container.textContent ?? "";
+    expect(texto).toContain("Transferência de Chat");
+    expect(texto).not.toContain("Motor de distribuição desligado");
+    expect(texto).not.toContain("as automações não fazem nada");
+  });
+
+  it("a subseção tem título, descrição e o ? de ajuda", async () => {
+    dadosPorTabela.automation_rules = [base, agendadaParaPessoa, fixaPorCanal, encerrada];
+    await render();
+
+    expect(container.textContent).toContain("Transferência de Chat");
+    expect(container.textContent).toContain("quando o setor fica sem ninguém conectado");
+    expect(container.querySelector('[aria-label="Como funciona a transferência de chat"]')).not.toBeNull();
+  });
+
+  it("o cabeçalho da subseção também aparece sem nenhuma regra criada", async () => {
+    dadosPorTabela.automation_rules = [];
+    await render();
+
+    expect(container.textContent).toContain("Transferência de Chat");
+    expect(container.querySelector('[aria-label="Como funciona a transferência de chat"]')).not.toBeNull();
   });
 
   it("conta as regras por situação nos filtros", async () => {
