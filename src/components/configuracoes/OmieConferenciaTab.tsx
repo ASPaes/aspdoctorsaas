@@ -30,6 +30,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import OmieFilaSincronizacaoPanel from "./OmieFilaSincronizacaoPanel";
 import { ConferenciaSaudeBanner } from "./ConferenciaSaudeBanner";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+// Mesmo extrator da tela do cliente: o motivo real costuma vir ANINHADO
+// (contrato.resultado.error, cliente_resultado, erros[], detalhe_omie), nunca no `error` da raiz.
+import { extrairMensagemErro } from "@/components/clientes/EnviarOmieComPreviaButton";
 import {
   AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, ChevronDown, ChevronRight, HelpCircle, History, Link2, Loader2, RefreshCw, Search,
 } from "lucide-react";
@@ -812,7 +815,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       if (error) throw error;
       const res = data as any;
       if (res?.ok === false) {
-        toast.error(res?.error || res?.bloqueado || "Envio bloqueado");
+        toast.error(extrairMensagemErro(res) || "Envio bloqueado");
         return;
       }
       if (res?.ok) {
@@ -823,7 +826,7 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
       toast.error("Resposta inesperada do servidor");
     } catch (e: any) {
       const corpo = await corpoDoErro(e);
-      const msg = corpo?.error || e?.message || "Falha ao preparar envio";
+      const msg = extrairMensagemErro(corpo) || e?.message || "Falha ao preparar envio";
       // Unica trava com saida: contrato anterior a data de ativacao. As outras viram toast.
       if (corpo?.dispensavel === true) {
         setDispensaCiente(false);
@@ -877,11 +880,11 @@ function LinhaConferencia({ row, tid }: { row: ReconciliacaoRow; tid: string | n
           queryClient.invalidateQueries({ queryKey: ["omie-conf-fornecedores"] }),
         ]);
       } else {
-        toast.error(res?.error || res?.bloqueado || "Falha ao enviar ao Omie");
+        toast.error(extrairMensagemErro(res) || "Falha ao enviar ao Omie");
       }
     } catch (e: any) {
       const corpo = await corpoDoErro(e);
-      toast.error(corpo?.error || e?.message || "Falha ao enviar ao Omie");
+      toast.error(extrairMensagemErro(corpo) || e?.message || "Falha ao enviar ao Omie");
     } finally {
       setEnviarLoading(false);
     }
