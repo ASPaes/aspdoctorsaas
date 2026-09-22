@@ -420,6 +420,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             onModoAgendarChange={setModoAgendar}
             agendadasAbertas={agendadasAbertas || !!editandoAgendadaId}
             onToggleAgendadas={toggleAgendadas}
+            variant={emCelular ? "mobile" : "desktop"}
           />
         )}
       </div>

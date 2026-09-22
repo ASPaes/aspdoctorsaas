@@ -6,11 +6,12 @@ import { useMetaWindow } from "@/hooks/useMetaWindow";
 import { MetaTemplatePicker, type TemplateEscolhido } from "@/components/whatsapp/templates/MetaTemplatePicker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock, History as HistoryIcon } from "lucide-react";
+import { Send, Mic, Paperclip, Maximize2, Minimize2, FileText, AlertTriangle, StickyNote, CalendarClock, History as HistoryIcon, Image as ImageIcon, Camera, Zap, Sparkles } from "lucide-react";
 import { useConversationNotes } from "../hooks/useConversationNotes";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EmojiPickerButton } from "./input/EmojiPickerButton";
+import { MobileComposerSheet, type OpcaoDoCompositor } from "@/components/chat-mobile/MobileComposerSheet";
 import { AIComposerButton } from "./input/AIComposerButton";
 import { AudioRecorder } from "./input/AudioRecorder";
 import { MacroSuggestions } from "./input/MacroSuggestions";
@@ -59,6 +60,8 @@ interface Props {
   agendadasAbertas?: boolean;
   /** Botão "N agendadas" da barra de sugestões: abre/recolhe as bolhas na conversa. */
   onToggleAgendadas?: () => void;
+  /** "mobile": uma linha só (mais, campo, emoji, enviar) e o resto dentro do "+". */
+  variant?: "desktop" | "mobile";
 }
 
 function getMessageType(mimeType: string): MediaSendParams['messageType'] {
@@ -92,7 +95,8 @@ export type ChatInputHandle = {
   pedirAcaoAgendada: (tipo: "cancelar" | "enviar", a: ScheduledMessage) => void;
 };
 
-export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId, onEditandoAgendadaChange, onModoAgendarChange, agendadasAbertas, onToggleAgendadas }, ref) {
+export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({ conversationId, replyTo, onCancelReply, initialMessage, disabled, isGroup, groupJid, instanceId, onEditandoAgendadaChange, onModoAgendarChange, agendadasAbertas, onToggleAgendadas, variant = "desktop" }, ref) {
+  const noCelular = variant === "mobile";
   const [mode, setMode] = useState<ComposerMode>("message");
   const [message, setMessage] = useState(() => initialMessage || getDraft(conversationId, "message") || "");
 
@@ -291,6 +295,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // No celular, "Documento", "Galeria" e "Câmera" são entradas diferentes do
+  // mesmo seletor: o accept e o capture é que mudam o que o aparelho oferece.
+  const galeriaInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const sendMutation = useWhatsAppSend();
   const { isBlocked: presenceBlocked } = useAgentPresence();
   const isBlocked = presenceBlocked || !!disabled;
@@ -1159,6 +1167,93 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
 
   const hasContent = message.trim() || attachedFiles.length > 0;
 
+  // O que mora dentro do "+" no celular. É a mesma lista de coisas que o desktop
+  // espalha pela barra e pelas abas — aqui elas só ficam guardadas até serem
+  // pedidas, que é o que mantém a tela parecida com um WhatsApp.
+  const opcoesDoCompositor: OpcaoDoCompositor[] = noCelular
+    ? [
+        {
+          chave: "documento",
+          rotulo: "Documento",
+          icone: <Paperclip className="h-6 w-6" />,
+          cor: "bg-violet-600",
+          onSelect: () => fileInputRef.current?.click(),
+          desabilitada: isDraftMode || (isBlocked && !isInternalNote),
+        },
+        {
+          chave: "galeria",
+          rotulo: "Galeria",
+          icone: <ImageIcon className="h-6 w-6" />,
+          cor: "bg-sky-600",
+          onSelect: () => galeriaInputRef.current?.click(),
+          desabilitada: isDraftMode || (isBlocked && !isInternalNote),
+        },
+        {
+          chave: "camera",
+          rotulo: "Câmera",
+          icone: <Camera className="h-6 w-6" />,
+          cor: "bg-pink-600",
+          onSelect: () => cameraInputRef.current?.click(),
+          desabilitada: isDraftMode || (isBlocked && !isInternalNote),
+        },
+        {
+          chave: "nota",
+          rotulo: "Nota interna",
+          icone: <StickyNote className="h-6 w-6" />,
+          cor: "bg-amber-500",
+          onSelect: () => switchMode(isInternalNote ? "message" : "note"),
+        },
+        {
+          chave: "agendar",
+          rotulo: "Agendar envio",
+          icone: <CalendarClock className="h-6 w-6" />,
+          cor: "bg-emerald-600",
+          onSelect: () => {
+            if (!scheduleAt) setScheduleAt(paraInputLocal(proximaHoraCheia()));
+            switchMode("schedule");
+          },
+        },
+        {
+          chave: "macro",
+          rotulo: "Macro",
+          icone: <Zap className="h-6 w-6" />,
+          cor: "bg-cyan-600",
+          // A macro já é acionada digitando "/" — aqui só escrevemos a barra por
+          // quem não sabe do atalho, e a lista de sempre aparece.
+          onSelect: () => {
+            setMessage((atual) => (atual.startsWith("/") ? atual : `/${atual}`));
+            setTimeout(() => textareaRef.current?.focus(), 50);
+          },
+          desabilitada: isBlocked && !isInternalNote,
+        },
+        ...(isMeta && contactPhone && !isInternalNote
+          ? [{
+              chave: "template",
+              rotulo: "Template",
+              icone: <FileText className="h-6 w-6" />,
+              cor: "bg-indigo-600",
+              onSelect: () => setShowTemplatePicker(true),
+              desabilitada: sendMutation.isPending || isBlocked,
+            }]
+          : []),
+        {
+          chave: "rascunho",
+          rotulo: "Rascunho",
+          icone: <FileText className="h-6 w-6" />,
+          cor: "bg-slate-600",
+          onSelect: () => switchMode(isDraftMode ? "message" : "draft"),
+        },
+        {
+          chave: "sugestoes",
+          rotulo: "Sugestões IA",
+          icone: <Sparkles className="h-6 w-6" />,
+          cor: "bg-fuchsia-600",
+          onSelect: () => refresh(),
+          desabilitada: isInternalNote || isBlocked,
+        },
+      ]
+    : [];
+
   return (
     <div
       className="border-t border-border bg-card relative"
@@ -1182,9 +1277,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         error={smartReplyError}
         onSelectSuggestion={handleSmartReplySelect}
         onRefresh={refresh}
+        esconderQuandoVazia={noCelular}
         centro={
           // Na aba Agendar as bolhas já estão abertas na conversa: o botão sobra.
-          !isScheduleMode && onToggleAgendadas ? (
+          // No celular o pill só entra quando existe agendada — senão ele segura
+          // a barra inteira na tela sem ter o que mostrar.
+          !isScheduleMode && onToggleAgendadas && (!noCelular || (agendadas?.length ?? 0) > 0) ? (
             <ScheduledPill agendadas={agendadas} aberto={!!agendadasAbertas} onToggle={onToggleAgendadas} />
           ) : undefined
         }
@@ -1196,10 +1294,42 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         isDraftMode && "bg-sky-500/5 border-t-2 border-sky-500/60",
         isScheduleMode && "bg-violet-500/5 border-t-2 border-violet-500/60",
       )}>
+        {/* No celular as quatro abas viram uma faixa fina que só aparece quando o
+            modo não é "mensagem" — trocar de modo é coisa de vez em quando, e as
+            abas roubavam a largura do campo de texto todo santo dia. Nota,
+            rascunho e agendamento entram pelo "+". */}
+        {noCelular && mode !== "message" && (
+          <div
+            className={cn(
+              "mb-2 flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
+              isInternalNote && "bg-amber-500/15 text-amber-800 dark:text-amber-200",
+              isDraftMode && "bg-sky-500/15 text-sky-800 dark:text-sky-200",
+              isScheduleMode && "bg-violet-500/15 text-violet-800 dark:text-violet-200",
+            )}
+          >
+            {isInternalNote && <StickyNote className="h-3.5 w-3.5 shrink-0" />}
+            {isDraftMode && <FileText className="h-3.5 w-3.5 shrink-0" />}
+            {isScheduleMode && <CalendarClock className="h-3.5 w-3.5 shrink-0" />}
+            <span className="min-w-0 flex-1 truncate">
+              {isInternalNote && "Nota interna — o cliente não vê"}
+              {isDraftMode && "Rascunho — não é enviado"}
+              {isScheduleMode && (editandoAgendadaId ? "Editando um agendamento" : "Sai sozinha na hora marcada")}
+            </span>
+            <button
+              type="button"
+              onClick={() => switchMode("message")}
+              className="shrink-0 rounded px-2 py-0.5 underline-offset-2 hover:underline"
+            >
+              Sair
+            </button>
+          </div>
+        )}
+
         {/* Toggle: Mensagem ao cliente vs. Nota interna vs. Rascunho */}
         {/* Quatro abas não cabem em chat estreito (painel de detalhes aberto, tela
             pequena). A fita rola dentro da própria caixa em vez de empurrar o
             aviso da direita para fora ou quebrar a linha no meio das bordas. */}
+        {!noCelular && (
         <div className="flex flex-wrap items-center justify-between gap-y-1 mb-2">
           <div className="inline-flex max-w-full overflow-x-auto rounded-md border border-border text-xs [&>button]:shrink-0 [&>button]:whitespace-nowrap">
             <button
@@ -1275,6 +1405,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </span>
           )}
         </div>
+        )}
 
         {isScheduleMode && (
           <ScheduleBar
@@ -1396,7 +1527,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         <div className="relative flex gap-2 items-end">
           {showMacroSuggestions && <MacroSuggestions macros={filteredMacros} onSelect={handleMacroSelect} selectedIndex={macroSelectedIndex} onClose={() => setShowMacroSuggestions(false)} />}
 
-          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
+          {!noCelular && (
+            <EmojiPickerButton onEmojiSelect={handleEmojiSelect} disabled={sendMutation.isPending || isBlocked || isInternalNote} />
+          )}
 
           {/* File attach button */}
           <input
@@ -1407,7 +1540,43 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             onChange={handleFileSelect}
             className="hidden"
           />
-          {!isDraftMode && (
+          {noCelular && (
+            <>
+              <input
+                ref={galeriaInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <MobileComposerSheet
+                opcoes={opcoesDoCompositor}
+                desabilitado={sendMutation.isPending || (isBlocked && !isInternalNote)}
+                extras={
+                  !isInternalNote ? (
+                    <div className="flex items-center gap-2 text-sm">
+                      <AIComposerButton
+                        message={message}
+                        onComposed={(nova) => setMessage(nova)}
+                        disabled={sendMutation.isPending || isBlocked}
+                      />
+                      <span className="text-muted-foreground">Reescrever com IA o que já está escrito</span>
+                    </div>
+                  ) : null
+                }
+              />
+            </>
+          )}
+          {!noCelular && !isDraftMode && (
             <Button
               type="button"
               size="icon"
@@ -1420,7 +1589,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </Button>
           )}
 
-          {!isInternalNote && isMeta && !requiresTemplate && (
+          {!noCelular && !isInternalNote && isMeta && !requiresTemplate && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -1438,7 +1607,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             </Tooltip>
           )}
 
-          {!isInternalNote && (
+          {!noCelular && !isInternalNote && (
             <AIComposerButton message={message} onComposed={(newMessage) => setMessage(newMessage)} disabled={sendMutation.isPending || isBlocked} />
           )}
 
@@ -1463,7 +1632,16 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder={
-                agendaTemplate
+                // No celular o texto de exemplo é curto: a faixa acima do campo já
+                // diz em que modo a pessoa está, e o placeholder longo ocupava três
+                // linhas do campo e saía cortado.
+                noCelular && isScheduleMode
+                  ? "Mensagem que vai sair na hora marcada"
+                  : noCelular && isInternalNote
+                  ? "Nota para a equipe"
+                  : noCelular && isDraftMode
+                  ? "Rascunho"
+                : agendaTemplate
                   ? "No canal da API Meta sai o template escolhido acima"
                   : isScheduleMode
                   ? "Escreva a mensagem que vai sair na hora marcada..."
@@ -1479,6 +1657,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               }
               className={cn(
                 "resize-none pr-8",
+                // No celular o emoji mora dentro do campo, como no WhatsApp, e a
+                // borda arredondada é o que diz "aqui se escreve".
+                noCelular && "pr-11 rounded-2xl",
                 isInternalNote && "border-amber-500/70 focus-visible:ring-amber-500/40 bg-amber-50 dark:bg-amber-950/20",
                 isScheduleMode && "border-violet-500/70 focus-visible:ring-violet-500/40 bg-violet-50 dark:bg-violet-950/20"
               )}
@@ -1490,16 +1671,25 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
               }}
               disabled={(!isInternalNote && !isScheduleMode && (isBlocked || requiresTemplate)) || !!activeMacro || agendaTemplate}
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="absolute top-1 right-1 h-6 w-6 opacity-60 hover:opacity-100"
-              aria-label={isExpanded ? "Recolher campo de texto" : "Expandir campo de texto"}
-            >
-              {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            </Button>
+            {noCelular ? (
+              <div className="absolute bottom-0.5 right-0.5">
+                <EmojiPickerButton
+                  onEmojiSelect={handleEmojiSelect}
+                  disabled={sendMutation.isPending || isBlocked || isInternalNote}
+                />
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="absolute top-1 right-1 h-6 w-6 opacity-60 hover:opacity-100"
+                aria-label={isExpanded ? "Recolher campo de texto" : "Expandir campo de texto"}
+              >
+                {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+              </Button>
+            )}
           </div>
 
           {isScheduleMode ? (

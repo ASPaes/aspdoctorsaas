@@ -21,6 +21,12 @@ interface SmartReplySuggestionsProps {
    * "N agendadas" (ScheduledPill). Vazio, a barra fica exatamente como antes.
    */
   centro?: ReactNode;
+  /**
+   * No celular a barra some quando não há nada para mostrar: pedir sugestão
+   * virou item do "+". Sem isto ela ocupa uma faixa fixa da tela só para
+   * oferecer um botão.
+   */
+  esconderQuandoVazia?: boolean;
 }
 
 const toneConfig: Record<string, { label: string; className: string }> = {
@@ -48,6 +54,7 @@ export const SmartReplySuggestions = ({
   onSelectSuggestion,
   onRefresh,
   centro,
+  esconderQuandoVazia,
 }: SmartReplySuggestionsProps) => {
   const [expanded, setExpanded] = useState(false);
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -92,6 +99,11 @@ export const SmartReplySuggestions = ({
         </Button>
       </div>
     );
+  }
+
+  // No celular, sem sugestão e sem nada no meio da barra: não desenha nada.
+  if (!isLoading && !error && suggestions.length === 0 && esconderQuandoVazia && !centro) {
+    return null;
   }
 
   // Empty state — show button to request suggestions manually
