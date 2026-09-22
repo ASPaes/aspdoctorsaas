@@ -19,6 +19,14 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 21/09
 
+- 🆕 **Novos Clientes do Dashboard de Vendas ganhou filtro, ordenação e exportação** — Em **Dashboard › Vendas**, o quadro **Novos Clientes no Período** agora ordena por qualquer coluna (nome, data da venda, vendedor, origem, valor de ativação e MRR) e tem filtros de busca por nome, vendedor, origem, período da venda e faixa de valor, que podem ser combinados. Com filtro aplicado, o título mostra quantos clientes sobraram do total. O botão **Exportar Excel** baixa a planilha com exatamente o que está na tela, respeitando o filtro e a ordem escolhida.
+
+- 🔧 **A data da venda aparecia um dia antes do que era** — No quadro **Novos Clientes no Período**, toda venda era exibida com a data do dia anterior: uma venda registrada em 17/09 aparecia como 16/09, em todas as linhas.
+
+- 🔧 **Planilha exportada saía com todas as datas um dia atrás** — Valia para as exportações de **Clientes**, **Movimentos de MRR** e **Reajustes**. A planilha abria com data plausível, mas sempre um dia antes da real. Junto, o nome do arquivo deixa de sair carimbado com o dia seguinte quando a exportação é feita à noite.
+
+- 🔧 **Venda e cancelamento do dia 1º entravam no mês errado nos gráficos** — Nos gráficos de evolução do Dashboard, quem foi vendido ou cancelado no primeiro dia do mês era contado no mês anterior. São 1.256 vendas e 29 cancelamentos na base.
+
 - 🆕 **Encerrar atendimento que já tem ticket ficou igual ao resto do chat** — Ao encerrar um atendimento reaberto, a tela de escolha ganhou a opção **Não alterar ticket**, para fechar o atendimento e deixar o ticket exatamente como está. E qualquer que seja a escolha, agora você decide como o cliente é avisado: **com pesquisa de satisfação, só com a mensagem de encerramento ou em silêncio**. Antes, quem atualizava o ticket encerrava sempre calado, sem poder escolher.
 
 - ⬆️ **Ajustar o ticket sem sair do atendimento** — No **Atualizar ticket existente**, o **Status** virou campo editável ali mesmo, e o botão **Abrir ticket completo** abre a ficha inteira por cima do chat para mexer em Setor, Responsável e classificação. O que você já tinha escrito na observação continua lá quando volta.
