@@ -7,8 +7,7 @@ import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download, Code2 } from "lucide-react";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
-import { subDays } from "date-fns";
-import { DateRangePicker } from "@/components/ui/DateRangePicker";
+import { DateRangePicker, rangeDoPreset, isPeriodoPresetId, type PeriodoPresetId, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
 import { AttendancesTab } from "@/components/tickets/AttendancesTab";
 import { Button } from "@/components/ui/button";
@@ -134,12 +133,17 @@ function SortableDeptPill({ dept, isActive, onClick }: { dept: { id: string; nam
 /**
  * Filtros que a tela guarda entre visitas (por usuário, em localStorage).
  *
- * Ficam de fora de propósito: o período (o DateRangePicker só devolve datas
- * absolutas, então "Hoje" salvo hoje viraria uma tela vazia semana que vem),
- * a busca e o filtro de cliente — os dois são recorte pontual e, salvos,
- * fariam a tela abrir escondendo quase tudo sem o usuário lembrar por quê.
+ * Do período guarda-se o ATALHO escolhido (`periodoPreset`), nunca as datas:
+ * "Hoje" salvo como 21/09 viraria uma tela vazia na semana seguinte. Período
+ * montado à mão no calendário não é guardado — a tela reabre no último atalho
+ * (ou nos últimos 30 dias, se o usuário nunca escolheu um).
+ *
+ * Ficam de fora de propósito a busca e o filtro de cliente: os dois são
+ * recorte pontual e, salvos, fariam a tela abrir escondendo quase tudo sem o
+ * usuário lembrar por quê.
  */
 type FiltrosTickets = {
+  periodoPreset: PeriodoPresetId;
   ticketStateFilter: string;
   sortBy: string;
   atendenteFilter: string;
@@ -172,11 +176,16 @@ const textoSalvo = (v: unknown, padrao: string) =>
 const listaSalva = (v: unknown) =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
+const presetSalvo = (v: unknown): PeriodoPresetId => (isPeriodoPresetId(v) ? v : "30dias");
+
 export default function SupportTickets() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId } = useUnidadeFilter();
   const { initial: filtrosSalvos, save: salvarFiltros } = usePersistedFilters<FiltrosTickets>("tickets-filtros");
-  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
+  const [periodoPreset, setPeriodoPreset] = useState<PeriodoPresetId>(() => presetSalvo(filtrosSalvos.periodoPreset));
+  const [dateRange, setDateRange] = useState<PeriodoRange>(() => rangeDoPreset(presetSalvo(filtrosSalvos.periodoPreset)));
+  /** "Todo Período": a consulta sai sem recorte de data (ver DateRangePicker). */
+  const semPeriodo = dateRange.allTime === true;
   const [produtoFilter, setProdutoFilter] = useState<string>(() => textoSalvo(filtrosSalvos.produtoFilter, "all"));
   const [statusFilter, setStatusFilter] = useState<string>(() => textoSalvo(filtrosSalvos.statusFilter, "all"));
   const [atendenteFilter, setAtendenteFilter] = useState<string>(() => textoSalvo(filtrosSalvos.atendenteFilter, "all"));
@@ -744,6 +753,7 @@ export default function SupportTickets() {
    */
   useEffect(() => {
     salvarFiltros({
+      periodoPreset,
       ticketStateFilter, sortBy, atendenteFilter, statusFilter, departmentFilter, ticketsView,
       produtoFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter,
       ticketDevFilter, serviceTypeFilters, tagFilters,
@@ -752,6 +762,7 @@ export default function SupportTickets() {
     });
   }, [
     salvarFiltros,
+    periodoPreset,
     ticketStateFilter, sortBy, atendenteFilter, statusFilter, departmentFilter, ticketsView,
     produtoFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter,
     ticketDevFilter, serviceTypeFilters, tagFilters,
@@ -799,7 +810,7 @@ export default function SupportTickets() {
   };
 
   const { data: listData = { rows: [] as TicketRow[], total: 0 }, isLoading } = useQuery({
-    queryKey: ["support_tickets_list", tid, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, emTicketDev, ticketDevEstado, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
+    queryKey: ["support_tickets_list", tid, semPeriodo, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, statusFilter, atendenteFilter, categoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, subcategoriaFilter, serviceTypeFilters.join(","), tagFilters.join(","), departmentFilter, isAdminOrHead, userId, userDepartmentId, clienteFilterId, selectedUnidadeId, ticketStateFilter, emTicketDev, ticketDevEstado, sortBy, debouncedSearch, currentPage, ticketStatuses.map((s) => s.id).join(","), matchedAgentIds.join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -861,7 +872,7 @@ export default function SupportTickets() {
         .eq("tenant_id", tid)
         .is("deleted_at", null)
         .neq("contexto", "onboarding");
-      if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
+      if (!emTicketDev && !semPeriodo) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
 
       if (!isAdminOrHead) {
         if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
@@ -922,7 +933,7 @@ export default function SupportTickets() {
   const tickets = listData.rows;
 
   const { data: counts = { total: 0, ativos: 0, finalizados: 0 } } = useQuery({
-    queryKey: ["support_tickets_counts", tid, emTicketDev, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
+    queryKey: ["support_tickets_counts", tid, emTicketDev, semPeriodo, dateRange.from.toISOString(), dateRange.to.toISOString(), produtoFilter, atendenteFilter, categoriaFilter, subcategoriaFilter, canalFilter, tipoHorarioFilter, ticketDevFilter, serviceTypeFilters.join(","), departmentFilter, tagFilters.join(","), clienteFilterId, selectedUnidadeId, isAdminOrHead, userId, userDepartmentId, ticketStatuses.map((s) => s.id).join(",")],
     enabled: !!tid,
     queryFn: async () => {
       const fromISO = dateRange.from.toISOString();
@@ -949,7 +960,7 @@ export default function SupportTickets() {
           // módulo de Implantação, não na fila de suporte. `contexto` é NOT NULL, então o neq
           // não descarta linha nenhuma por engano.
           .neq("contexto", "onboarding");
-        if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
+        if (!emTicketDev && !semPeriodo) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
         if (!isAdminOrHead) {
           if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
           else if (userId) q = q.eq("responsavel_user_id", userId);
@@ -1056,7 +1067,7 @@ export default function SupportTickets() {
         .eq("tenant_id", tid)
         .is("deleted_at", null)
         .neq("contexto", "onboarding");
-      if (!emTicketDev) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
+      if (!emTicketDev && !semPeriodo) q = q.gte("aberto_em", fromISO).lte("aberto_em", toISO);
 
       if (!isAdminOrHead) {
         if (userDepartmentId) q = q.eq("department_id", userDepartmentId);
@@ -1272,7 +1283,15 @@ export default function SupportTickets() {
       <div className="flex items-center gap-2 flex-wrap">
         {!emTicketDev && (
           <>
-            <DateRangePicker dateRange={dateRange} onDateRangeChange={setDateRange} />
+            <DateRangePicker
+              dateRange={dateRange}
+              allowAllTime
+              onDateRangeChange={(range, preset) => {
+                setDateRange(range);
+                // Período montado à mão não vira preferência: a tela reabre no último atalho.
+                if (preset) setPeriodoPreset(preset);
+              }}
+            />
 
             <Select value={ticketStateFilter} onValueChange={setTicketStateFilter}>
               <SelectTrigger className="h-9 w-[140px] text-sm"><SelectValue /></SelectTrigger>

@@ -8,9 +8,27 @@ import "react-day-picker/dist/style.css";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
+/**
+ * Piso do atalho "Todo Período".
+ *
+ * Quem liga `allowAllTime` é que tira o filtro de data da consulta ao ler
+ * `allTime`. Ainda assim o range vem com datas: RPC e sub-aba exigem
+ * `p_date_from`/`p_date_to`, e não existe registro anterior a 01/01/2000 em
+ * lugar nenhum do sistema — para quem precisa de uma data, o piso vale como
+ * "sem limite".
+ */
+const INICIO_DE_TUDO = new Date(2000, 0, 1);
+
+type PeriodoPresetId = "hoje" | "7dias" | "30dias" | "mes" | "mes_passado" | "tudo";
+
+type PeriodoRange = { from: Date; to: Date; allTime?: boolean };
+
 interface DateRangePickerProps {
-  dateRange: { from: Date; to: Date };
-  onDateRangeChange: (range: { from: Date; to: Date }) => void;
+  dateRange: PeriodoRange;
+  /** `preset` vem `null` quando o usuário escolheu as datas à mão no calendário. */
+  onDateRangeChange: (range: PeriodoRange, preset: PeriodoPresetId | null) => void;
+  /** Mostra o atalho "Todo Período" — só nas telas que sabem consultar sem período. */
+  allowAllTime?: boolean;
   align?: "start" | "center" | "end";
   className?: string;
 }
@@ -45,12 +63,14 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 type Shortcut = {
+  id: PeriodoPresetId;
   label: string;
-  getRange: () => { from: Date; to: Date };
+  getRange: () => PeriodoRange;
 };
 
 const shortcuts: Shortcut[] = [
   {
+    id: "hoje",
     label: "Hoje",
     getRange: () => {
       const today = new Date();
@@ -58,6 +78,7 @@ const shortcuts: Shortcut[] = [
     },
   },
   {
+    id: "7dias",
     label: "Últimos 7 dias",
     getRange: () => {
       const today = new Date();
@@ -65,6 +86,15 @@ const shortcuts: Shortcut[] = [
     },
   },
   {
+    id: "30dias",
+    label: "Últimos 30 dias",
+    getRange: () => {
+      const today = new Date();
+      return { from: startOfDay(subDays(today, 29)), to: endOfDay(today) };
+    },
+  },
+  {
+    id: "mes",
     label: "Este mês",
     getRange: () => {
       const today = new Date();
@@ -72,6 +102,7 @@ const shortcuts: Shortcut[] = [
     },
   },
   {
+    id: "mes_passado",
     label: "Mês passado",
     getRange: () => {
       const prev = subMonths(new Date(), 1);
@@ -80,36 +111,71 @@ const shortcuts: Shortcut[] = [
   },
 ];
 
+const atalhoTodoPeriodo: Shortcut = {
+  id: "tudo",
+  label: "Todo Período",
+  getRange: () => ({ from: INICIO_DE_TUDO, to: endOfDay(new Date()), allTime: true }),
+};
+
+const TODOS_ATALHOS = [...shortcuts, atalhoTodoPeriodo];
+
+/**
+ * Remonta o período de um atalho guardado (localStorage) quando a tela abre.
+ * É por isso que o que se guarda é o ID do atalho, e não as datas: "Hoje"
+ * salvo hoje precisa valer hoje de novo na semana que vem.
+ */
+function rangeDoPreset(id: PeriodoPresetId): PeriodoRange {
+  const sc = TODOS_ATALHOS.find((s) => s.id === id);
+  return (sc ?? shortcuts[2]).getRange();
+}
+
+function isPeriodoPresetId(v: unknown): v is PeriodoPresetId {
+  return typeof v === "string" && TODOS_ATALHOS.some((s) => s.id === v);
+}
+
 function DateRangePicker({
   dateRange,
   onDateRangeChange,
+  allowAllTime = false,
   align = "start",
   className,
 }: DateRangePickerProps) {
   const [open, setOpen] = useState(false);
-  const [tempRange, setTempRange] = useState<{ from: Date; to: Date }>(dateRange);
-  const [fromInput, setFromInput] = useState(formatBRDate(dateRange.from));
-  const [toInput, setToInput] = useState(formatBRDate(dateRange.to));
+
+  /**
+   * Com "Todo Período" ligado o calendário não tem o que mostrar: o piso é
+   * 01/01/2000 e abriria num mês que o usuário nunca escolheu. Ele abre nos
+   * últimos 30 dias, com o atalho "Todo Período" ainda marcado — só sai de lá
+   * se o usuário aplicar alguma data.
+   */
+  const rangeVisivel = (r: PeriodoRange): { from: Date; to: Date } =>
+    r.allTime
+      ? { from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) }
+      : { from: r.from, to: r.to };
+
+  const [tempRange, setTempRange] = useState<{ from: Date; to: Date }>(() => rangeVisivel(dateRange));
+  const [fromInput, setFromInput] = useState(() => formatBRDate(rangeVisivel(dateRange).from));
+  const [toInput, setToInput] = useState(() => formatBRDate(rangeVisivel(dateRange).to));
 
   useEffect(() => {
     if (open) {
-      setTempRange(dateRange);
-      setFromInput(formatBRDate(dateRange.from));
-      setToInput(formatBRDate(dateRange.to));
+      const visivel = rangeVisivel(dateRange);
+      setTempRange(visivel);
+      setFromInput(formatBRDate(visivel.from));
+      setToInput(formatBRDate(visivel.to));
     }
   }, [open, dateRange]);
 
   const handleShortcut = (sc: Shortcut) => {
-    const range = sc.getRange();
-    onDateRangeChange(range);
+    onDateRangeChange(sc.getRange(), sc.id);
     setOpen(false);
   };
 
   const handleApply = () => {
-    onDateRangeChange({
-      from: startOfDay(tempRange.from),
-      to: endOfDay(tempRange.to),
-    });
+    onDateRangeChange(
+      { from: startOfDay(tempRange.from), to: endOfDay(tempRange.to) },
+      null,
+    );
     setOpen(false);
   };
 
@@ -146,9 +212,13 @@ function DateRangePicker({
   };
 
   const isShortcutActive = (sc: Shortcut): boolean => {
+    if (sc.id === "tudo") return dateRange.allTime === true;
+    if (dateRange.allTime) return false;
     const r = sc.getRange();
     return isSameDay(r.from, dateRange.from) && isSameDay(r.to, dateRange.to);
   };
+
+  const atalhos = allowAllTime ? TODOS_ATALHOS : shortcuts;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -163,7 +233,9 @@ function DateRangePicker({
         >
           <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
           <span>
-            {formatShort(dateRange.from)} – {formatShort(dateRange.to)}
+            {dateRange.allTime
+              ? "Todo Período"
+              : `${formatShort(dateRange.from)} – ${formatShort(dateRange.to)}`}
           </span>
         </button>
       </PopoverTrigger>
@@ -174,11 +246,11 @@ function DateRangePicker({
             <p className="text-[10px] font-medium uppercase text-muted-foreground mb-1 tracking-wider">
               Atalhos
             </p>
-            {shortcuts.map((sc) => {
+            {atalhos.map((sc) => {
               const active = isShortcutActive(sc);
               return (
                 <button
-                  key={sc.label}
+                  key={sc.id}
                   type="button"
                   onClick={() => handleShortcut(sc)}
                   className={cn(
@@ -255,5 +327,5 @@ function DateRangePicker({
   );
 }
 
-export { DateRangePicker };
-export type { DateRangePickerProps };
+export { DateRangePicker, rangeDoPreset, isPeriodoPresetId };
+export type { DateRangePickerProps, PeriodoPresetId, PeriodoRange };
