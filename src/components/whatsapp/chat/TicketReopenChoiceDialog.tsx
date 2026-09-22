@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCcw, FilePlus2, Ticket } from "lucide-react";
+import { RefreshCcw, FilePlus2, Ticket, MinusCircle } from "lucide-react";
 
 interface Props {
   open: boolean;
@@ -9,6 +9,7 @@ interface Props {
   existingTicketCode: string | null;
   onUpdateExisting: () => void;
   onCreateNew: () => void;
+  onSkipTicket: () => void;
 }
 
 export function TicketReopenChoiceDialog({
@@ -17,6 +18,7 @@ export function TicketReopenChoiceDialog({
   existingTicketCode,
   onUpdateExisting,
   onCreateNew,
+  onSkipTicket,
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,6 +62,21 @@ export function TicketReopenChoiceDialog({
           >
             <FilePlus2 className="h-4 w-4" />
             <span className="font-medium">Criar novo ticket</span>
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center gap-0.5"
+            onClick={onSkipTicket}
+          >
+            <div className="flex items-center gap-2">
+              <MinusCircle className="h-4 w-4" />
+              <span className="font-medium">Não alterar ticket</span>
+            </div>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              Encerra o atendimento e deixa o ticket como está
+            </span>
           </Button>
 
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>

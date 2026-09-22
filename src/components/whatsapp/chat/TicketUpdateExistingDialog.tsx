@@ -1,20 +1,27 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, RefreshCcw, Paperclip, Upload, Trash2, FileText } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, RefreshCcw, Paperclip, Upload, Trash2, FileText, ExternalLink } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   attendanceId: string | null;
   existingTicketId: string | null;
+  /**
+   * Chamado depois de gravar a nova interacao no ticket. Este dialog NAO encerra
+   * o atendimento: quem encerra e o fluxo padrao do ChatHeader (closeConversation),
+   * unico caminho com CSAT, mensagem de encerramento, TME/TMA e finalize-attendance.
+   * Encerrar aqui por fora deixava tudo isso de lado.
+   */
   onCompleted: () => void;
 }
 
@@ -35,19 +42,23 @@ export function TicketUpdateExistingDialog({
   existingTicketId,
   onCompleted,
 }: Props) {
+  const queryClient = useQueryClient();
   const [observacao, setObservacao] = useState("");
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [showFullTicket, setShowFullTicket] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       setObservacao("");
       setPendingFiles([]);
+      setShowFullTicket(false);
     }
   }, [open]);
 
-  const { data: ticket, isLoading: ticketLoading, error: ticketError } = useQuery({
+  const { data: ticket, isLoading: ticketLoading, error: ticketError, refetch: refetchTicket } = useQuery({
     queryKey: ["ticket-update-existing", existingTicketId],
     enabled: open && !!existingTicketId,
     queryFn: async () => {
@@ -55,6 +66,7 @@ export function TicketUpdateExistingDialog({
       const res = await (supabase.from("support_tickets" as any) as any)
         .select(`
           id, ticket_code, observacao_agente, observacao_ia, concluido_em, aberto_em, responsavel_user_id, deleted_at,
+          tenant_id, department_id, status_id,
           status:ticket_statuses(name, color),
           category:service_categories(nome),
           subcategory:service_subcategories(nome),
@@ -78,6 +90,53 @@ export function TicketUpdateExistingDialog({
       return { ...(data as any), responsavel };
     },
   });
+
+  // Status disponiveis. O tenant vem do proprio ticket (e nao do filtro da tela)
+  // para o super admin simulando tenant nao cair numa lista vazia.
+  const ticketTenantId = (ticket as any)?.tenant_id ?? null;
+  const { data: ticketStatuses = [] } = useQuery({
+    queryKey: ["ticket-update-existing-statuses", ticketTenantId],
+    enabled: open && !!ticketTenantId,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("ticket_statuses" as any) as any)
+        .select("id, name, color, position, department_id")
+        .eq("tenant_id", ticketTenantId)
+        .eq("is_active", true)
+        .order("position");
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        id: string; name: string; color: string; position: number; department_id: string | null;
+      }>;
+    },
+  });
+
+  // Mesmo recorte do detalhe do ticket: setor definido filtra a lista.
+  const statusOptions = useMemo(() => {
+    const deptId = (ticket as any)?.department_id ?? null;
+    if (!deptId) return ticketStatuses;
+    return ticketStatuses.filter((s) => s.department_id === deptId);
+  }, [ticketStatuses, ticket]);
+
+  const handleStatusChange = async (statusId: string) => {
+    if (!existingTicketId || statusId === ((ticket as any)?.status_id ?? "")) return;
+    setIsUpdatingStatus(true);
+    try {
+      const { error } = await (supabase.rpc as any)("update_ticket_fields", {
+        p_ticket_id: existingTicketId,
+        p_fields: { status_id: statusId },
+      });
+      if (error) throw error;
+      toast.success("Status do ticket atualizado");
+      await refetchTicket();
+      queryClient.invalidateQueries({ queryKey: ["support_tickets_list"] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_detail", existingTicketId] });
+      queryClient.invalidateQueries({ queryKey: ["support_ticket_events", existingTicketId] });
+    } catch (err: any) {
+      toast.error(err?.message || "Falha ao atualizar o status");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   const handlePickFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -139,15 +198,9 @@ export function TicketUpdateExistingDialog({
         }
       }
 
-      // 3) Encerrar atendimento (reaberto: sem CSAT, motivo manual)
-      const { error: closeErr } = await (supabase.rpc as any)("fn_close_attendance_atomic", {
-        p_attendance_id: attendanceId,
-        p_closed_reason: "manual",
-        p_closure_type: "silent",
-      });
-      if (closeErr) throw new Error(`Erro ao encerrar atendimento: ${closeErr.message}`);
-
-      toast.success("Ticket atualizado e atendimento encerrado");
+      // 3) O encerramento sai daqui: quem fecha e o fluxo padrao do chat, que
+      // pergunta CSAT / mensagem / silencio e dispara o finalize-attendance.
+      toast.success("Ticket atualizado");
       onCompleted();
     } catch (err: any) {
       toast.error(err?.message || "Falha ao atualizar ticket");
@@ -157,7 +210,11 @@ export function TicketUpdateExistingDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!isSubmitting) onOpenChange(o); }}>
+    <>
+      <Dialog
+        open={open && !showFullTicket}
+        onOpenChange={(o) => { if (!isSubmitting && !showFullTicket) onOpenChange(o); }}
+      >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base">
@@ -185,9 +242,55 @@ export function TicketUpdateExistingDialog({
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm font-semibold">#{ticket.ticket_code ?? ticket.id?.slice(0, 8)}</span>
                   </div>
-                  {ticket.status?.name && (
-                    <Badge variant="secondary" className="text-[10px]">{ticket.status.name}</Badge>
-                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs gap-1.5"
+                    onClick={() => setShowFullTicket(true)}
+                    disabled={isSubmitting}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Abrir ticket completo
+                  </Button>
+                </div>
+
+                {/* Status editavel aqui: e o ajuste que o agente quase sempre
+                    precisa fazer ao encerrar, e sair do chat so por causa dele
+                    custava o contexto inteiro do atendimento. */}
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Status</p>
+                  <Select
+                    value={ticket.status_id ?? ""}
+                    onValueChange={handleStatusChange}
+                    disabled={isUpdatingStatus || isSubmitting || statusOptions.length === 0}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Sem status">
+                        <span className="flex items-center gap-1.5">
+                          {isUpdatingStatus ? (
+                            <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                          ) : (
+                            <span
+                              className="h-2 w-2 rounded-full shrink-0"
+                              style={{ background: ticket.status?.color ?? "#6b7280" }}
+                            />
+                          )}
+                          {ticket.status?.name ?? "Sem status"}
+                        </span>
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((s) => (
+                        <SelectItem key={s.id} value={s.id} className="text-xs">
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: s.color }} />
+                            {s.name}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {/* grid-ok: lista rótulo→valor de 11px, não campo editável. */}
                 <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
@@ -331,5 +434,23 @@ export function TicketUpdateExistingDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+      {/* Ficha completa por cima. O dialog de cima some em vez de empilhar, e
+          como ele continua montado a observacao ja digitada nao se perde.
+          Montada so durante o fluxo: e um componente pesado e o ChatHeader fica
+          montado o tempo todo. */}
+      {open && (
+        <SupportTicketDetailDialog
+          ticketId={existingTicketId}
+          open={showFullTicket}
+          onOpenChange={(o) => {
+            if (!o) {
+              setShowFullTicket(false);
+              refetchTicket();
+            }
+          }}
+        />
+      )}
+    </>
   );
 }

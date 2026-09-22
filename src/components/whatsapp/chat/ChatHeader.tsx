@@ -493,12 +493,30 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
     else setShowCreateAdditional(true);
   }, []);
 
+  // Ticket gravado: o encerramento segue o MESMO caminho do fluxo normal
+  // (CSAT / mensagem / silencio). Antes este dialog fechava por conta propria e
+  // pulava CSAT, mensagem, TME/TMA e a analise do finalize-attendance.
   const handleUpdateExistingCompleted = useCallback(() => {
     setShowUpdateExisting(false);
     queryClient.invalidateQueries({ queryKey: ["support_ticket_events"] });
     queryClient.invalidateQueries({ queryKey: ["whatsapp", "conversations"] });
     queryClient.invalidateQueries({ queryKey: ["attendance-status"] });
-  }, [queryClient]);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id, queryClient]);
+
+  // "Nao alterar ticket": encerra o atendimento e deixa o ticket como esta.
+  const handleReopenSkipTicket = useCallback(() => {
+    setShowReopenChoice(false);
+    if (!csatEnabled) {
+      closeConversation({ conversationId: conversation.id, generateSummary: true, skipCsat: true, isGroup: isGroupConv });
+    } else {
+      setShowCloseModal(true);
+    }
+  }, [csatEnabled, closeConversation, conversation.id]);
 
   const handleAdditionalTicketCreated = useCallback(() => {
     setShowCreateAdditional(false);
@@ -1429,6 +1447,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         existingTicketCode={attachTicketCode ?? null}
         onUpdateExisting={() => handleReopenChoose("update")}
         onCreateNew={() => handleReopenChoose("create")}
+        onSkipTicket={handleReopenSkipTicket}
       />
 
       <TicketUpdateExistingDialog
