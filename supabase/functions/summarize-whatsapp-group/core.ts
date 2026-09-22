@@ -153,3 +153,15 @@ export function sectionsForMerge(parts: Sections[], lines: Line[]): string {
 export function countItems(s: Sections): number {
   return SECTION_KEYS.reduce((n, k) => n + s[k].length, 0);
 }
+
+// Teto de tokens da chamada de IA. Modelo de raciocinio (familia gpt-5, o1/o3/o4)
+// gasta os tokens de "pensar" DENTRO desse mesmo teto: com 4000, o gpt-5-mini
+// consumia o teto inteiro raciocinando e a resposta era cortada antes do resumo
+// sair (4000/4000 em 4 das 5 chamadas do Athuz em 22/09/2026, medido no
+// ai_usage_log). Quem nao raciocina fica em 4000, que e o que varios modelos da
+// Anthropic aceitam como maximo de saida.
+export function maxTokensFor(model: string): number {
+  const m = (model ?? "").toLowerCase();
+  const raciocina = m.includes("gpt-5") || /(^|[/-])o[134](-|$)/.test(m);
+  return raciocina ? 16_000 : 4000;
+}

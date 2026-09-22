@@ -15,6 +15,7 @@ import {
   chunkLines,
   countItems,
   type Line,
+  maxTokensFor,
   parseSections,
   type RawMessage,
   SECTION_KEYS,
@@ -291,7 +292,7 @@ async function callAndLog(supabase: any, aiConfig: any, tenantId: string, user: 
   const ai = await callAI(aiConfig, [
     { role: "system", content: SYSTEM_PROMPT },
     { role: "user", content: user },
-  ], TOOL, { maxTokens: 4000 });
+  ], TOOL, { maxTokens: maxTokensFor(aiConfig.model) });
   try {
     await supabase.from("ai_usage_log").insert({
       tenant_id: tenantId,
@@ -303,6 +304,9 @@ async function callAndLog(supabase: any, aiConfig: any, tenantId: string, user: 
       estimated_cost_usd: ai.usage.estimatedCostUsd,
     });
   } catch (_) { /* log nao pode derrubar o resumo */ }
+  // Teto de tokens estourado volta como conteudo vazio. Sem isso o erro chega
+  // ao usuario como "fora do formato" e esconde a causa.
+  if (!ai.content.trim()) throw new Error(`A IA nao devolveu conteudo (saida: ${ai.usage.outputTokens} tokens)`);
   return ai.content;
 }
 
@@ -310,6 +314,7 @@ function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   if (msg.includes("401") || msg.includes("invalid_api_key")) return "A chave da IA é inválida. Verifique em Configurações > Inteligência Artificial.";
   if (msg.includes("429") || msg.includes("quota")) return "O provedor de IA recusou por limite de uso. Tente de novo em alguns minutos.";
+  if (msg.includes("nao devolveu conteudo")) return "A IA gastou o limite de tokens sem responder. Tente um período menor.";
   if (msg.includes("formato esperado")) return "A IA respondeu fora do formato. Tente gerar de novo.";
   return "Não foi possível gerar o resumo. Tente de novo.";
 }

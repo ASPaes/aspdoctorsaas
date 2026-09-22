@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildLines, chunkLines, fmtBR, parseSections, sectionsForMerge, type RawMessage } from "./core.ts";
+import { buildLines, chunkLines, fmtBR, maxTokensFor, parseSections, sectionsForMerge, type RawMessage } from "./core.ts";
 
 const base: Omit<RawMessage, "id" | "timestamp"> = {
   content: null, message_type: "text", is_from_me: false, sender_name: null,
@@ -90,5 +90,20 @@ describe("parseSections", () => {
   it("consolidacao devolve o ref original de cada item", () => {
     const part = parseSections(JSON.stringify({ decisoes: [{ texto: "d", ref: 1 }] }), byRef);
     expect(JSON.parse(sectionsForMerge([part], lines)).decisoes).toEqual([{ texto: "d", ref: 1 }]);
+  });
+});
+
+describe("maxTokensFor", () => {
+  it("da folga ao modelo que gasta o teto raciocinando", () => {
+    expect(maxTokensFor("gpt-5-mini")).toBe(16_000);
+    expect(maxTokensFor("gpt-5.4")).toBe(16_000);
+    expect(maxTokensFor("o3-mini")).toBe(16_000);
+  });
+
+  it("mantem 4000 no resto, que e o teto de saida de varios modelos", () => {
+    expect(maxTokensFor("gpt-4o")).toBe(4000);
+    expect(maxTokensFor("claude-3-5-haiku")).toBe(4000);
+    expect(maxTokensFor("gemini-2.0-flash")).toBe(4000);
+    expect(maxTokensFor("")).toBe(4000);
   });
 });
