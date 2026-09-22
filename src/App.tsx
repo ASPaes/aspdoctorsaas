@@ -15,6 +15,8 @@ import { Loader2 } from "lucide-react";
 import RequirePermission from "@/components/auth/RequirePermission";
 import LandingRedirect from "@/components/auth/LandingRedirect";
 import { registerMediaBlobRevoker } from "@/lib/mediaBlobRegistry";
+import { isChatHost } from "@/lib/chatHost";
+import ChatHostRoutes from "@/routes/ChatHostRoutes";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
 import Dashboard from "@/pages/Dashboard";
@@ -87,6 +89,10 @@ const App = () => (
       <BrowserRouter>
           {/* dentro do Router: o offset do toast depende da rota (ver AppToasters) */}
           <AppToasters />
+          {/* chat.doctorsaas.com.br serve a MESMA pasta do app (ver lib/chatHost.ts):
+              é aqui que os dois endereços se separam, e nada do ramo do chat
+              atravessa para o app. */}
+          {isChatHost() ? <ChatHostRoutes /> : (
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
@@ -145,6 +151,7 @@ const App = () => (
 
             <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
           </Routes>
+          )}
       </BrowserRouter>
     </TooltipProvider>
     </ThemeProvider>
