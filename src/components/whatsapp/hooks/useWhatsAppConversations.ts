@@ -103,6 +103,13 @@ export interface ConversationsFilters {
    * é justamente quem fica fora dela.
    */
   queueOrder?: boolean;
+  /**
+   * Cadência da releitura de segurança. O caminho normal é o Realtime, que
+   * invalida esta chave a cada mudança; este intervalo só cobre o evento
+   * perdido. No celular ele afrouxa (ver ConversationsSidebar), porque um
+   * aparelho fica com a lista aberta o dia inteiro.
+   */
+  refetchIntervalMs?: number;
 }
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -139,7 +146,7 @@ export const useWhatsAppConversations = (filters?: ConversationsFilters) => {
     queryKey: ['whatsapp', 'conversations', filters, tid],
     initialPageParam: 0,
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    refetchInterval: filters?.refetchIntervalMs ?? 60_000,
     // Volta para a aba = busca de novo. É a ÚNICA recuperação que a lista tem
     // para a janela em que o operador está em outro app: ali o refetchInterval
     // acima não corre (refetchIntervalInBackground é false por padrão) e o

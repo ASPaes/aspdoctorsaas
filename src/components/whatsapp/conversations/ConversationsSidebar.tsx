@@ -84,6 +84,17 @@ const PILL_LABELS: Record<string, string> = {
 
 export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, variant = "desktop" }: Props) {
   const isMobileVariant = variant === "mobile";
+  /**
+   * Releitura de segurança da lista e das contagens. O caminho normal é o
+   * Realtime, que invalida as duas chaves a cada mudança (useWhatsAppConversations,
+   * com 1s de coalescing); este intervalo só cobre evento perdido.
+   *
+   * No celular ele cai de 60s para 180s porque o aparelho fica com a lista
+   * aberta o dia inteiro. Medido em produção em 22/09/2026: whatsapp_pill_counts
+   * é a consulta mais cara do sistema — 5.490 chamadas/hora a 198ms de média,
+   * ~30% de um núcleo só para manter os números das abas.
+   */
+  const CADENCIA_SEGURANCA_MS = isMobileVariant ? 180_000 : 60_000;
   // Recolhimento do cabeçalho no celular: histerese para não piscar quando o
   // dedo para no meio do caminho.
   const [headerCompacto, setHeaderCompacto] = useState(false);
@@ -300,6 +311,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
     autoReplyDisabledOnly: queueLikePills ? undefined : filters.autoReplyDisabledOnly,
     rulesDisabledOnly: queueLikePills ? undefined : filters.rulesDisabledOnly,
     queueOrder: isQueuePill,
+    refetchIntervalMs: CADENCIA_SEGURANCA_MS,
   });
 
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
@@ -377,7 +389,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
       filteredInstanceIds,
     ]
   );
-  const { data: pillCountsData } = usePillCounts(pillCountFilters);
+  const { data: pillCountsData } = usePillCounts({ ...pillCountFilters, refetchInterval: CADENCIA_SEGURANCA_MS });
   // Só o destaque visual — o bip e a detecção de borda vivem no AppLayout, um
   // por aplicação. Ler daqui evita um segundo detector tocando o mesmo bip.
   const { justArrived: queueJustArrived } = useQueueAlertState();
