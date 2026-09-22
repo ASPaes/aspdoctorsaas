@@ -205,6 +205,9 @@ export function MetaTemplatePicker({
             instance_id: instanceId,
             to,
             template_id: selected.id,
+            // DEM-0437: o nome digitado na Nova Conversa vai junto para batizar o
+            // contato que nasce aqui. Sem isto o chat abria mostrando so o numero.
+            contact_name: contactName?.trim() || null,
             ...paramsPayload,
           },
         },

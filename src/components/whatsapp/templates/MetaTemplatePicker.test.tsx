@@ -50,6 +50,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: { functions: { invoke: vi.fn() } },
 }));
 
+import { supabase } from "@/integrations/supabase/client";
 import { MetaTemplatePicker } from "./MetaTemplatePicker";
 
 class FakeResizeObserver {
@@ -165,5 +166,46 @@ describe("MetaTemplatePicker · pré-preenchimento (DEM-0350)", () => {
 
     clicarNoTemplate("continuidade");
     expect(campos()[0].value).toBe("Jordana");
+  });
+});
+
+describe("MetaTemplatePicker · nome do contato no envio (DEM-0437)", () => {
+  const invoke = () =>
+    (supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>);
+
+  const clicarEnviar = async () => {
+    const botao = Array.from(tela().querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Enviar template",
+    );
+    if (!botao) throw new Error("botão de envio não encontrado na tela");
+    await act(async () => {
+      botao.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+  };
+
+  beforeEach(() => {
+    invoke().mockReset();
+    invoke().mockResolvedValue({
+      data: { success: true, conversation_id: "c1", message_id: "m1" },
+      error: null,
+    });
+  });
+
+  it("manda o nome digitado junto do template, para o contato nascer batizado", async () => {
+    montar({ contactName: "Vanessa" });
+    clicarNoTemplate("iniciarvar");
+    await clicarEnviar();
+
+    const [slug, opcoes] = invoke().mock.calls[0];
+    expect(slug).toBe("send-whatsapp-template");
+    expect(opcoes.body.contact_name).toBe("Vanessa");
+  });
+
+  it("sem nome digitado manda null, e não o número disfarçado de nome", async () => {
+    montar({ contactName: null });
+    clicarNoTemplate("iniciarvar");
+    await clicarEnviar();
+
+    expect(invoke().mock.calls[0][1].body.contact_name).toBeNull();
   });
 });

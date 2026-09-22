@@ -40,11 +40,13 @@ Deno.serve(async (req) => {
 
   try {
     const input = await req.json().catch(() => ({}));
-    const { instance_id, to, template_id, parameters } = input as {
+    const { instance_id, to, template_id, parameters, contact_name } = input as {
       instance_id?: string;
       to?: string;
       template_id?: string;
       parameters?: string[] | Record<string, string>;
+      /** Nome digitado em 'Nome (opcional)' na Nova Conversa (DEM-0437). */
+      contact_name?: string | null;
     };
 
     if (!instance_id || !to || !template_id) {
@@ -222,6 +224,30 @@ Deno.serve(async (req) => {
     );
     if (!contactId) {
       return jsonResponse({ error: 'failed to create contact', wamid }, 500);
+    }
+
+    // DEM-0437: o nome digitado em 'Nome (opcional)' precisa grudar no contato.
+    // findOrCreateContact e chamado com isFromMe=true (quem fala primeiro somos nos),
+    // e nesse ramo ele grava name = telefone de proposito — nome vindo de mensagem
+    // nossa nao e o nome do contato. O nome daqui foi DIGITADO pelo operador, entao
+    // vale; so nao pode atropelar contato ja batizado: o UPDATE so pega a linha cujo
+    // name ainda e o proprio telefone (ou esta nulo).
+    const nomeDigitado = (contact_name ?? '').trim();
+    if (nomeDigitado) {
+      const { data: ctRow } = await supabase
+        .from('whatsapp_contacts')
+        .select('name, phone_number')
+        .eq('id', contactId)
+        .maybeSingle();
+      const nomeAtual = (ctRow?.name ?? '').trim();
+      const semNome = nomeAtual === '' || nomeAtual === (ctRow?.phone_number ?? '') || nomeAtual === normalizedTo;
+      if (semNome && nomeDigitado !== nomeAtual) {
+        const { error: nameErr } = await supabase
+          .from('whatsapp_contacts')
+          .update({ name: nomeDigitado, updated_at: new Date().toISOString() })
+          .eq('id', contactId);
+        if (nameErr) console.error(`${LOG} could not set contact name (non-fatal):`, nameErr);
+      }
     }
 
     const conversationId = await findOrCreateConversation(
