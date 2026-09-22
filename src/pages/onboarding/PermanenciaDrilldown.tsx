@@ -1,4 +1,7 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
+import { exportDrilldownPermanenciaXlsx } from "@/lib/exportOnboardingDrilldownXlsx";
 import type { ClientePermanencia } from "./permanencia";
 
 /**
@@ -28,12 +31,24 @@ export default function PermanenciaDrilldown({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col">
-        <SheetHeader>
+        <SheetHeader className="pr-8">
           <SheetTitle>{titulo}</SheetTitle>
           <SheetDescription>{regra}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto mt-4">
+        <div className="flex justify-end mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={ordenadas.length === 0}
+            onClick={() => exportDrilldownPermanenciaXlsx({ titulo, linhas: ordenadas, nomeCliente, nomeImplantador })}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar Excel
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto mt-2">
           {ordenadas.length === 0 ? (
             <p className="text-sm text-muted-foreground py-8 text-center">Nenhum cliente nesta conta.</p>
           ) : (

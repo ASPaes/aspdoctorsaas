@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Download, ExternalLink } from "lucide-react";
+import { exportDrilldownSlaXlsx } from "@/lib/exportOnboardingDrilldownXlsx";
 import { formatMinUtil, formatMinCal } from "./slaFormat";
 
 export interface LinhaDrilldown {
@@ -40,10 +42,22 @@ export default function DrilldownSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col">
-        <SheetHeader>
+        <SheetHeader className="pr-8">
           <SheetTitle>{titulo}</SheetTitle>
           <SheetDescription>{regra}</SheetDescription>
         </SheetHeader>
+
+        <div className="flex justify-end mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={ordenadas.length === 0}
+            onClick={() => exportDrilldownSlaXlsx({ titulo, linhas: ordenadas })}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Exportar Excel
+          </Button>
+        </div>
 
         <div className="flex-1 overflow-y-auto -mx-6 px-6 mt-2">
           <table className="w-full text-xs">
