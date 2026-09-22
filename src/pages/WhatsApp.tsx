@@ -17,6 +17,7 @@ import { usePodeVerTodosSetores } from "@/hooks/usePodeVerTodosSetores";
 import { ShieldAlert } from "lucide-react";
 import AgentPresenceOverlay from "@/components/whatsapp/presence/AgentPresenceOverlay";
 import { ScheduleReminderBanner } from "@/components/whatsapp/ScheduleReminderBanner";
+import { isChatHost } from "@/lib/chatHost";
 
 function WhatsAppContent() {
   const [selected, setSelected] = useState<ConversationWithContact | null>(null);
@@ -276,8 +277,11 @@ function WhatsAppContent() {
     );
   }
 
-  // Mobile: show either sidebar or chat
-  if (isMobile) {
+  // Mobile: show either sidebar or chat.
+  // chat.doctorsaas.com.br sempre entra por aqui, mesmo aberto num navegador
+  // largo: o endereço existe para ser o chat de celular, e testar nele sem o
+  // layout de celular esconderia justamente o que precisa ser visto.
+  if (isMobile || isChatHost()) {
     if (selected) {
       return (
         <div className="flex flex-col h-[calc(100vh-3.5rem)]">
@@ -294,7 +298,7 @@ function WhatsAppContent() {
         <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
         <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
             <div className="w-full h-full">
-              <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} />
+              <ConversationsSidebar selectedId={null} onSelect={handleSelect} onSelectMessage={handleSelectMessage} variant="mobile" />
             </div>
           <AgentPresenceOverlay />
         </div>

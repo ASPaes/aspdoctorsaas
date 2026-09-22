@@ -47,11 +47,18 @@ import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgentAvailability } from "@/hooks/useAgentAvailability";
 import { usePortao } from "@/hooks/usePortao";
+import { MobileListHeader } from "@/components/chat-mobile/MobileListHeader";
 
 interface Props {
   selectedId: string | null;
   onSelect: (conv: ConversationWithContact) => void;
   onSelectMessage?: (conv: ConversationWithContact, messageId: string) => void;
+  /**
+   * "mobile" troca só a apresentação do cabeçalho (chip de setor, folhas de
+   * baixo, recolhimento ao rolar). Estado, filtros e consultas são os MESMOS —
+   * duplicar essa lógica para o celular seria duas listas para manter.
+   */
+  variant?: "desktop" | "mobile";
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -75,7 +82,15 @@ const PILL_LABELS: Record<string, string> = {
   closed: "Encerrados",
 };
 
-export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: Props) {
+export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, variant = "desktop" }: Props) {
+  const isMobileVariant = variant === "mobile";
+  // Recolhimento do cabeçalho no celular: histerese para não piscar quando o
+  // dedo para no meio do caminho.
+  const [headerCompacto, setHeaderCompacto] = useState(false);
+  const handleListScroll = useCallback((e: React.UIEvent<HTMLElement>) => {
+    const y = (e.target as HTMLElement)?.scrollTop ?? 0;
+    setHeaderCompacto((antes) => (antes ? y >= 8 : y > 28));
+  }, []);
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   // antes: sem restrição — agenda de contatos e busca nas mensagens abertas a todos.
@@ -734,7 +749,36 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
   );
 
   return (
-    <div className="flex flex-col h-full border-r border-border">
+    <div className={cn("flex flex-col h-full", !isMobileVariant && "border-r border-border")}>
+      {isMobileVariant && (
+        <MobileListHeader
+          compacto={headerCompacto}
+          capacidade={availability.isEnabled ? availability : null}
+          search={search}
+          onSearchChange={handleSearchChange}
+          onAbrirBuscaMensagens={() => setShowMessageSearch(true)}
+          onNovaConversa={() => setShowNewModal(true)}
+          filters={filters}
+          onFiltersChange={setFilters}
+          showGroupByAgent={activePill === "in_progress"}
+          operatorFilterInactive={queueLikePills}
+          unreadOnly={unreadOnly}
+          onUnreadOnlyChange={setUnreadOnly}
+          naoLidasNaAba={(pillCounts.counts as any)?.[activePill]?.unreadConvs ?? 0}
+          onMarcarTodasLidas={() => setMarkAllOpen(true)}
+          isSearching={isSearching}
+          activePill={activePill}
+          onPillChange={setActivePill}
+          pillCounts={pillCounts.counts}
+          pillBadges={pillCounts.badges}
+          groupsHasUnread={pillCounts.groupsUnread > 0}
+          queueJustArrived={queueJustArrived}
+          setorResumo={selectedDepartmentId ? (departmentNameMap.get(selectedDepartmentId) ?? null) : "Todos os setores"}
+        />
+      )}
+
+      {!isMobileVariant && (
+      <>
       {/* Header */}
       <div className="p-3 border-b border-border space-y-2">
         <div className="flex items-center justify-between">
@@ -851,6 +895,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
           })()}
         </div>
       )}
+      </>
+      )}
 
       <AlertDialog open={markAllOpen} onOpenChange={(o) => !markAllLoading && setMarkAllOpen(o)}>
         <AlertDialogContent>
@@ -907,8 +953,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       </AlertDialog>
 
 
-      {/* Quick Pills */}
-      {!isSearching && (
+      {/* Quick Pills — no celular elas já vão dentro do MobileListHeader */}
+      {!isSearching && !isMobileVariant && (
       <div className="pt-1.5">
         <QuickPills
           active={activePill}
@@ -952,7 +998,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage }: 
       )}
 
       {/* List */}
-      <ScrollArea className="flex-1">
+      {/* onScrollCapture, não onScroll: o scroll acontece no viewport interno do
+          Radix, e evento de scroll não borbulha — só a fase de captura pega. */}
+      <ScrollArea className="flex-1" onScrollCapture={isMobileVariant ? handleListScroll : undefined}>
         {(isSearching ? isSearchLoading : isLoading) ? (
           <div className="space-y-1 p-2">
             {Array.from({ length: 8 }).map((_, i) => (

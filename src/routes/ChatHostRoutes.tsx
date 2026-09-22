@@ -18,6 +18,7 @@ const ResetPassword = lazyWithReload(() => import("@/pages/ResetPassword"));
 const Onboarding = lazyWithReload(() => import("@/pages/Onboarding"));
 const AccessPending = lazyWithReload(() => import("@/pages/AccessPending"));
 const AccessBlocked = lazyWithReload(() => import("@/pages/AccessBlocked"));
+const WhatsAppContatos = lazyWithReload(() => import("@/pages/WhatsAppContatos"));
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-background">
@@ -62,6 +63,16 @@ export default function ChatHostRoutes() {
         }
       >
         <Route index element={<ChatHostGuard><WhatsApp /></ChatHostGuard>} />
+        <Route
+          path="/whatsapp/contatos"
+          element={
+            <ChatHostGuard>
+              <Suspense fallback={<PageLoader />}>
+                <WhatsAppContatos />
+              </Suspense>
+            </ChatHostGuard>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
