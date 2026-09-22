@@ -11,6 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { AlertTriangle, ChevronDown, ChevronRight, RefreshCw, Clock, Pause, TestTube2, ExternalLink, RotateCw, Loader2, Trash2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { useLinhaDestacada, CLASSE_DESTAQUE } from "@/hooks/useDeepLinkIntegracao";
 
 type ReprocessarResp = {
@@ -323,7 +324,52 @@ const TERMINAIS = ["invalido", "erro", "ignorado"];
  *   O balde 'contrato_cancelado' é ALARM_BUCKET, então não filtra status_usuario — é o único
  *   lugar da tela onde linha já vinculada aparece.
  */
-type DestinoConferencia = "escolher_candidato" | "contrato_cancelado";
+type DestinoConferencia =
+  | "escolher_candidato"
+  | "contrato_cancelado"
+  | "criar_contrato"
+  | "criar"
+  | "atribuir_modelo"
+  | "resolver";
+
+/** O texto do botao diz PARA ONDE ele leva. "Resolver na Conferencia" para tudo escondia que
+ *  cada caso mora num balde diferente, e mandava gente para lista vazia. */
+const DESTINO_LABEL: Record<DestinoConferencia, string> = {
+  escolher_candidato: "Escolher o cadastro certo",
+  contrato_cancelado: "Ver cancelados no Omie",
+  criar_contrato: "Ir para Criar contrato",
+  criar: "Ir para A criar no Omie",
+  atribuir_modelo: "Ir para Sem modelo",
+  resolver: "Ir para Divergências",
+};
+
+/** O que a Conferência já sabe sobre o contrato desta linha. É isto que diz para onde mandar
+ *  quem clica: a mesma mensagem "não vinculado" tem destino diferente conforme a ação sugerida. */
+type ReconInfo = {
+  acao_sugerida?: string | null;
+  status_usuario?: string | null;
+  codigo_contrato_omie?: number | string | null;
+  estado_match?: string | null;
+};
+
+function destinoDoRecon(recon?: ReconInfo | null): DestinoConferencia | undefined {
+  switch (recon?.acao_sugerida ?? "") {
+    case "criar_contrato":
+      return "criar_contrato";
+    case "criar":
+      return "criar";
+    case "atribuir_modelo":
+      return "atribuir_modelo";
+    case "resolver":
+      return "resolver";
+    case "escolher_candidato":
+      return "escolher_candidato";
+    default:
+      // Sem linha na Conferência não existe balde para abrir: mandar para um deles é beco sem
+      // saída (lista vazia). Nesses casos a saída é a ficha do cliente.
+      return undefined;
+  }
+}
 
 type Diagnostico = {
   titulo: string;
@@ -332,6 +378,8 @@ type Diagnostico = {
   descartavel?: boolean;
   destinoConferencia?: DestinoConferencia;
   podeReprocessar?: boolean;
+  /** Quando a saída é a ficha do cliente (criar cadastro próprio, juntar cadastros, enviar ao Omie). */
+  abrirCliente?: boolean;
 };
 
 /**
@@ -343,7 +391,7 @@ type Diagnostico = {
  * DS) e nas que reprocessar não resolve (bloqueio ainda de pé). Quem abria a tela via 7 problemas
  * e nenhum caminho.
  */
-function diagnosticar(item: FilaItem): Diagnostico {
+function diagnosticar(item: FilaItem, recon?: ReconInfo | null): Diagnostico {
   const erro = item.motivo ?? "";
   const status = (item.status || "").toLowerCase();
 
@@ -415,6 +463,61 @@ function diagnosticar(item: FilaItem): Diagnostico {
     };
   }
 
+  /**
+   * Cadastro do Omie compartilhado por 2 clientes do DoctorSaaS.
+   *
+   * Caía no diagnóstico genérico de "Falha ao enviar", que mandava clicar em Reprocessar --
+   * e reprocessar toma o MESMO 409 de novo, porque a causa não é transitória: é uma decisão que
+   * ninguém tomou. A saída já existe no produto (o "criar cadastro próprio no Omie" da ficha do
+   * cliente) e a fila não apontava para ela.
+   */
+  if (erro.includes("MAIS DE UM cliente") || erro.includes("cadastro_omie_ja_vinculado")) {
+    return {
+      titulo: "O cadastro no Omie é usado por mais de um cliente daqui",
+      aconteceu:
+        "Dois clientes do DoctorSaaS apontam para o mesmo cadastro do Omie. Escrever nele trocaria a " +
+        "fantasia, o e-mail, o telefone e o endereço do outro cliente, então nada foi escrito.",
+      passos: [
+        'Se este é outro estabelecimento no mesmo CNPJ: abra o cliente, clique em "Enviar ao Omie" e escolha "Criar cadastro próprio no Omie". Ele passa a ter cadastro só dele e esta linha volta a andar.',
+        "Se os dois são a mesma empresa: junte os dois cadastros aqui no DoctorSaaS e depois descarte esta linha.",
+      ],
+      abrirCliente: true,
+      podeReprocessar: true,
+    };
+  }
+
+  /**
+   * Cliente com mais de um contrato ativo. Vinha com o título "Faltam dados no contrato" (não
+   * falta dado nenhum) e o passo "Corrija: <a própria mensagem>", que mandava ajustar o valor à
+   * mão no Omie sem dizer em qual contrato -- e, nos dois casos da base, o contrato nem vínculo
+   * tinha, então ajustar à mão não resolveria a linha.
+   */
+  if (erro.includes("multiplos contratos ativos") || erro.includes("múltiplos contratos ativos")) {
+    const semVinculo = !recon?.codigo_contrato_omie;
+    const destino = destinoDoRecon(recon);
+    return {
+      titulo: "Cliente com mais de um contrato ativo",
+      aconteceu:
+        "A sincronização automática de valor ainda não cobre cliente com mais de um contrato ativo: " +
+        "ela não tem como decidir qual contrato do Omie recebe qual valor. Nada foi escrito no OMIE." +
+        (semVinculo
+          ? " Além disso, este contrato ainda não tem vínculo com um contrato do Omie."
+          : ""),
+      passos: semVinculo
+        ? [
+            "Primeiro resolva o vínculo deste contrato na Conferência: cada contrato do DoctorSaaS precisa apontar para um contrato do Omie.",
+            "Enquanto o cliente tiver mais de um contrato ativo, o valor continua sendo ajustado à mão no Omie.",
+          ]
+        : [
+            "Ajuste o valor direto no Omie, no contrato correspondente.",
+            "Esta linha não vai passar sozinha enquanto o cliente tiver mais de um contrato ativo.",
+          ],
+      destinoConferencia: destino,
+      abrirCliente: !destino,
+      podeReprocessar: true,
+    };
+  }
+
   if (erro.startsWith("validacao:") || erro.includes("validacao:")) {
     // A RPC devolve um array JSON dentro da string. Vira lista, não parágrafo.
     let itensErro: string[] = [];
@@ -463,17 +566,71 @@ function diagnosticar(item: FilaItem): Diagnostico {
    * era a tela pedir.
    */
   if (status === "ignorado") {
-    return {
-      titulo: "Contrato ainda não vinculado ao OMIE",
-      aconteceu:
-        "A fila automática só altera contrato que já existe no OMIE. Ela nunca cria. Nada foi escrito.",
-      passos: [
-        'Se este contrato deve ir ao OMIE: resolva o vínculo na Conferência (ou use "Enviar ao Omie" na tela do cliente) e depois clique em Reprocessar.',
-        "Se ele não deve ir ao OMIE: descarte a linha. Nada foi escrito lá, é só limpeza de fila.",
-      ],
-      destinoConferencia: "escolher_candidato",
+    // A mensagem era uma só ("resolva o vínculo na Conferência") e o botão levava sempre para
+    // Escolher Candidato. Só que contrato com ação sugerida 'criar_contrato' NÃO aparece lá:
+    // quem clicava chegava numa lista vazia. A Conferência já sabe o que falta em cada caso.
+    const destino = destinoDoRecon(recon);
+    const base = {
       podeReprocessar: true,
       descartavel: true,
+      destinoConferencia: destino,
+    };
+
+    if (destino === "criar_contrato" || destino === "criar") {
+      return {
+        ...base,
+        titulo: "Este contrato ainda não existe no OMIE",
+        aconteceu:
+          destino === "criar_contrato"
+            ? "O cliente já está no OMIE, o contrato não. A fila automática só altera contrato que já existe lá; ela nunca cria. Nada foi escrito."
+            : "Nem o cliente nem o contrato existem no OMIE. A fila automática só altera o que já está lá; ela nunca cria. Nada foi escrito.",
+        passos: [
+          destino === "criar_contrato"
+            ? 'Crie o contrato no OMIE: use o botão abaixo (balde "Criar contrato" da Conferência) ou "Enviar ao Omie" na ficha do cliente.'
+            : 'Crie cliente e contrato no OMIE: use o botão abaixo (balde "A criar no Omie") ou "Enviar ao Omie" na ficha do cliente.',
+          "Criado o contrato, esta linha não tem mais função: descarte. As alterações seguintes já vão sozinhas.",
+          "Se este contrato NÃO deve ir ao OMIE, descarte a linha: nada foi escrito lá.",
+        ],
+      };
+    }
+
+    if (destino === "escolher_candidato") {
+      return {
+        ...base,
+        titulo: "Qual cadastro do OMIE é este cliente?",
+        aconteceu:
+          "O CNPJ aparece em mais de um cadastro, então o vínculo não pôde ser criado sozinho e a alteração não foi enviada. Nada foi escrito no OMIE.",
+        passos: [
+          "Escolha o cadastro certo na Conferência (botão abaixo). Isso cria o vínculo e não altera nada no OMIE.",
+          "Depois clique em Reprocessar para esta alteração seguir.",
+        ],
+      };
+    }
+
+    if (destino) {
+      return {
+        ...base,
+        titulo: "Contrato ainda não vinculado ao OMIE",
+        aconteceu:
+          "A fila automática só altera contrato que já existe no OMIE. Este ainda está pendente na Conferência. Nada foi escrito.",
+        passos: [
+          "Resolva a pendência na Conferência (botão abaixo) e depois clique em Reprocessar.",
+          "Se este contrato não deve ir ao OMIE, descarte a linha.",
+        ],
+      };
+    }
+
+    return {
+      ...base,
+      titulo: "Contrato ainda não vinculado ao OMIE",
+      aconteceu:
+        "A fila automática só altera contrato que já existe no OMIE, e este contrato não aparece na " +
+        "Conferência (o que costuma acontecer com contrato cancelado ou recém-criado). Nada foi escrito.",
+      passos: [
+        'Se ele deve ir ao OMIE: abra o cliente e use "Enviar ao Omie".',
+        "Se não deve: descarte a linha. Nada foi escrito lá, é só limpeza de fila.",
+      ],
+      abrirCliente: true,
     };
   }
 
@@ -513,6 +670,7 @@ export default function OmieFilaSincronizacaoPanel({
 }) {
   // Conta Omie escolhida no seletor de Integracoes -> Omie. Ver OmieContaContext.
   const { conta } = useOmieConta();
+  const navigate = useNavigate();
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [okOpen, setOkOpen] = useState(false);
 
@@ -528,6 +686,46 @@ export default function OmieFilaSincronizacaoPanel({
 
   const data = query.data;
   const itens = data?.itens ?? [];
+
+  // ========================================================================
+  // O que a Conferência sabe sobre cada contrato parado.
+  //
+  // A mesma mensagem ("contrato não vinculado") tem destino diferente conforme a ação sugerida:
+  // 'criar_contrato' não aparece em Escolher Candidato, e era para lá que a tela mandava todo
+  // mundo. Sem esta leitura não dá para escolher o balde certo nem para dizer se o contrato já
+  // tem par no Omie.
+  //
+  // Só das linhas travadas (as outras estão andando) e só quando existe alguma.
+  // ========================================================================
+  const contratosTravados = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          itens
+            .filter((i) => TERMINAIS.includes((i.status || "").toLowerCase()))
+            .map((i) => i.contrato_id)
+            .filter((id): id is string => !!id)
+        )
+      ),
+    [itens]
+  );
+
+  const reconQuery = useQuery({
+    queryKey: ["omie-fila-recon", tid, conta?.id, contratosTravados.join(",")],
+    enabled: !!tid && !!conta?.id && contratosTravados.length > 0,
+    queryFn: async () => {
+      const { data: rows, error } = await (supabase.from("reconciliacao_cadastro" as any) as any)
+        .select("ds_contract_id, acao_sugerida, status_usuario, codigo_contrato_omie, estado_match")
+        .eq("tenant_id", tid)
+        .eq("conta_integration_id", conta?.id)
+        .in("ds_contract_id", contratosTravados);
+      if (error) throw error;
+      const mapa: Record<string, ReconInfo> = {};
+      for (const r of rows ?? []) mapa[r.ds_contract_id] = r as ReconInfo;
+      return mapa;
+    },
+  });
+  const reconPorContrato = reconQuery.data ?? {};
   const resumo = data?.resumo ?? {};
   const saude = data?.saude ?? {};
   const okRecentes = data?.ok_recentes ?? [];
@@ -778,7 +976,10 @@ export default function OmieFilaSincronizacaoPanel({
                 {itensFiltrados.map((item, i) => {
                   const status = (item.status || "").toLowerCase();
                   const isIgnorado = status === "ignorado";
-                  const dg = diagnosticar(item);
+                  const dg = diagnosticar(
+                    item,
+                    item.contrato_id ? reconPorContrato[item.contrato_id] : null
+                  );
                   const terminal = TERMINAIS.includes(status);
                   const canReprocess =
                     terminal && !!item.fila_id && dg.podeReprocessar !== false && !item.contrato_removido;
@@ -863,9 +1064,22 @@ export default function OmieFilaSincronizacaoPanel({
                             }
                           >
                             <ExternalLink className="h-3 w-3" />
-                            {dg.destinoConferencia === "contrato_cancelado"
-                              ? "Ver cancelados no Omie"
-                              : "Resolver na Conferência"}
+                            {DESTINO_LABEL[dg.destinoConferencia]}
+                          </Button>
+                        )}
+                        {/* Quando a saída não é um balde da Conferência e sim uma decisão na ficha
+                            do cliente (cadastro próprio no Omie, juntar cadastros, enviar ao Omie),
+                            o caminho tem que estar aqui: era o passo que a tela descrevia em texto
+                            e deixava a pessoa procurar. */}
+                        {dg.abrirCliente && item.cliente_id && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="gap-1"
+                            onClick={() => navigate(`/clientes/${item.cliente_id}`)}
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            Abrir o cliente
                           </Button>
                         )}
                         {dg.descartavel && item.fila_id && (

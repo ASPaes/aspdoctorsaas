@@ -1618,11 +1618,13 @@ function VisaoGeralPanel({
       <OmieFilaSincronizacaoPanel
         tid={tid}
         onIrParaConferencia={(cnpj, destino) => {
-          // Contrato JÁ vinculado não existe no Escolher Candidato (a recon-candidatos-listar
-          // descarta status_usuario 'vinculado'/'resolvido'). O balde 'contrato_cancelado' é
-          // ALARM_BUCKET e não filtra status_usuario — é onde essa linha realmente aparece.
-          if (destino === "contrato_cancelado") {
-            onIrParaBalde("contrato_cancelado", cnpj);
+          // Cada situação da fila mora num balde diferente da Conferência, e mandar todas para o
+          // Escolher Candidato levava gente para lista vazia: contrato com ação sugerida
+          // 'criar_contrato' ou 'criar' não aparece lá, e contrato já vinculado também não (a
+          // recon-candidatos-listar descarta status_usuario 'vinculado'/'resolvido'). O único
+          // destino que NÃO é balde é o próprio Escolher Candidato, que é uma aba separada.
+          if (destino !== "escolher_candidato") {
+            onIrParaBalde(destino, cnpj);
             return;
           }
           try {
