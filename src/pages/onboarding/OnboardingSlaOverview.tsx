@@ -158,9 +158,9 @@ const complianceTone = (v: number): Tone => {
 
 /* ---------- cards ---------- */
 
-function KpiCard({ icon: Icon, label, value, sub, tone = "default" }: { icon: any; label: string; value: string; sub?: string; tone?: Tone }) {
+function KpiCard({ icon: Icon, label, value, sub, tone = "default", onClick }: { icon: any; label: string; value: string; sub?: string; tone?: Tone; onClick?: () => void }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5">
+    <div className={cn("rounded-lg border border-border bg-card p-4 flex flex-col gap-1.5 transition-colors", onClick && CLICAVEL_CLS)} {...clicavel(onClick)}>
       <div className="flex items-center justify-between">
         <span className="text-[11px] uppercase tracking-wide text-muted-foreground font-medium">{label}</span>
         <Icon className={`h-4 w-4 ${toneText[tone]}`} />
@@ -272,7 +272,15 @@ export default function OnboardingSlaOverview({
   permanencia?: ReactNode;
 }) {
   const [areaDim, setAreaDim] = useState<"demanda" | "setor">("demanda");
-  const [drill, setDrill] = useState<{ titulo: string; regra: string; linhas: LinhaDrilldown[]; unidade: "util" | "cal" } | null>(null);
+  const [drill, setDrill] = useState<{
+    titulo: string;
+    regra: string;
+    linhas: LinhaDrilldown[];
+    unidade: "util" | "cal";
+    rotuloUtil?: string;
+    ordenarPor?: "valor" | "pctSla";
+    rodape?: ReactNode;
+  } | null>(null);
 
 
   const pipelinesQ = useQuery({
@@ -407,6 +415,12 @@ export default function OnboardingSlaOverview({
   // KPIs "SLA Total"
   const total = useMemo(() => {
     let withSla = 0, okC = 0, okE = 0, sumParado = 0, sumBruto = 0, sumCal = 0, started = 0, cicloCal = 0, cicloE = 0;
+    // As listas saem do MESMO laço que soma os cartões — recontar por fora era o
+    // caminho curto para a lista discordar do número que ela explica (DEM-0439).
+    const prazoBruto: LinhaDrilldown[] = [];
+    const prazoEfetivo: LinhaDrilldown[] = [];
+    const parados: LinhaDrilldown[] = [];
+    const ciclos: LinhaDrilldown[] = [];
     journeys.forEach((j) => {
       const phases = journeyPhases(j);
       if (phases.length) {
@@ -434,8 +448,35 @@ export default function OnboardingSlaOverview({
         cicloCal += cal;
         cicloE += efe;
       }
+
+      const id = j.journey_id;
+      if (id) {
+        // Mesma janela da aba "Por Área": com recorte o número é das passagens
+        // escolhidas, e o nome tem que acompanhar o que o número mede.
+        const de = recorteDeFase ? phases[0]?.de ?? j.aberta_em : j.aberta_em;
+        const ate = recorteDeFase ? phases[phases.length - 1]?.ate ?? j.concluido_em : j.concluido_em;
+        const base = { journeyId: id, cliente: nomes.cliente(id), responsavel: nomes.responsavelEm(id, de, ate) };
+        // Sob recorte, `cal` é soma de fases em minutos úteis — não é calendário.
+        // Mostrar "—" é mais honesto do que rotular de Calendário o que não é.
+        const calExibir = recorteDeFase ? null : cal || null;
+        if (phases.length) {
+          // A fase que MAIS consumiu decide o prazo da jornada: >= 100% aqui é
+          // exatamente a jornada que saiu de `okC`/`okE`. Somar as fases daria
+          // linha "no prazo" com 80% e jornada fora do prazo por causa de uma delas.
+          const pior = (medida: (f: FaseMedida) => number) =>
+            Math.round(Math.max(...phases.map((f) => (medida(f) / f.target) * 100)));
+          prazoBruto.push({ ...base, util: phases.reduce((t, f) => t + f.bruto, 0), cal: calExibir, pctSla: pior((f) => f.bruto) });
+          prazoEfetivo.push({ ...base, util: phases.reduce((t, f) => t + f.efetivo, 0), cal: calExibir, pctSla: pior((f) => f.efetivo) });
+        }
+        if (par > 0) parados.push({ ...base, util: par, cal: calExibir, pctSla: null });
+        if (cal > 0) ciclos.push({ ...base, util: efe, cal: calExibir, pctSla: null });
+      }
     });
     return {
+      prazoBruto,
+      prazoEfetivo,
+      parados,
+      ciclos,
       withSla,
       okC,
       okE,
@@ -446,7 +487,7 @@ export default function OnboardingSlaOverview({
       cicloCal: started ? cicloCal / started : 0,
       cicloE: started ? cicloE / started : 0,
     };
-  }, [journeys, journeyPhases, recorteDeFase]);
+  }, [journeys, journeyPhases, recorteDeFase, nomes]);
 
   // Por pipeline
   const pipelineAgg = useMemo(() => {
@@ -669,10 +710,57 @@ export default function OnboardingSlaOverview({
           SLA Total · {total.withSla} jornadas com SLA · medido em horário útil
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <KpiCard icon={Clock} label="No prazo · bruto" value={`${total.pctC}%`} sub={`${total.okC} de ${total.withSla} no prazo`} tone={complianceTone(total.pctC)} />
-          <KpiCard icon={CheckCircle2} label="No prazo · efetivo" value={`${total.pctE}%`} sub={`${total.okE} de ${total.withSla} no prazo`} tone={complianceTone(total.pctE)} />
-          <KpiCard icon={Pause} label="Tempo parado" value={formatMin(total.parado)} sub={`${total.paradoPct}% do expediente`} tone="warning" />
-          <KpiCard icon={TrendingUp} label="Ciclo médio · efetivo" value={formatMin(total.cicloE)} sub={`calendário ${formatMinCal(total.cicloCal)}`} tone="success" />
+          <KpiCard
+            icon={Clock}
+            label="No prazo · bruto"
+            value={`${total.pctC}%`}
+            sub={`${total.okC} de ${total.withSla} no prazo`}
+            tone={complianceTone(total.pctC)}
+            onClick={total.prazoBruto.length ? () => setDrill({
+              titulo: "No prazo · bruto",
+              regra: `As ${total.withSla} jornadas com SLA de fase definido. Bruto é o expediente COM as pausas. A jornada só está no prazo quando nenhuma fase estoura o alvo — a coluna % SLA mostra a fase que mais consumiu, então 100% ou mais é jornada fora do prazo.`,
+              linhas: total.prazoBruto, unidade: "util", rotuloUtil: "Bruto", ordenarPor: "pctSla",
+              rodape: <>A conta: <b className="text-foreground">{total.okC}</b> de {total.withSla} no prazo = <b className="text-foreground">{total.pctC}%</b></>,
+            }) : undefined}
+          />
+          <KpiCard
+            icon={CheckCircle2}
+            label="No prazo · efetivo"
+            value={`${total.pctE}%`}
+            sub={`${total.okE} de ${total.withSla} no prazo`}
+            tone={complianceTone(total.pctE)}
+            onClick={total.prazoEfetivo.length ? () => setDrill({
+              titulo: "No prazo · efetivo",
+              regra: `As mesmas ${total.withSla} jornadas do cartão ao lado, agora SEM as pausas manuais. A coluna % SLA mostra a fase que mais consumiu do alvo: 100% ou mais é jornada fora do prazo.`,
+              linhas: total.prazoEfetivo, unidade: "util", rotuloUtil: "Efetivo", ordenarPor: "pctSla",
+              rodape: <>A conta: <b className="text-foreground">{total.okE}</b> de {total.withSla} no prazo = <b className="text-foreground">{total.pctE}%</b></>,
+            }) : undefined}
+          />
+          <KpiCard
+            icon={Pause}
+            label="Tempo parado"
+            value={formatMin(total.parado)}
+            sub={`${total.paradoPct}% do expediente`}
+            tone="warning"
+            onClick={total.parados.length ? () => setDrill({
+              titulo: "Tempo parado",
+              regra: `${total.parados.length === 1 ? "A jornada que ficou parada" : `As ${total.parados.length} jornadas que ficaram paradas`} em algum momento. A coluna mostra quanto tempo de expediente cada uma passou em pausa manual.`,
+              linhas: total.parados, unidade: "util", rotuloUtil: "Parado",
+              rodape: <>A conta: a soma das {total.parados.length} = <b className="text-foreground">{formatMin(total.parado)}</b>, ou {total.paradoPct}% do expediente bruto</>,
+            }) : undefined}
+          />
+          <KpiCard
+            icon={TrendingUp}
+            label="Ciclo médio · efetivo"
+            value={formatMin(total.cicloE)}
+            sub={`calendário ${formatMinCal(total.cicloCal)}`}
+            tone="success"
+            onClick={total.ciclos.length ? () => setDrill({
+              titulo: "Ciclo médio · efetivo",
+              regra: `Média do tempo efetivo (expediente sem as pausas) das ${total.ciclos.length} jornadas com tempo medido. Jornada que ainda não começou a contar fica fora.`,
+              linhas: total.ciclos, unidade: "util", rotuloUtil: "Efetivo",
+            }) : undefined}
+          />
         </div>
       </section>
 
@@ -822,6 +910,9 @@ export default function OnboardingSlaOverview({
         regra={drill?.regra ?? ""}
         linhas={drill?.linhas ?? []}
         unidade={drill?.unidade ?? "util"}
+        rotuloUtil={drill?.rotuloUtil}
+        ordenarPor={drill?.ordenarPor}
+        rodape={drill?.rodape}
       />
     </>
   );

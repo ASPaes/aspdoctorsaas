@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import SituacaoAgoraBand from "./SituacaoAgoraBand";
+import { MemoryRouter } from "react-router-dom";
+import SituacaoAgoraBand, { type LinhasSituacao } from "./SituacaoAgoraBand";
 import { contarSituacao } from "./dashMetrics";
+import type { LinhaJornada } from "./jornadaLinha";
 
 /** A faixa só conta situação e data de abertura — não precisa da jornada inteira. */
 type JourneyLite = { journey_id: string; situacao: string; aberta_em: string | null };
@@ -38,8 +40,35 @@ afterEach(() => {
   container.remove();
 });
 
-function render(journeys: JourneyLite[]) {
-  act(() => root.render(<SituacaoAgoraBand contagem={contarSituacao(journeys)} />));
+function render(journeys: JourneyLite[], linhas?: LinhasSituacao) {
+  act(() =>
+    root.render(
+      <MemoryRouter>
+        <SituacaoAgoraBand contagem={contarSituacao(journeys)} linhas={linhas} />
+      </MemoryRouter>,
+    ),
+  );
+}
+
+/** O painel abre num portal do Radix — fora do `container`. */
+const tela = () => document.body.textContent ?? "";
+
+function cartao(rotulo: string): HTMLElement | undefined {
+  return Array.from(container.querySelectorAll<HTMLElement>('[role="button"]')).find((el) =>
+    (el.textContent ?? "").includes(rotulo),
+  );
+}
+
+function linhaJornada(p: Partial<LinhaJornada> = {}): LinhaJornada {
+  return {
+    journeyId: "a0",
+    cliente: "Padaria do Zé",
+    responsavel: "Fulano",
+    situacao: "em_andamento",
+    abertaEm: "2026-08-10T12:00:00Z",
+    fechadaEm: null,
+    ...p,
+  };
 }
 
 describe("SituacaoAgoraBand", () => {
@@ -90,5 +119,43 @@ describe("SituacaoAgoraBand", () => {
   it("não quebra com zero jornadas", () => {
     render([]);
     expect(container.textContent).toContain("0");
+  });
+
+  /** DEM-0439: o número abre a lista de clientes que ele conta. */
+  describe("drill-down", () => {
+    const linhas: LinhasSituacao = {
+      emAberto: [linhaJornada()],
+      abertasNoPeriodo: [linhaJornada()],
+      concluidas: [linhaJornada({ journeyId: "d0", cliente: "Mercado Central", situacao: "concluido", fechadaEm: "2026-08-20T12:00:00Z" })],
+      canceladas: [],
+    };
+
+    it("nenhum cartão é clicável sem as listas", () => {
+      render(digiOffice);
+      expect(container.querySelectorAll('[role="button"]').length).toBe(0);
+    });
+
+    it("cartão com lista vira botão; cartão de lista vazia continua parado", () => {
+      render(digiOffice, linhas);
+      expect(cartao("Jornadas em aberto")).toBeTruthy();
+      expect(cartao("Jornadas canceladas")).toBeUndefined();
+    });
+
+    it("clicar no cartão abre o painel com os clientes daquele número", () => {
+      render(digiOffice, linhas);
+      act(() => {
+        cartao("Jornadas em aberto")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(tela()).toContain("Padaria do Zé");
+      expect(tela()).not.toContain("Mercado Central");
+    });
+
+    it("cada cartão abre a SUA lista", () => {
+      render(digiOffice, linhas);
+      act(() => {
+        cartao("Jornadas concluídas")!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+      expect(tela()).toContain("Mercado Central");
+    });
   });
 });

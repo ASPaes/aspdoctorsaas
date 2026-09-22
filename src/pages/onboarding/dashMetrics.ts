@@ -46,6 +46,20 @@ export interface SituacaoLite {
   cancelado_em?: string | null;
 }
 
+/** As jornadas por trás de cada cartão da faixa de situação. Ver `listarSituacao`. */
+export interface ListasSituacao<T> {
+  naoIniciadas: T[];
+  emAndamento: T[];
+  paradas: T[];
+  /** As três acima juntas — é o que o cartão "Jornadas em aberto" mostra. */
+  emAberto: T[];
+  abertasNoPeriodo: T[];
+  concluidas: T[];
+  canceladas: T[];
+  /** Canceladas sem carimbo de cancelamento: ficam fora de qualquer janela. */
+  canceladasSemData: T[];
+}
+
 export function pct(num: number, den: number): number {
   if (!den) return 0;
   return Math.round((num / den) * 1000) / 10;
@@ -103,37 +117,70 @@ export function separarJornadas<T extends JourneyLite>(
  * Sem `range`, conta tudo (a foto de sempre).
  */
 export function contarSituacao(journeys: SituacaoLite[], range?: { from: Date; to: Date }): ContagemSituacao {
-  let naoIniciadas = 0, emAndamento = 0, paradas = 0, concluidas = 0, canceladas = 0, canceladasSemData = 0;
-  let abertasNoPeriodo = 0;
+  return contarDeListas(listarSituacao(journeys, range));
+}
+
+/**
+ * As MESMAS jornadas que cada cartão da faixa conta, agora nominais — é o que o
+ * drill-down mostra ao clicar no número (DEM-0439).
+ *
+ * A contagem deriva desta separação de propósito: enquanto fossem dois códigos, a
+ * lista poderia discordar do número que ela explica. Aqui só existe um predicado
+ * por cartão, então o "15" e as 15 linhas são o mesmo cálculo.
+ *
+ * Genérica em `T` para devolver a linha inteira que entrou — a página precisa do
+ * `journey_id` e das datas para montar o painel, não só da contagem.
+ */
+export function listarSituacao<T extends SituacaoLite>(
+  journeys: T[],
+  range?: { from: Date; to: Date },
+): ListasSituacao<T> {
+  const l: ListasSituacao<T> = {
+    naoIniciadas: [], emAndamento: [], paradas: [], emAberto: [],
+    abertasNoPeriodo: [], concluidas: [], canceladas: [], canceladasSemData: [],
+  };
   journeys.forEach((j) => {
     // Independe da situação: cancelada também entrou na janela em que foi aberta.
-    if (range ? dentroDaJanela(j.aberta_em, range) : !!j.aberta_em) abertasNoPeriodo++;
+    if (range ? dentroDaJanela(j.aberta_em, range) : !!j.aberta_em) l.abertasNoPeriodo.push(j);
     switch (j.situacao) {
-      case "nao_iniciado": naoIniciadas++; break;
-      case "em_andamento": emAndamento++; break;
-      case "parado": paradas++; break;
+      case "nao_iniciado": l.naoIniciadas.push(j); l.emAberto.push(j); break;
+      case "em_andamento": l.emAndamento.push(j); l.emAberto.push(j); break;
+      case "parado": l.paradas.push(j); l.emAberto.push(j); break;
       case "concluido":
-        if (!range || dentroDaJanela(j.concluido_em, range)) concluidas++;
+        if (!range || dentroDaJanela(j.concluido_em, range)) l.concluidas.push(j);
         break;
       case "cancelado":
-        if (!j.cancelado_em) canceladasSemData++;
-        if (!range || dentroDaJanela(j.cancelado_em, range)) canceladas++;
+        if (!j.cancelado_em) l.canceladasSemData.push(j);
+        if (!range || dentroDaJanela(j.cancelado_em, range)) l.canceladas.push(j);
         break;
       default: break; // situação desconhecida não vira "aberta" por omissão
     }
   });
-  const emAberto = naoIniciadas + emAndamento + paradas;
+  return l;
+}
+
+/** Os números da faixa a partir das listas. Ver `listarSituacao`. */
+export function contarDeListas(l: ListasSituacao<unknown>): ContagemSituacao {
+  const emAberto = l.emAberto.length;
+  const concluidas = l.concluidas.length;
+  const canceladas = l.canceladas.length;
   // O total é a base desta faixa — abertas mais os desfechos da janela. Usar
   // `journeys.length` faria o "% das N" falar de uma população que a faixa não mostra.
   const total = emAberto + concluidas + canceladas;
   return {
     total,
     emAberto,
-    abertasNoPeriodo,
-    naoIniciadas, emAndamento, paradas, concluidas, canceladas, canceladasSemData,
+    abertasNoPeriodo: l.abertasNoPeriodo.length,
+    naoIniciadas: l.naoIniciadas.length,
+    emAndamento: l.emAndamento.length,
+    paradas: l.paradas.length,
+    concluidas,
+    canceladas,
+    canceladasSemData: l.canceladasSemData.length,
     pctCanceladas: pct(canceladas, total),
   };
 }
+
 
 /* ---------- treinos ---------- */
 

@@ -27,7 +27,8 @@ import TempoDeEntregaSection from "./TempoDeEntregaSection";
 import PermanenciaSection from "./PermanenciaSection";
 import { useJourneyNames } from "./useJourneyNames";
 import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
-import { pct, separarJornadas, contarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
+import { pct, separarJornadas, contarDeListas, listarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
+import type { LinhaJornada } from "./jornadaLinha";
 
 interface JourneyRow {
   journey_id: string;
@@ -208,18 +209,41 @@ export default function OnboardingDashboardPage() {
     [journeysFiltradas, dateRange],
   );
 
-  const contagem = useMemo(() => {
+  /** As jornadas de cada cartão da faixa de situação, em linha inteira — o número
+   *  sai desta mesma separação, então a lista do drill-down e o "15" do cartão não
+   *  têm como divergir (DEM-0439). */
+  const situacao = useMemo(() => {
     const canceladasEm = canceladasEmQ.data ?? {};
-    return contarSituacao(
+    return listarSituacao(
       journeysFiltradas.map((j) => ({
-        situacao: j.situacao,
-        concluido_em: j.concluido_em,
-        aberta_em: j.aberta_em,
+        ...j,
         cancelado_em: j.ticket_id ? (canceladasEm[j.ticket_id] ?? null) : null,
       })),
       dateRange,
     );
   }, [journeysFiltradas, canceladasEmQ.data, dateRange]);
+
+  const contagem = useMemo(() => contarDeListas(situacao), [situacao]);
+
+  /** O nome do cliente e do responsável entram só aqui, na borda da tela: a
+   *  aritmética não conhece nome, e o painel não deve conhecer `JourneyRow`. */
+  const linhasSituacao = useMemo(() => {
+    const linha = (j: JourneyRow & { cancelado_em: string | null }): LinhaJornada => ({
+      journeyId: j.journey_id,
+      cliente: nomes.cliente(j.journey_id),
+      // Dono de HOJE: o cartão conta jornadas, não mede tempo de ninguém.
+      responsavel: nomes.responsavel(j.journey_id),
+      situacao: j.situacao,
+      abertaEm: j.aberta_em,
+      fechadaEm: j.situacao === "cancelado" ? j.cancelado_em : j.concluido_em,
+    });
+    return {
+      emAberto: situacao.emAberto.map(linha),
+      abertasNoPeriodo: situacao.abertasNoPeriodo.map(linha),
+      concluidas: situacao.concluidas.map(linha),
+      canceladas: situacao.canceladas.map(linha),
+    };
+  }, [situacao, nomes]);
 
   /** Allowlist de treinos/pausas/retornos: SEM canceladas, mas SEM recorte por
    *  abertura — esses três já filtram pela data do próprio evento. Usar `periodo`
@@ -529,7 +553,7 @@ export default function OnboardingDashboardPage() {
             </div>
           )}
 
-          <SituacaoAgoraBand contagem={contagem} />
+          <SituacaoAgoraBand contagem={contagem} linhas={linhasSituacao} />
 
           {/* SLA — visão corrido vs. efetivo (total, pipeline, etapa, área) */}
           <OnboardingSlaOverview

@@ -2,6 +2,7 @@ import { baixarPlanilha, dataCell, hojeISO, slugArquivo } from "@/lib/xlsxExport
 import { formatMinUtil, formatMinCal } from "@/pages/onboarding/slaFormat";
 import type { LinhaDrilldown } from "@/pages/onboarding/DrilldownSheet";
 import type { ClientePermanencia } from "@/pages/onboarding/permanencia";
+import { diasDeVida, rotuloSituacao, type LinhaJornada } from "@/pages/onboarding/jornadaLinha";
 
 /**
  * Exportação das listas de clientes que abrem ao clicar num card do SLA de
@@ -80,5 +81,46 @@ export function exportDrilldownPermanenciaXlsx(params: {
     ]),
     aba: titulo || "Permanência",
     arquivo: `permanencia_${slugArquivo(titulo, "onboarding")}_${hojeISO()}.xlsx`,
+  });
+}
+
+/**
+ * Lista de jornadas de um cartão de contagem da faixa de situação (DEM-0439).
+ *
+ * As datas viram célula de DATA, não texto: é por elas que o conferente ordena e
+ * filtra no Excel. Os carimbos chegam em UTC, então o dia sai do fuso do navegador
+ * — `dataCell` sozinha jogaria para o dia seguinte tudo que aconteceu depois das
+ * 21h em São Paulo.
+ */
+export function exportDrilldownJornadasXlsx(params: {
+  titulo: string;
+  linhas: LinhaJornada[];
+}): void {
+  const { titulo, linhas } = params;
+  const diaLocal = (iso: string | null): string | null => {
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : hojeISO(d);
+  };
+
+  baixarPlanilha({
+    colunas: [
+      { header: "Cliente", wch: 38 },
+      { header: "Responsável", wch: 24 },
+      { header: "Situação", wch: 16 },
+      { header: "Aberta em", wch: 12, z: "dd/mm/yyyy" },
+      { header: "Desfecho", wch: 12, z: "dd/mm/yyyy" },
+      { header: "Dias", wch: 8 },
+    ],
+    linhas: linhas.map((l) => [
+      l.cliente,
+      l.responsavel,
+      rotuloSituacao(l.situacao),
+      dataCell(diaLocal(l.abertaEm)),
+      dataCell(diaLocal(l.fechadaEm)),
+      diasDeVida(l) ?? "",
+    ]),
+    aba: titulo || "Jornadas",
+    arquivo: `onboarding_${slugArquivo(titulo, "jornadas")}_${hojeISO()}.xlsx`,
   });
 }

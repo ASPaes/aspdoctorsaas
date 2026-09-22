@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ export interface LinhaDrilldown {
  * quebraria a promessa de "isto é tudo que entrou na conta".
  */
 export default function DrilldownSheet({
-  open, onOpenChange, titulo, regra, linhas, unidade,
+  open, onOpenChange, titulo, regra, linhas, unidade, rotuloUtil = "Expediente", ordenarPor = "valor", rodape,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -32,12 +33,22 @@ export default function DrilldownSheet({
   regra: string;
   linhas: LinhaDrilldown[];
   unidade: "util" | "cal";
+  /** Cabeçalho da coluna de minutos úteis. Os cartões de prazo mandam "Bruto" ou
+   *  "Efetivo" para lá, porque é o que a coluna carrega neles. */
+  rotuloUtil?: string;
+  /** Quando o cartão fala de CUMPRIMENTO de prazo, quem interessa no topo é quem
+   *  mais consumiu o alvo — não quem demorou mais em minutos. */
+  ordenarPor?: "valor" | "pctSla";
+  /** Substitui a linha "A conta: soma ÷ n = média" do rodapé. Cartão que mostra um
+   *  total ou um percentual precisa dizer a conta DELE — a média mentiria. */
+  rodape?: ReactNode;
 }) {
   const valor = (l: LinhaDrilldown) => (unidade === "util" ? l.util : l.cal);
   const medidos = linhas.filter((l) => valor(l) != null);
   const soma = medidos.reduce((s, l) => s + (valor(l) as number), 0);
   const fmt = unidade === "util" ? formatMinUtil : formatMinCal;
-  const ordenadas = [...linhas].sort((a, b) => (valor(b) ?? -1) - (valor(a) ?? -1));
+  const chave = (l: LinhaDrilldown) => (ordenarPor === "pctSla" ? l.pctSla : valor(l));
+  const ordenadas = [...linhas].sort((a, b) => (chave(b) ?? -1) - (chave(a) ?? -1));
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -65,9 +76,9 @@ export default function DrilldownSheet({
               <tr className="text-left">
                 <th className="px-2 py-2 font-medium">Cliente</th>
                 <th className="px-2 py-2 font-medium">Responsável</th>
-                <th className="px-2 py-2 font-medium text-right">Expediente</th>
-                <th className="px-2 py-2 font-medium text-right">Calendário</th>
-                <th className="px-2 py-2 font-medium text-right">% SLA</th>
+                <th className="px-2 py-2 font-medium text-right whitespace-nowrap">{rotuloUtil}</th>
+                <th className="px-2 py-2 font-medium text-right whitespace-nowrap">Calendário</th>
+                <th className="px-2 py-2 font-medium text-right whitespace-nowrap">% SLA</th>
                 <th className="px-2 py-2" />
               </tr>
             </thead>
@@ -76,8 +87,8 @@ export default function DrilldownSheet({
                 <tr key={`${l.journeyId}-${i}`} className="border-t border-border hover:bg-muted/20">
                   <td className="px-2 py-2 font-medium">{l.cliente}</td>
                   <td className="px-2 py-2 text-muted-foreground">{l.responsavel}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{l.util == null ? "—" : formatMinUtil(l.util)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-muted-foreground">
+                  <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{l.util == null ? "—" : formatMinUtil(l.util)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap text-muted-foreground">
                     {l.cal == null ? "—" : formatMinCal(l.cal)}
                   </td>
                   <td className={`px-2 py-2 text-right tabular-nums ${l.pctSla != null && l.pctSla >= 100 ? "text-destructive font-medium" : ""}`}>
@@ -99,7 +110,9 @@ export default function DrilldownSheet({
         </div>
 
         <div className="border-t border-border pt-3 text-[11px] text-muted-foreground">
-          {medidos.length === 0 ? (
+          {rodape != null ? (
+            rodape
+          ) : medidos.length === 0 ? (
             `Nenhum dos ${linhas.length} itens tem tempo medido.`
           ) : (
             <>

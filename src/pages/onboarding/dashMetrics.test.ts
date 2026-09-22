@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  pct, separarJornadas, contarSituacao, desfechoTreino, agregarTreinos,
+  pct, separarJornadas, contarSituacao, listarSituacao, contarDeListas, desfechoTreino, agregarTreinos,
   agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, coorteOnboarding, minutosEntre,
   type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo, type SituacaoLite,
 } from "./dashMetrics";
@@ -118,6 +118,75 @@ describe("contarSituacao", () => {
   it("total é a base da faixa, não o tamanho da lista", () => {
     const c = contarSituacao([j("situacao_nova_do_futuro", "2026-07-01T12:00:00Z")]);
     expect(c.total).toBe(0);
+  });
+});
+
+/** O drill-down do cartão (DEM-0439) mostra estas listas. O que os testes abaixo
+ *  protegem é a igualdade entre a lista e o número que ela explica: se um cartão
+ *  disser 15 e o painel abrir com 14 linhas, a tela perde a serventia. */
+describe("listarSituacao", () => {
+  const comCancelamento = (id: string, situacao: string, aberta: string | null, fim: string | null): SituacaoLite & { journey_id: string } => ({
+    journey_id: id,
+    situacao,
+    aberta_em: aberta,
+    concluido_em: situacao === "concluido" ? fim : null,
+    cancelado_em: situacao === "cancelado" ? fim : null,
+  });
+
+  it("cada lista tem exatamente o tamanho do número que o cartão mostra", () => {
+    const l = listarSituacao(digiOffice);
+    const c = contarSituacao(digiOffice);
+    expect(l.emAberto.length).toBe(c.emAberto);
+    expect(l.emAndamento.length).toBe(c.emAndamento);
+    expect(l.naoIniciadas.length).toBe(c.naoIniciadas);
+    expect(l.concluidas.length).toBe(c.concluidas);
+    expect(l.canceladas.length).toBe(c.canceladas);
+    expect(l.abertasNoPeriodo.length).toBe(c.abertasNoPeriodo);
+  });
+
+  it("emAberto junta as três situações abertas e nenhuma outra", () => {
+    const l = listarSituacao([...digiOffice, j("parado", "2026-07-15T12:00:00Z", "p1")]);
+    expect(l.emAberto.length).toBe(38);
+    expect(l.emAberto.map((x) => x.situacao)).not.toContain("concluido");
+    expect(l.emAberto.map((x) => x.situacao)).not.toContain("cancelado");
+    expect(l.paradas.map((x) => x.journey_id)).toEqual(["p1"]);
+  });
+
+  it("devolve a linha inteira que entrou, não uma cópia reduzida", () => {
+    const linha = { ...j("em_andamento", "2026-07-10T12:00:00Z", "x1"), cliente_id: "cli-1" };
+    const l = listarSituacao([linha]);
+    expect(l.emAberto[0]).toBe(linha);
+    expect(l.emAberto[0].cliente_id).toBe("cli-1");
+  });
+
+  it("aberta e concluída na mesma janela aparece na entrada e no desfecho", () => {
+    const dupla = comCancelamento("d1", "concluido", "2026-07-05T12:00:00Z", "2026-07-20T12:00:00Z");
+    const l = listarSituacao([dupla], JULHO);
+    expect(l.abertasNoPeriodo).toEqual([dupla]);
+    expect(l.concluidas).toEqual([dupla]);
+  });
+
+  it("desfecho fora da janela sai da lista do desfecho, não da de entrada", () => {
+    const tarde = comCancelamento("d2", "concluido", "2026-07-05T12:00:00Z", "2026-08-20T12:00:00Z");
+    const l = listarSituacao([tarde], JULHO);
+    expect(l.abertasNoPeriodo).toEqual([tarde]);
+    expect(l.concluidas).toEqual([]);
+  });
+
+  it("cancelada sem carimbo fica fora da lista de canceladas e é contada à parte", () => {
+    const semData = comCancelamento("c1", "cancelado", "2026-07-05T12:00:00Z", null);
+    const comData = comCancelamento("c2", "cancelado", "2026-07-06T12:00:00Z", "2026-07-25T12:00:00Z");
+    const l = listarSituacao([semData, comData], JULHO);
+    expect(l.canceladas).toEqual([comData]);
+    expect(l.canceladasSemData).toEqual([semData]);
+  });
+
+  it("contarDeListas devolve os mesmos números de contarSituacao", () => {
+    const entrada = [
+      ...digiOffice,
+      comCancelamento("c9", "cancelado", "2026-07-06T12:00:00Z", "2026-07-25T12:00:00Z"),
+    ];
+    expect(contarDeListas(listarSituacao(entrada, JULHO))).toEqual(contarSituacao(entrada, JULHO));
   });
 });
 
