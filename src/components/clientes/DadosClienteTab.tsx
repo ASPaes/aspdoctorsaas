@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Users, Loader2, MessageCircle, X, Search, Star, ChevronDown, ChevronUp, Sparkles, AlertTriangle } from "lucide-react";
 import { maskCNPJ, maskCPF, maskCEP } from "@/lib/masks";
+import { resolverCidadeId } from "@/lib/cidadeLookup";
 import { normalizeBRPhone } from "@/lib/phoneBR";
 import { PhoneInputBR } from "@/components/ui/PhoneInputBR";
 import ContatosAdicionaisModal from "@/components/clientes/ContatosAdicionaisModal";
@@ -231,15 +232,11 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
       const estado = estados.find((e) => e.sigla === data.uf);
       if (estado) {
         form.setValue("estado_id", estado.id);
-        const { data: cidadesResult } = await supabase
-          .from("cidades")
-          .select("id")
-          .eq("estado_id", estado.id)
-          .ilike("nome", data.localidade)
-          .limit(1);
-        if (cidadesResult && cidadesResult.length > 0) {
-          form.setValue("cidade_id", cidadesResult[0].id);
-        }
+        const cidadeId = await resolverCidadeId(estado.id, {
+          codigoIbge: data.ibge,
+          nome: data.localidade,
+        });
+        if (cidadeId) form.setValue("cidade_id", cidadeId);
       }
     } catch {
       toast({ title: "Erro ao consultar CEP", variant: "destructive" });
@@ -308,17 +305,13 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         const estado = estados.find((e) => e.sigla === data.uf);
         if (estado) {
           form.setValue("estado_id", estado.id);
-          if (data.municipio) {
-            const { data: cidadesResult } = await supabase
-              .from("cidades")
-              .select("id")
-              .eq("estado_id", estado.id)
-              .ilike("nome", data.municipio)
-              .limit(1);
-            if (cidadesResult && cidadesResult.length > 0) {
-              form.setValue("cidade_id", cidadesResult[0].id);
-            }
-          }
+          // A Receita devolve o municipio sem acento ("TEUTONIA"); o CEP entra
+          // como desempate quando nem o nome normalizado casa.
+          const cidadeId = await resolverCidadeId(estado.id, {
+            nome: data.municipio,
+            cep: data.cep ? String(data.cep) : null,
+          });
+          if (cidadeId) form.setValue("cidade_id", cidadeId);
         }
       }
 
