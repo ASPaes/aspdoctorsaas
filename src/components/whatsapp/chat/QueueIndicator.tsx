@@ -30,9 +30,18 @@ interface QueueIndicatorProps {
   assignedOperatorName?: string | null;
   contactId?: string | null;
   clienteId?: string | null;
+  /**
+   * Celular: fica só a ação principal do momento (Assumir / Reabrir). Some o
+   * chip de estado, que ali é redundante com o selo "Em Atendimento" da faixa
+   * de contexto logo abaixo, e some o botão de transferir, que passa a viver no
+   * menu de três pontos. Os dois juntos ocupavam ~70px da linha do cabeçalho —
+   * medido em 22/09/2026: o nome do contato ficava com 81px em tela de 390px e
+   * 60px em tela de 320px, e cortava até em nome curto.
+   */
+  compacto?: boolean;
 }
 
-export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId }: QueueIndicatorProps) {
+export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId, compacto }: QueueIndicatorProps) {
   const { user, profile } = useAuth();
   const { claimConversation, unassignConversation, isAssigning, isClaiming } = useConversationAssignment();
 
@@ -148,20 +157,22 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   return (
     <div className="flex items-center gap-1.5">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border select-none",
-              chipConfig.className
-            )}
-          >
-            <ChipIcon className="h-3 w-3" />
-            <span className="hidden sm:inline">{chipConfig.label}</span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" className="text-xs">{chipConfig.label}</TooltipContent>
-      </Tooltip>
+      {!compacto && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium border select-none",
+                chipConfig.className
+              )}
+            >
+              <ChipIcon className="h-3 w-3" />
+              <span className="hidden sm:inline">{chipConfig.label}</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">{chipConfig.label}</TooltipContent>
+        </Tooltip>
+      )}
 
       {/* Primary action button */}
       {canClaim ? (
@@ -200,8 +211,8 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
               Assumir
             </Button>
           )}
-          {/* antes: sem restrição */}
-          {podeTransferir && (
+          {/* antes: sem restrição. No celular ele vive no menu de três pontos. */}
+          {podeTransferir && !compacto && (
             <Button
               variant="outline"
               size="icon"

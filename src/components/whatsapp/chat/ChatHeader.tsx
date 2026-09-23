@@ -741,6 +741,16 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
               onSelect: () => setShowParticipants(true),
             }]
           : []),
+        // Saiu do cabeçalho junto com o chip do QueueIndicator: no celular
+        // aquele par custava ~70px da linha, que é onde mora o nome do contato.
+        ...(!isGroupConv
+          ? [{
+              chave: "transferir",
+              rotulo: "Transferir atendimento",
+              icone: <ArrowLeftRight className="h-[18px] w-[18px]" />,
+              onSelect: () => setIsTransferOpen(true),
+            }]
+          : []),
         {
           chave: "editar-contato",
           rotulo: "Editar contato",
@@ -1019,15 +1029,20 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 assignedOperatorName={assignedOperatorName}
                 contactId={(conversation as any).contact_id ?? conversation.contact?.id}
                 clienteId={(conversation.contact as any)?.cliente_id ?? null}
+                compacto={isMobileVariant}
               />
             )}
 
-            <AcessoFastButton
-              conversationId={conversation.id}
-              tenantId={conversation.tenant_id}
-              cnpj={isLinked ? (linkedCliente as any)?.cnpj_digits : null}
-              nome={linkedClienteName || contact?.name || null}
-            />
+            {/* No celular ele desce para o rodapé da folha de ações: é atalho de
+                apoio, não coisa de usar a cada mensagem. */}
+            {!isMobileVariant && (
+              <AcessoFastButton
+                conversationId={conversation.id}
+                tenantId={conversation.tenant_id}
+                cnpj={isLinked ? (linkedCliente as any)?.cnpj_digits : null}
+                nome={linkedClienteName || contact?.name || null}
+              />
+            )}
 
             {/* No celular estes oito ícones não cabem lado a lado: viram lista
                 com nome dentro da folha de ações, logo abaixo. Encerrar fica de
@@ -1051,6 +1066,15 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                   acoes={acoesDoCelular}
                   rodape={
                     <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <AcessoFastButton
+                          conversationId={conversation.id}
+                          tenantId={conversation.tenant_id}
+                          cnpj={isLinked ? (linkedCliente as any)?.cnpj_digits : null}
+                          nome={linkedClienteName || contact?.name || null}
+                        />
+                        <span className="text-muted-foreground">Acesso remoto do cliente</span>
+                      </div>
                       <div className="flex items-center gap-2 text-sm">
                         <ConversationMuteButton conversationId={conversation.id} />
                         <span className="text-muted-foreground">Silenciar esta conversa</span>

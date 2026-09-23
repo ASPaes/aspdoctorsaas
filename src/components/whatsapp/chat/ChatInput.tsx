@@ -1653,6 +1653,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                   ? "Voc\u{00EA} precisa estar ATIVO para atender."
                   : requiresTemplate
                   ? "Janela de 24h fechada \u2014 use um template Meta"
+                  // Em tela de 320px "Digite uma mensagem..." quebra em duas linhas
+                  // e empurra o campo para cima.
+                  : noCelular
+                  ? "Mensagem"
                   : "Digite uma mensagem..."
               }
               className={cn(
