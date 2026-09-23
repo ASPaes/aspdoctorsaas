@@ -8,9 +8,19 @@
 // recriar aquela view de 53 colunas para acrescentar uma coluna arrisca perder o
 // security_invoker (ja aconteceu neste projeto).
 
-import { useQuery } from "@tanstack/react-query";
-import { FileText, Paperclip } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { FileText, Paperclip, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  modoDoResumo, templatesDoPipeline, montarUpdateResumo, houveConflito, type TemplateResumo,
+} from "./resumoVenda";
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -299,24 +309,129 @@ function TabelaModulos({ itens }: { itens: any[] }) {
   );
 }
 
-// A aba so existe para jornada importada. Consulta leve — so o id — para nao
-// carregar o payload inteiro apenas para decidir se desenha um botao.
-export function useTemProposta(journeyId: string | null, enabled = true) {
-  const { data } = useQuery({
-    queryKey: ["journey-tem-proposta", journeyId],
-    enabled: !!journeyId && enabled,
+// Modo observação: jornada que não veio do sistema comercial. O vendedor escolhe
+// um template (opcional) e escreve. Sem autosave: onboarding_journeys está na
+// publication do Realtime e cada UPDATE vira WAL + fanout.
+function ObservacaoDaVenda({
+  journeyId, inicial, templateInicial, pipelineId, editadoEm, editadoPor,
+}: {
+  journeyId: string;
+  inicial: string;
+  templateInicial: string | null;
+  pipelineId: string | null;
+  editadoEm: string | null;
+  editadoPor: string | null;
+}) {
+  const qc = useQueryClient();
+  const [texto, setTexto] = useState(inicial);
+  const [templateId, setTemplateId] = useState<string | null>(templateInicial);
+  const [salvando, setSalvando] = useState(false);
+
+  // O texto chega depois da primeira renderização (a query resolve): sem isto o
+  // campo abriria vazio numa jornada que já tem resumo escrito.
+  useEffect(() => { setTexto(inicial); setTemplateId(templateInicial); }, [inicial, templateInicial]);
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ["resumo-venda-templates", journeyId],
     staleTime: 5 * 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("id")
-        .eq("id", journeyId)
-        .not("proposta_payload", "is", null)
-        .maybeSingle();
+      const { data, error } = await (supabase.from("onboarding_sale_summary_templates" as any) as any)
+        .select("id, nome, corpo, pipeline_id, ativo, position")
+        .order("position");
       if (error) throw error;
-      return !!data;
+      return (data ?? []) as TemplateResumo[];
     },
   });
-  return data === true;
+  const oferecidos = templatesDoPipeline(templates, pipelineId);
+
+  const { data: autor } = useQuery({
+    queryKey: ["resumo-venda-autor", editadoPor],
+    enabled: !!editadoPor,
+    staleTime: 10 * 60_000,
+    queryFn: async () => {
+      // O nome do usuário mora em funcionarios; profiles não tem nome nenhum.
+      const { data } = await (supabase.from("profiles" as any) as any)
+        .select("funcionario_id, funcionarios(nome)")
+        .eq("user_id", editadoPor)
+        .maybeSingle();
+      return (data?.funcionarios?.nome as string | undefined) ?? null;
+    },
+  });
+
+  function aplicarTemplate(id: string) {
+    const t = oferecidos.find((x) => x.id === id);
+    if (!t) return;
+    if (texto.trim() !== "" && !confirm("Substituir o que está escrito pelo texto do template?")) return;
+    setTexto(t.corpo);
+    setTemplateId(t.id);
+  }
+
+  const sujo = texto !== inicial;
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const patch = montarUpdateResumo(texto, templateId, userData?.user?.id ?? "");
+      // Trava de concorrência: o UPDATE só passa se ninguém salvou depois que
+      // esta tela carregou. Comercial e implantador abrem a mesma jornada.
+      let q = (supabase.from("onboarding_journeys" as any) as any)
+        .update(patch).eq("id", journeyId);
+      q = editadoEm ? q.eq("resumo_venda_updated_at", editadoEm) : q.is("resumo_venda_updated_at", null);
+      const { data, error } = await q.select("id");
+      if (error) throw error;
+      if (houveConflito(data)) {
+        toast.error("Alguém salvou este resumo antes de você. Recarregue a jornada para não perder o texto dessa pessoa.");
+        return;
+      }
+      toast.success("Resumo da venda salvo");
+      qc.invalidateQueries({ queryKey: ["journey-proposta", journeyId] });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {oferecidos.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">Template</span>
+          <Select value={templateId ?? undefined} onValueChange={aplicarTemplate}>
+            <SelectTrigger className="h-8 w-[260px] text-xs">
+              <SelectValue placeholder="Escolher um modelo de perguntas" />
+            </SelectTrigger>
+            <SelectContent>
+              {oferecidos.map((t) => (
+                <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <Textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        rows={18}
+        placeholder="Escreva aqui o que a implantação precisa saber sobre esta venda."
+        className="text-sm leading-relaxed"
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[11px] text-muted-foreground">
+          {sujo && <span className="text-amber-500 font-medium">Alterações não salvas · </span>}
+          {editadoEm
+            ? `Editado${autor ? ` por ${autor}` : ""} em ${new Date(editadoEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}`
+            : "Ainda não preenchido."}
+        </span>
+        <Button size="sm" onClick={salvar} disabled={!sujo || salvando}>
+          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export default function PropostaVendaSection({
@@ -329,19 +444,21 @@ export default function PropostaVendaSection({
     staleTime: 5 * 60_000,          // proposta nao muda depois de importada
     queryFn: async () => {
       const { data, error } = await (supabase.from("onboarding_journeys" as any) as any)
-        .select("proposta_payload")
+        .select("proposta_payload, resumo_venda_texto, resumo_venda_template_id, resumo_venda_updated_at, resumo_venda_updated_by, pipeline_onboarding_id")
         .eq("id", journeyId)
         .maybeSingle();
       if (error) throw error;
-      return (data?.proposta_payload ?? null) as Record<string, any> | null;
+      return (data ?? null) as Record<string, any> | null;
     },
   });
 
   // Traduz os ids do contrato em nome. Sem isto o bloco "Registrado no contrato"
   // mostra "Produto 13" e UUID de modulo — identificador nao e informacao.
-  const produtoIds = (Array.isArray(data?.produtos) ? data.produtos : [])
+  const payload = (data?.proposta_payload ?? null) as Record<string, any> | null;
+
+  const produtoIds = (Array.isArray(payload?.produtos) ? payload!.produtos : [])
     .map((p: any) => p?.produto_id).filter((v: any) => v != null);
-  const moduloIds = (Array.isArray(data?.produtos) ? data.produtos : [])
+  const moduloIds = (Array.isArray(payload?.produtos) ? payload!.produtos : [])
     .flatMap((p: any) => (Array.isArray(p?.modulos) ? p.modulos : []))
     .map((m: any) => m?.modulo_id).filter(Boolean);
 
@@ -365,16 +482,37 @@ export default function PropostaVendaSection({
     },
   });
 
-  // Jornada criada a mao nao tem proposta: a secao simplesmente nao existe.
+  // Enquanto a jornada nao carregou nao ha o que desenhar.
   if (!data) return null;
 
-  const cliente = data.cliente ?? {};
-  const comercial = data.comercial ?? {};
-  const proposta = data.proposta ?? {};
-  const produtos: any[] = Array.isArray(data.produtos) ? data.produtos : [];
-  const anexos: any[] = Array.isArray(data.anexos) ? data.anexos : [];
-  const alteracao = data.alteracao ?? null;
-  const avulso = data.avulso ?? null;
+  // Jornada que nao veio do sistema comercial: a aba e um campo de observacao.
+  if (modoDoResumo(payload) === "observacao") {
+    return (
+      <div className="p-5 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold flex items-center gap-2">
+            <FileText className="h-4 w-4" /> Resumo da venda
+          </h3>
+        </div>
+        <ObservacaoDaVenda
+          journeyId={journeyId as string}
+          inicial={data.resumo_venda_texto ?? ""}
+          templateInicial={data.resumo_venda_template_id ?? null}
+          pipelineId={data.pipeline_onboarding_id ?? null}
+          editadoEm={data.resumo_venda_updated_at ?? null}
+          editadoPor={data.resumo_venda_updated_by ?? null}
+        />
+      </div>
+    );
+  }
+
+  const cliente = payload!.cliente ?? {};
+  const comercial = payload!.comercial ?? {};
+  const proposta = payload!.proposta ?? {};
+  const produtos: any[] = Array.isArray(payload!.produtos) ? payload!.produtos : [];
+  const anexos: any[] = Array.isArray(payload!.anexos) ? payload!.anexos : [];
+  const alteracao = payload!.alteracao ?? null;
+  const avulso = payload!.avulso ?? null;
 
   return (
     <div className="p-5 space-y-5">
