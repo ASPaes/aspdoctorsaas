@@ -785,7 +785,6 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
           pillBadges={pillCounts.badges}
           groupsHasUnread={pillCounts.groupsUnread > 0}
           queueJustArrived={queueJustArrived}
-          setorResumo={selectedDepartmentId ? (departmentNameMap.get(selectedDepartmentId) ?? null) : "Todos os setores"}
         />
       )}
 

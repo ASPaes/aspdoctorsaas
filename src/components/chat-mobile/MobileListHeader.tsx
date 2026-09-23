@@ -1,4 +1,4 @@
-import { CheckCheck, FileSearch, Plus, Search, Users } from "lucide-react";
+import { ArrowUpDown, CheckCheck, FileSearch, Plus, Search, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { QuickPills } from "@/components/whatsapp/conversations/QuickPills";
 import type { FiltersState } from "@/components/whatsapp/conversations/ConversationFiltersPopover";
 
 interface Props {
-  /** Recolhe busca e setor quando a lista rolou — ganha 3 conversas de tela. */
+  /** Recolhe a linha de busca quando a lista rolou. O setor fica: ele mora na linha do título. */
   compacto: boolean;
   capacidade?: { current: number; limit: number; status: string } | null;
 
@@ -35,7 +35,6 @@ interface Props {
   pillBadges: any;
   groupsHasUnread: boolean;
   queueJustArrived: boolean;
-  setorResumo?: string | null;
 }
 
 export function MobileListHeader({
@@ -60,7 +59,6 @@ export function MobileListHeader({
   pillBadges,
   groupsHasUnread,
   queueJustArrived,
-  setorResumo,
 }: Props) {
   const navigate = useNavigate();
 
@@ -83,16 +81,11 @@ export function MobileListHeader({
               {capacidade.current}/{capacidade.limit}
             </span>
           )}
-          {/* Com o cabeçalho recolhido o chip de setor some: o nome vem para cá
-              para ninguém atender achando que está vendo outro setor. */}
-          <span
-            className={cn(
-              "min-w-0 overflow-hidden whitespace-nowrap text-xs text-muted-foreground transition-all duration-200",
-              compacto && setorResumo ? "max-w-[40%] opacity-100" : "max-w-0 opacity-0"
-            )}
-          >
-            {setorResumo}
-          </span>
+          {/* O setor manda na lista que vem logo abaixo, então mora na mesma
+              linha do título. Fica visível também com o cabeçalho recolhido —
+              antes ele sumia junto com a busca, e o nome tinha de ser repetido
+              aqui do lado para ninguém atender achando que via outro setor. */}
+          <MobileSetorSheet compacto />
         </div>
 
         <Button
@@ -123,16 +116,60 @@ export function MobileListHeader({
           compacto ? "max-h-0 opacity-0" : "max-h-32 opacity-100"
         )}
       >
-        <div className="flex items-center gap-2 px-3 pb-2">
-          <div className="relative flex-1">
+        <div className="flex items-center gap-1.5 px-3 pb-2">
+          <div className="relative min-w-0 flex-1">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar contato e número..."
+              placeholder="Buscar contato"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               className="h-10 pl-8"
             />
           </div>
+
+          {/* Um botão só, que DIZ O ESTADO: "Todos" = a lista mostra todas, e
+              tocar troca para não lidas. Dois botões lado a lado custavam uma
+              faixa inteira do cabeçalho. O ⇅ e o verde forte são o que avisam
+que ele alterna — sem isso viraria um rótulo que ninguém toca.
+
+              "Todas"/"Não lidas" no feminino de propósito: são CONVERSAS, e o
+              chip do setor ao lado já diz "Todos". Dois "Todos" na mesma tela,
+              um de setor e outro de leitura, era confusão desnecessária. */}
+          {!isSearching && (
+            <button
+              type="button"
+              onClick={() => onUnreadOnlyChange(!unreadOnly)}
+              aria-pressed={unreadOnly}
+              className={cn(
+                "inline-flex h-10 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors",
+                unreadOnly
+                  ? "border-primary/50 bg-primary/15 text-primary"
+                  : "border-border bg-muted text-muted-foreground"
+              )}
+            >
+              {/* O ⇅ aparece só no estado neutro, que é onde a pessoa precisa
+                  descobrir que o botão alterna. Ligado, o verde já diz o que é —
+                  e sem o ícone o rótulo maior ("Não lidas") ocupa a mesma largura
+                  do menor ("Todas"), então o campo de busca não muda de tamanho
+                  a cada toque. */}
+              {!unreadOnly && <ArrowUpDown className="h-3 w-3 shrink-0" />}
+              {unreadOnly ? "Não lidas" : "Todas"}
+            </button>
+          )}
+
+          {/* Só existe quando há o que marcar, e some junto com a linha ao rolar. */}
+          {naoLidasNaAba > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-8 shrink-0"
+              aria-label={`Marcar as ${naoLidasNaAba} conversas não lidas desta aba como lidas`}
+              onClick={onMarcarTodasLidas}
+            >
+              <CheckCheck className="h-[18px] w-[18px]" />
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="icon"
@@ -144,45 +181,6 @@ export function MobileListHeader({
           </Button>
         </div>
 
-        {!isSearching && (
-          <div className="flex items-center gap-2 px-3 pb-2">
-            <MobileSetorSheet />
-            <div className="flex-1" />
-            <div className="inline-flex rounded-full bg-muted p-0.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => onUnreadOnlyChange(false)}
-                className={cn(
-                  "rounded-full px-3 py-1 font-medium transition-colors",
-                  !unreadOnly ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                )}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => onUnreadOnlyChange(true)}
-                className={cn(
-                  "rounded-full px-3 py-1 font-medium transition-colors",
-                  unreadOnly ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                )}
-              >
-                Não lidos
-              </button>
-            </div>
-            {naoLidasNaAba > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 shrink-0"
-                aria-label={`Marcar as ${naoLidasNaAba} conversas não lidas desta aba como lidas`}
-                onClick={onMarcarTodasLidas}
-              >
-                <CheckCheck className="h-[18px] w-[18px]" />
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       {!isSearching && (

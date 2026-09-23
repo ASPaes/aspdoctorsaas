@@ -12,7 +12,17 @@ import { useState } from "react";
  * Quem não é admin não troca de setor — mesma regra do DepartmentSelector: o
  * chip aparece, mas só como etiqueta do setor da pessoa.
  */
-export function MobileSetorSheet() {
+interface Props {
+  /**
+   * Chip da linha do título, que divide a largura com os três ícones da direita:
+   * "Todos os setores" vira "Todos", e nome comprido é cortado com reticências
+   * em vez de empurrar os botões para fora da tela. O nome inteiro continua na
+   * folha que abre ao tocar.
+   */
+  compacto?: boolean;
+}
+
+export function MobileSetorSheet({ compacto }: Props = {}) {
   const {
     departments,
     selectedDepartmentId,
@@ -25,11 +35,20 @@ export function MobileSetorSheet() {
   if (isLoading || departments.length === 0) return null;
 
   const atual = departments.find((d) => d.id === selectedDepartmentId);
-  const rotulo = selectedDepartmentId ? (atual?.name ?? "Setor") : "Todos os setores";
+  const rotulo = selectedDepartmentId
+    ? (atual?.name ?? "Setor")
+    : compacto
+      ? "Todos"
+      : "Todos os setores";
+
+  const classeChip = cn(
+    "inline-flex min-w-0 items-center gap-1.5 rounded-full border border-border bg-muted",
+    compacto ? "h-7 max-w-[45%] px-2.5 text-[11px]" : "h-8 max-w-[60%] px-3 text-xs"
+  );
 
   if (!canSeeAllDepartments) {
     return (
-      <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-muted px-3 text-xs text-muted-foreground max-w-[60%]">
+      <span className={cn(classeChip, "text-muted-foreground")}>
         <Building2 className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">{atual?.name ?? departments[0]?.name ?? "Sem setor"}</span>
       </span>
@@ -41,7 +60,7 @@ export function MobileSetorSheet() {
       <SheetTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-muted px-3 text-xs text-foreground max-w-[60%]"
+          className={cn(classeChip, "text-foreground")}
         >
           <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate">{rotulo}</span>
