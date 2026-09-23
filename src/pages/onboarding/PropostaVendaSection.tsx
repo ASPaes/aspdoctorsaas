@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileText, Paperclip, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -323,6 +324,7 @@ function ObservacaoDaVenda({
   editadoPor: string | null;
 }) {
   const qc = useQueryClient();
+  const { effectiveTenantId } = useTenantFilter();
   const [texto, setTexto] = useState(inicial);
   const [templateId, setTemplateId] = useState<string | null>(templateInicial);
   const [salvando, setSalvando] = useState(false);
@@ -332,11 +334,15 @@ function ObservacaoDaVenda({
   useEffect(() => { setTexto(inicial); setTemplateId(templateInicial); }, [inicial, templateInicial]);
 
   const { data: templates = [] } = useQuery({
-    queryKey: ["resumo-venda-templates", journeyId],
+    queryKey: ["resumo-venda-templates", effectiveTenantId],
+    enabled: !!effectiveTenantId,
     staleTime: 5 * 60_000,
     queryFn: async () => {
+      // Filtro de tenant explícito: é a convenção do projeto e o índice da
+      // tabela começa por tenant_id. A segurança continua sendo a RLS.
       const { data, error } = await (supabase.from("onboarding_sale_summary_templates" as any) as any)
         .select("id, nome, corpo, pipeline_id, ativo, position")
+        .eq("tenant_id", effectiveTenantId)
         .order("position");
       if (error) throw error;
       return (data ?? []) as TemplateResumo[];
@@ -489,11 +495,9 @@ export default function PropostaVendaSection({
   if (modoDoResumo(payload) === "observacao") {
     return (
       <div className="p-5 space-y-5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <FileText className="h-4 w-4" /> Resumo da venda
-          </h3>
-        </div>
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <FileText className="h-4 w-4" /> Resumo da venda
+        </h3>
         <ObservacaoDaVenda
           journeyId={journeyId as string}
           inicial={data.resumo_venda_texto ?? ""}

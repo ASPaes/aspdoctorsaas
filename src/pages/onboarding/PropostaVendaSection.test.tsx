@@ -44,6 +44,9 @@ vi.mock("@/integrations/supabase/client", () => {
     },
   };
 });
+vi.mock("@/contexts/TenantFilterContext", () => ({
+  useTenantFilter: () => ({ effectiveTenantId: "t1" }),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function render(ui: React.ReactNode) {
