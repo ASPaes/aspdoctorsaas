@@ -7,7 +7,6 @@ import { AlertTriangle, TrendingDown, Wallet, Clock, UserX } from 'lucide-react'
 import {
   useFinTitulosAbertos,
   useFinSyncEstado,
-  useFinTitulos,
   FAIXAS_ATRASO,
 } from '@/hooks/useFinTitulos';
 
@@ -69,19 +68,23 @@ function KpiCard({
 export default function PainelCobrancaTab() {
   const { data: abertos = [], isLoading } = useFinTitulosAbertos();
   const { data: estados = [] } = useFinSyncEstado();
-  // Títulos sem vínculo de cliente: enquanto não casam, não podem ser cobrados.
-  const { data: semCliente = [] } = useFinTitulos({
-    situacoes: ['atrasado', 'vence_hoje', 'a_vencer'],
-    busca: '',
-    venceDe: null,
-    venceAte: null,
-    semCliente: true,
-  });
 
   const resumo = useMemo(() => {
-    const vencidos = abertos.filter((t) => t.situacao === 'atrasado' || (t.vencido && t.situacao !== 'a_vencer'));
-    const aVencer = abertos.filter((t) => !vencidos.includes(t));
+    // ⚠️ O PAINEL SÓ CONTA O QUE DÁ PARA COBRAR, e isso não é detalhe.
+    // Título sem cliente vinculado não vira cobrança nunca, e o sistema de
+    // origem tem lançamento que não é cliente nenhum: em 23/09/2026 a Digi
+    // Office tinha R$ 3,35 milhões a vencer no "Cliente Consumidor / Sem
+    // Tomador" e no "Banco Itaú". Somando tudo, a tela dizia R$ 3,57 milhões
+    // quando o cobrável era R$ 223 mil — quinze vezes maior. Painel financeiro
+    // que erra nessa escala não serve para decidir nada.
+    // O que fica de fora não some: vira o cartão de pendência de vínculo, com
+    // valor à vista, porque parte disso é cliente de verdade faltando cadastro.
+    const cobraveis = abertos.filter((t) => t.cliente_id !== null);
+    const semVinculo = abertos.filter((t) => t.cliente_id === null);
+
     const soma = (arr: typeof abertos) => arr.reduce((s, t) => s + t.valor, 0);
+    const vencidos = cobraveis.filter((t) => t.situacao === 'atrasado' || (t.vencido && t.situacao !== 'a_vencer'));
+    const aVencer = cobraveis.filter((t) => !vencidos.includes(t));
 
     const faixas = FAIXAS_ATRASO.map((f) => {
       const itens = vencidos.filter((t) => t.dias_atraso >= f.de && t.dias_atraso <= f.ate);
@@ -89,8 +92,9 @@ export default function PainelCobrancaTab() {
     });
     const maiorFaixa = Math.max(1, ...faixas.map((f) => f.valor));
 
-    const clientesVencidos = new Set(vencidos.map((t) => t.cliente_id ?? 'sem-vinculo'));
+    const clientesVencidos = new Set(vencidos.map((t) => t.cliente_id));
     const semBoleto = vencidos.filter((t) => !t.boleto_gerado);
+    const semVinculoVencidos = semVinculo.filter((t) => t.vencido);
 
     return {
       vencidoQtd: vencidos.length,
@@ -103,6 +107,9 @@ export default function PainelCobrancaTab() {
       maisAntigo: vencidos.reduce((max, t) => Math.max(max, t.dias_atraso), 0),
       semBoleto: semBoleto.length,
       risco: faixas.find((f) => f.chave === '60+'),
+      semVinculoQtd: semVinculo.length,
+      semVinculoValor: soma(semVinculo),
+      semVinculoVencidosQtd: semVinculoVencidos.length,
     };
   }, [abertos]);
 
@@ -173,18 +180,28 @@ export default function PainelCobrancaTab() {
         />
         <KpiCard
           label="Sem cliente vinculado"
-          valor={String(semCliente.length)}
-          detalhe="não podem ser cobrados"
+          valor={fmtBRL(resumo.semVinculoValor)}
+          detalhe={
+            resumo.semVinculoVencidosQtd > 0
+              ? `${plural(resumo.semVinculoQtd, 'título', 'títulos')} · ${resumo.semVinculoVencidosQtd} já vencidos`
+              : plural(resumo.semVinculoQtd, 'título', 'títulos')
+          }
           icone={<UserX className="h-4 w-4" />}
-          tom={semCliente.length > 0 ? 'alerta' : 'bom'}
+          tom={resumo.semVinculoQtd > 0 ? 'alerta' : 'bom'}
         />
       </div>
+
+      <p className="text-xs text-muted-foreground">
+        Os três primeiros números contam <strong className="text-foreground">só títulos com cliente vinculado</strong>,
+        que é o que dá para cobrar. O que não casou com nenhum cliente fica no último cartão: parte é cliente de
+        verdade faltando cadastro, parte é lançamento que nunca vai virar cobrança, como consumidor genérico e banco.
+      </p>
 
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
         <Card className="p-4">
           <div className="flex items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold">Vencidos por faixa de atraso</h3>
-            <span className="text-xs text-muted-foreground">valor em aberto</span>
+            <span className="text-xs text-muted-foreground">valor cobrável</span>
           </div>
           <div className="mt-3 space-y-3">
             {resumo.faixas.map((f) => (
