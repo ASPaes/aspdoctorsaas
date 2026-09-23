@@ -616,14 +616,19 @@ export function CreateSupportTicketModal({
       return;
     }
     (supabase.from("cliente_contatos" as any) as any)
-      .select("name:nome, phone_number:fone")
+      .select("id, name:nome, phone_number:fone")
       .eq("cliente_id", clienteId)
       .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle()
       .then(({ data }: any) => {
-        if (data?.name) setContatoSolicitante(data.name);
-        else setContatoSolicitante("");
+        if (data?.name) {
+          setContatoSolicitante(data.name);
+          setContatoSelectedId(data.id ?? null);
+        } else {
+          setContatoSolicitante("");
+          setContatoSelectedId(null);
+        }
       });
   }, [selectedCliente?.id, fromClosure]);
 
@@ -742,6 +747,31 @@ export function CreateSupportTicketModal({
     onOpenChange(false);
   };
 
+  // O campo é texto livre com busca: só o clique na lista e o "+" carimbavam o id,
+  // e o submit mandava null fixo, então o nome digitado morria e o ticket nascia sem contato.
+  const resolveClienteContatoId = async (): Promise<string | null> => {
+    if (contatoSelectedId) return contatoSelectedId;
+    const nome = contatoSolicitante.trim();
+    if (!nome || !selectedCliente || !tid) return null;
+    // Comparação do nome fora do banco: o texto digitado pode trazer % ou _,
+    // que o ilike leria como curinga.
+    const { data: existentes } = await (supabase.from("cliente_contatos" as any) as any)
+      .select("id, nome")
+      .eq("cliente_id", selectedCliente.id)
+      .limit(200);
+    const alvo = nome.toLocaleLowerCase();
+    const achado = ((existentes as any[]) ?? []).find(
+      (c) => String(c?.nome ?? "").trim().toLocaleLowerCase() === alvo
+    );
+    if (achado?.id) return achado.id as string;
+    const { data: inserted, error } = await (supabase.from("cliente_contatos" as any) as any)
+      .insert({ tenant_id: tid, cliente_id: selectedCliente.id, nome })
+      .select("id")
+      .single();
+    if (error) throw error;
+    return ((inserted as any)?.id as string) ?? null;
+  };
+
   const handleSubmit = async (nextAction: "close" | "continue" = "close") => {
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
@@ -770,6 +800,7 @@ export function CreateSupportTicketModal({
     setSubmitMode(nextAction);
     try {
       let ticketId: string | null = null;
+      const clienteContatoId = fromClosure ? contatoSelectedId : await resolveClienteContatoId();
       const horarioInicioIso = tipoHorario === "plantao" && horarioInicio ? new Date(horarioInicio).toISOString() : null;
       const horarioFimIso = tipoHorario === "plantao" && horarioFim ? new Date(horarioFim).toISOString() : null;
 
@@ -834,7 +865,7 @@ export function CreateSupportTicketModal({
           p_contact_id: null,
           p_department_id: departamentoId,
           p_responsavel_user_id: responsavelId || null,
-          p_cliente_contato_id: null,
+          p_cliente_contato_id: clienteContatoId,
           p_previsao_encerramento: previsaoEncerramento ? new Date(previsaoEncerramento).toISOString() : null,
         });
         if (error) throw error;
@@ -842,6 +873,16 @@ export function CreateSupportTicketModal({
       }
 
       if (ticketId) {
+        if (fromClosure && clienteContatoId) {
+          try {
+            await (supabase.rpc as any)("update_ticket_fields", {
+              p_ticket_id: ticketId,
+              p_fields: { cliente_contato_id: clienteContatoId },
+            });
+          } catch (e) {
+            console.warn("Falha ao aplicar contato solicitante no ticket:", e);
+          }
+        }
         if (selectedTagIds.length > 0) {
           await (supabase.from("ticket_tag_assignments" as any) as any).insert(
             selectedTagIds.map((tagId) => ({ ticket_id: ticketId, tag_id: tagId }))
