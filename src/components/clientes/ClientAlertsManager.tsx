@@ -9,11 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Loader2, Trash2, AlertTriangle, Ban, ScrollText } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { alertLabel } from "@/hooks/useClientAlerts";
 
 interface ClientAlert {
   id: string;
   kind: "aviso" | "bloqueio";
   block_behavior: "confirm" | "hard" | null;
+  blocks_atendimento: boolean;
+  blocks_ticket: boolean;
   titulo: string;
   mensagem: string;
   expires_at: string | null;
@@ -40,7 +44,7 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
     enabled: !!targetVal,
     queryFn: async () => {
       const { data, error } = await (supabase.from("client_alerts" as any) as any)
-        .select("id, kind, block_behavior, titulo, mensagem, expires_at, created_at")
+        .select("id, kind, block_behavior, blocks_atendimento, blocks_ticket, titulo, mensagem, expires_at, created_at")
         .eq(targetCol, targetVal)
         .eq("ativo", true)
         .order("created_at", { ascending: false });
@@ -53,12 +57,15 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
   const [auditOpen, setAuditOpen] = useState(false);
   const [kind, setKind] = useState<"aviso" | "bloqueio">("aviso");
   const [blockBehavior, setBlockBehavior] = useState<"confirm" | "hard">("confirm");
+  const [blocksAtendimento, setBlocksAtendimento] = useState(true);
+  const [blocksTicket, setBlocksTicket] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [mensagem, setMensagem] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
 
   const resetForm = () => {
     setKind("aviso"); setBlockBehavior("confirm");
+    setBlocksAtendimento(true); setBlocksTicket(false);
     setTitulo(""); setMensagem(""); setExpiresAt("");
     setShowForm(false);
   };
@@ -75,6 +82,8 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
         contact_id: contactId ?? null,
         kind,
         block_behavior: kind === "bloqueio" ? blockBehavior : null,
+        blocks_atendimento: kind === "bloqueio" ? blocksAtendimento : false,
+        blocks_ticket: kind === "bloqueio" ? blocksTicket : false,
         titulo: titulo.trim(),
         mensagem: mensagem.trim(),
         expires_at: expiresAt ? `${expiresAt}T23:59:59` : null,
@@ -139,7 +148,7 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
                       ? <Ban className="h-4 w-4 text-destructive shrink-0" />
                       : <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />}
                     <span className="text-xs font-medium">
-                      {isBlock ? (a.block_behavior === "hard" ? "Bloqueio · trava" : "Bloqueio · confirmação") : "Aviso"}
+                      {alertLabel(a)}
                     </span>
                   </div>
                   {canManage && (
@@ -201,6 +210,27 @@ export function ClientAlertsManager({ clienteId, contactId, canManage = true }: 
                     Trava — impede abrir
                   </button>
                 </div>
+              </div>
+            )}
+
+            {kind === "bloqueio" && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] text-muted-foreground">O que este bloqueio impede?</p>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={blocksAtendimento} onCheckedChange={(v) => setBlocksAtendimento(v === true)} />
+                  <span className="text-xs">Atendimento no chat</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox checked={blocksTicket} onCheckedChange={(v) => setBlocksTicket(v === true)} />
+                  <span className="text-xs">Abertura de ticket</span>
+                </label>
+                <p className="text-[10px] text-muted-foreground">
+                  {blocksAtendimento || blocksTicket
+                    ? blockBehavior === "hard"
+                      ? "Trava: o time não consegue seguir sem desativar o bloqueio."
+                      : "Confirmação: o time segue confirmando ciência, e a ação fica registrada na auditoria."
+                    : "Nada marcado: o time vê o bloqueio, mas nada trava."}
+                </p>
               </div>
             )}
 
@@ -318,7 +348,10 @@ function AuditDialog({
                   <span className="text-[10px] text-muted-foreground tabular-nums">{fmt(r.performed_at)}</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground leading-snug">
-                  Assumiu o atendimento confirmando ciência do bloqueio &ldquo;{r.alert_titulo}&rdquo;.
+                  {r.action === "bloqueio_confirmado_ticket"
+                    ? "Abriu um ticket confirmando ciência do bloqueio"
+                    : "Assumiu o atendimento confirmando ciência do bloqueio"}{" "}
+                  &ldquo;{r.alert_titulo}&rdquo;.
                 </p>
               </div>
             ))}

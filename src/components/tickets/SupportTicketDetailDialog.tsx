@@ -25,6 +25,7 @@ import { useAbrirEnvioEmail } from "@/components/whatsapp/chat/email/useAbrirEnv
 // a tela de leitura traz o editor de resposta junto: só baixa quando alguém abre um e-mail
 const LerEmailDialog = lazy(() => import("@/components/emails/LerEmailDialog").then((m) => ({ default: m.LerEmailDialog })));
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
+import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner";
 import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail, Eye,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
@@ -1198,6 +1199,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">Sem cliente vinculado</p>
+        )}
+        {ticketClienteId && (
+          <ClientAlertBanner clienteId={ticketClienteId} contactId={ticket?.contact_id ?? null} />
         )}
         <div className="space-y-1 pt-1">
           <Label className="text-[11px] text-muted-foreground">Contato solicitante</Label>

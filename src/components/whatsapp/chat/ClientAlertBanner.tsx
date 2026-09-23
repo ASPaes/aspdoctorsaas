@@ -1,4 +1,4 @@
-import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { useClientAlerts, resolveAlertsFor, alertLabel } from "@/hooks/useClientAlerts";
 import { AlertTriangle, Ban } from "lucide-react";
 
 interface Props {
@@ -17,11 +17,7 @@ export function ClientAlertBanner({ contactId, clienteId }: Props) {
     <div className={`rounded-md border p-3 space-y-2 ${hasBlock ? "border-destructive/50 bg-destructive/10" : "border-amber-500/50 bg-amber-500/10"}`}>
       {alerts.map((a) => {
         const isBlock = a.kind === "bloqueio";
-        const label = isBlock
-          ? a.block_behavior === "hard"
-            ? "Bloqueio · trava"
-            : "Bloqueio · confirmação"
-          : "Aviso";
+        const label = alertLabel(a);
         return (
           <div key={a.id} className="flex items-start gap-2">
             {isBlock ? (

@@ -8,7 +8,7 @@ import type { ConversationWithContact } from "../hooks/useWhatsAppConversations"
 import { useAppTimezone } from "@/hooks/useAppTimezone";
 import type { AttendanceInfo } from "../hooks/useAttendanceStatus";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { useClientAlerts, resolveAlertsFor, alertLabel } from "@/hooks/useClientAlerts";
 import { useGroupMentionLookup } from "../hooks/useGroupMentionLookup";
 import { resolveMentionsToText } from "../chat/mentionUtils";
 import { showsCSTicketAlert } from "@/lib/churnDismiss";
@@ -281,11 +281,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
                     {clientAlerts.map((a) => (
                       <div key={a.id}>
                         <p className="text-xs font-semibold">
-                          {a.kind === "bloqueio"
-                            ? a.block_behavior === "hard"
-                              ? "Bloqueio · trava"
-                              : "Bloqueio · confirmação"
-                            : "Aviso"}
+                          {alertLabel(a)}
                           {" — "}
                           {a.titulo}
                         </p>

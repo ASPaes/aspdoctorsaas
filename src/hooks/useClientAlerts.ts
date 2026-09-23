@@ -7,6 +7,8 @@ export interface ClientAlert {
   tenant_id: string;
   kind: "aviso" | "bloqueio";
   block_behavior: "confirm" | "hard" | null;
+  blocks_atendimento: boolean;
+  blocks_ticket: boolean;
   titulo: string;
   mensagem: string;
   cliente_id: string | null;
@@ -22,7 +24,7 @@ export function useClientAlerts() {
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await (supabase.from("client_alerts" as any) as any)
-        .select("id, tenant_id, kind, block_behavior, titulo, mensagem, cliente_id, contact_id, expires_at")
+        .select("id, tenant_id, kind, block_behavior, blocks_atendimento, blocks_ticket, titulo, mensagem, cliente_id, contact_id, expires_at")
         .eq("ativo", true);
       if (error) throw error;
       return (data ?? []) as ClientAlert[];
@@ -43,4 +45,20 @@ export function resolveAlertsFor(
     const matchCliente = !!opts.clienteId && a.cliente_id === opts.clienteId;
     return matchContact || matchCliente;
   });
+}
+
+// Dos alertas que se aplicam, os que realmente travam alguma coisa no escopo pedido.
+// Um "bloqueio" sem escopo marcado vira aviso na prática: aparece, mas não impede nada.
+export function blocksFor(alerts: ClientAlert[], escopo: "atendimento" | "ticket"): ClientAlert[] {
+  return alerts.filter(
+    (a) => a.kind === "bloqueio" && (escopo === "ticket" ? a.blocks_ticket : a.blocks_atendimento)
+  );
+}
+
+// Rótulo único do alerta em toda a tela: tipo, modo e onde o bloqueio pega.
+export function alertLabel(a: Pick<ClientAlert, "kind" | "block_behavior" | "blocks_atendimento" | "blocks_ticket">): string {
+  if (a.kind !== "bloqueio") return "Aviso";
+  const modo = a.block_behavior === "hard" ? "trava" : "confirmação";
+  const escopo = [a.blocks_atendimento ? "chat" : null, a.blocks_ticket ? "ticket" : null].filter(Boolean).join(" + ");
+  return escopo ? `Bloqueio · ${modo} · ${escopo}` : "Bloqueio · sem trava";
 }

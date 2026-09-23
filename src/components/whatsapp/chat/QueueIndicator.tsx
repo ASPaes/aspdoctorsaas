@@ -10,7 +10,7 @@ import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { useClientAlerts, resolveAlertsFor } from "@/hooks/useClientAlerts";
+import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { usePortao } from "@/hooks/usePortao";
 import {
   AlertDialog,
@@ -68,8 +68,8 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
   // Bloqueios ativos do contato/cliente desta conversa
   const { data: allClientAlerts = [] } = useClientAlerts();
-  const clientBlocks = resolveAlertsFor(allClientAlerts, { contactId, clienteId })
-    .filter((a) => a.kind === "bloqueio");
+  // Só os bloqueios marcados para o chat travam aqui: os de escopo ticket aparecem no banner, mas não impedem assumir.
+  const clientBlocks = blocksFor(resolveAlertsFor(allClientAlerts, { contactId, clienteId }), "atendimento");
   const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [takeoverDialogOpen, setTakeoverDialogOpen] = useState(false);

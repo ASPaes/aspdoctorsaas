@@ -263,7 +263,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const hardBlocks = resolveAlertsFor(allClientAlerts, {
     contactId: conversation.contact_id ?? conversation.contact?.id,
     clienteId: (conversation.contact as any)?.cliente_id,
-  }).filter((a) => a.kind === "bloqueio" && a.block_behavior === "hard");
+  }).filter((a) => a.kind === "bloqueio" && a.blocks_atendimento && a.block_behavior === "hard");
   const hasHardBlock = hardBlocks.length > 0;
 
   return (

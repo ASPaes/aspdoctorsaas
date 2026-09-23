@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot, ArrowLeft, ArrowRight, HelpCircle } from "lucide-react";
+import { Loader2, X, ChevronDown, Phone, Mail, MessageSquare, Building2, UserPlus, Paperclip, Plus, Trash2, Tag as TagIcon, Send, Clock, User as UserIcon, Calendar, Check, Lock, RefreshCw, Bot, ArrowLeft, ArrowRight, HelpCircle, Ban } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -15,6 +15,9 @@ import { toast } from "sonner";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
+import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner";
+import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function HelpBadge({ text }: { text: string }) {
   const [open, setOpen] = useState(false);
@@ -132,6 +135,16 @@ export function CreateSupportTicketModal({
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const { results: clienteResults, isLoading: isSearchingClientes } = useClienteSearch(clienteSearchTerm);
+
+  // Bloqueios do cliente com escopo "ticket": "hard" impede abrir, "confirm" exige ciência (e vai para a auditoria).
+  // Ticket nascido do encerramento do atendimento não entra: ele é registro do que já aconteceu, e travar
+  // aqui deixaria o operador sem saída quando o setor exige ticket para fechar (requires_ticket_on_close).
+  const { data: allClientAlerts = [] } = useClientAlerts();
+  const ticketBlocks = fromClosure
+    ? []
+    : blocksFor(resolveAlertsFor(allClientAlerts, { clienteId: selectedCliente?.id ?? null }), "ticket");
+  const hasHardTicketBlock = ticketBlocks.some((b) => b.block_behavior === "hard");
+  const [pendingBlockAction, setPendingBlockAction] = useState<"close" | "continue" | null>(null);
   const [produtoId, setProdutoId] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [subcategoryId, setSubcategoryId] = useState<string>("");
@@ -772,7 +785,42 @@ export function CreateSupportTicketModal({
     return ((inserted as any)?.id as string) ?? null;
   };
 
-  const handleSubmit = async (nextAction: "close" | "continue" = "close") => {
+  // Furar um bloqueio "confirmação" fica registrado: mesma auditoria que o chat grava ao assumir atendimento.
+  const handleConfirmBlockOverride = async () => {
+    const action = pendingBlockAction;
+    setPendingBlockAction(null);
+    if (!action) return;
+    if (authUserId && ticketBlocks.length > 0) {
+      const rows = ticketBlocks.map((b) => ({
+        tenant_id: b.tenant_id,
+        alert_id: b.id,
+        cliente_id: b.cliente_id,
+        contact_id: b.contact_id,
+        conversation_id: null,
+        action: "bloqueio_confirmado_ticket",
+        alert_titulo: b.titulo,
+        alert_kind: b.kind,
+        alert_block_behavior: b.block_behavior,
+        performed_by: authUserId,
+      }));
+      try {
+        await (supabase.from("client_alert_audit" as any) as any).insert(rows);
+      } catch (e) {
+        console.error("Falha ao registrar auditoria de bloqueio", e);
+      }
+    }
+    handleSubmit(action, true);
+  };
+
+  const handleSubmit = async (nextAction: "close" | "continue" = "close", blockConfirmed = false) => {
+    if (hasHardTicketBlock) {
+      toast.error("Cliente bloqueado: não é possível abrir ticket. Desative o bloqueio na ficha do cliente.");
+      return;
+    }
+    if (ticketBlocks.length > 0 && !blockConfirmed) {
+      setPendingBlockAction(nextAction);
+      return;
+    }
     if (!selectedCliente) {
       toast.error("Selecione um cliente");
       return;
@@ -1301,6 +1349,13 @@ export function CreateSupportTicketModal({
                 </div>
               )}
 
+              {selectedCliente && <ClientAlertBanner clienteId={selectedCliente.id} />}
+              {hasHardTicketBlock && (
+                <p className="text-[11px] text-destructive">
+                  Não é possível abrir ticket para este cliente. Desative o bloqueio na ficha do cliente.
+                </p>
+              )}
+
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Contato solicitante</Label>
                 <div className="flex gap-1.5">
@@ -1771,7 +1826,7 @@ export function CreateSupportTicketModal({
             <Button
               variant="outline"
               onClick={() => handleSubmit("close")}
-              disabled={isSubmitting}
+              disabled={isSubmitting || hasHardTicketBlock}
               className="gap-1.5"
             >
               {submitMode === "close" ? (
@@ -1784,7 +1839,7 @@ export function CreateSupportTicketModal({
             </Button>
             <Button
               onClick={() => handleSubmit("continue")}
-              disabled={isSubmitting}
+              disabled={isSubmitting || hasHardTicketBlock}
               className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
             >
               {submitMode === "continue" && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -1802,6 +1857,35 @@ export function CreateSupportTicketModal({
       open={!!continueTicketId}
       onOpenChange={(o) => { if (!o) setContinueTicketId(null); }}
     />
+
+    <AlertDialog open={!!pendingBlockAction} onOpenChange={(o) => { if (!o) setPendingBlockAction(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Ban className="h-4 w-4 text-destructive" />
+            Cliente com bloqueio
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-3">
+              <p>Este cliente tem um bloqueio para abertura de ticket:</p>
+              <div className="space-y-2">
+                {ticketBlocks.map((b) => (
+                  <div key={b.id} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <p className="font-medium text-sm text-foreground">{b.titulo}</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{b.mensagem}</p>
+                  </div>
+                ))}
+              </div>
+              <p>Confirme que está ciente antes de abrir o ticket. A ação fica registrada na auditoria.</p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={handleConfirmBlockOverride}>Abrir mesmo assim</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     {pendingContinueTicketId && (
       <Dialog open={!!pendingContinueTicketId} onOpenChange={(o) => { if (!o) setPendingContinueTicketId(null); }}>
