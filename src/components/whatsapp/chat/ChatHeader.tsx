@@ -594,7 +594,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         .maybeSingle();
       if (!wc?.cliente_id) return null;
       const { data: cliente } = await (supabase.from("clientes" as any) as any)
-        .select("id, codigo_sequencial, nome_fantasia, razao_social")
+        .select("id, codigo_sequencial, nome_fantasia, razao_social, cancelado, data_cancelamento")
         .eq("id", wc.cliente_id)
         .maybeSingle();
       return cliente ?? null;
@@ -625,6 +625,19 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const effLinkedName = isGroupConv
     ? (groupLinkedCliente?.nome_fantasia || groupLinkedCliente?.razao_social || null)
     : linkedClienteName;
+
+  // DEM-0449: status do contrato no proprio icone, para nao precisar abrir "Detalhes".
+  // `clientes.cancelado` e derivado — so fica true quando o cliente nao tem NENHUM contrato
+  // ativo. Cliente com 2 produtos e 1 cancelado continua verde, mesma regra do painel lateral.
+  const effLinkedRow = isGroupConv ? groupLinkedCliente : (isLinked ? linkedCliente : null);
+  const effContratoEncerrado = (effLinkedRow as any)?.cancelado === true;
+  // Enquanto o cliente nao carregou nao afirmamos nada: sem sufixo e icone verde, como antes.
+  const effContratoSufixo = effLinkedRow
+    ? (effContratoEncerrado ? " | Contrato Encerrado" : " | Contrato Ativo")
+    : "";
+  const linkLabel = effIsLinked
+    ? `Vinculado ao cliente: ${effLinkedName}${effContratoSufixo}`
+    : "Contato sem cliente vinculado";
 
   // Resolve assigned operator name — try senderMap (funcionario via profile), then query funcionario directly
   const { data: tenantUsers } = useTenantUsers();
@@ -881,17 +894,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     size="sm"
                     className="h-5 w-5 p-0 shrink-0"
                     onClick={onToggleDetails}
-                    aria-label={effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
+                    aria-label={linkLabel}
                   >
                     {effIsLinked ? (
-                      <Link2 className="h-3 w-3 text-green-500" />
+                      <Link2 className={effContratoEncerrado ? "h-3 w-3 text-red-500" : "h-3 w-3 text-green-500"} />
                     ) : (
                       <AlertTriangle className="h-3 w-3 text-yellow-500" />
                     )}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  {effIsLinked ? `Vinculado ao cliente: ${effLinkedName}` : "Contato sem cliente vinculado"}
+                  {linkLabel}
                 </TooltipContent>
               </Tooltip>
               </>
