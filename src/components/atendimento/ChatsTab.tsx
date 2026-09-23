@@ -3,9 +3,10 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAtendimentoChats, useAtendimentoChatsTimeline } from "./useAtendimentoChats";
 import { ChatsListaDialog } from "./ChatsListaDialog";
+import type { ChatsRecorte } from "./useAtendimentoChatsLista";
 import { AvisoCategoria } from "./AvisoCategoria";
 import { fmtDur } from "./fmtDuracao";
-import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
+import { useAtendimentoFilter, SEM_CATEGORIA_ID } from "@/contexts/AtendimentoFilterContext";
 
 const CLOSE_OPTS: { v: string; label: string }[] = [
   { v: "manual", label: "Manual" },
@@ -48,11 +49,12 @@ const resolColor = (r: string) =>
     : "hsl(var(--muted-foreground))";
 
 
-type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string; rotulo?: string };
+/** `recorte` presente = a linha abre a lista dos atendimentos que a formaram. */
+type BarRow = { key: string; nome: string; qtd: number; pct: number; color?: string; rotulo?: string; recorte?: ChatsRecorte };
 
 // `colunas`: nome, barra e rótulo. Os quadros de categoria alargam o nome, que
 // leva o produto junto ("HARDWARE · PDV Legal").
-function Barras({ rows, colunas = "grid-cols-[1fr_2fr_120px]" }: { rows: BarRow[]; colunas?: string }) {
+function Barras({ rows, colunas = "grid-cols-[1fr_2fr_120px]", onSelecionar }: { rows: BarRow[]; colunas?: string; onSelecionar?: (r: ChatsRecorte) => void }) {
   const max = Math.max(1, ...rows.map((r) => r.qtd));
   if (rows.length === 0) {
     return <div className="text-xs text-muted-foreground italic py-6 text-center">Sem dados no período.</div>;
@@ -61,21 +63,40 @@ function Barras({ rows, colunas = "grid-cols-[1fr_2fr_120px]" }: { rows: BarRow[
     <div className="space-y-2">
       {rows.map((r) => {
         const w = (100 * r.qtd) / max;
-        return (
-          <div key={r.key} className={cn("grid items-center gap-2 text-xs", colunas)}>
+        // Linha com zero atendimento não abre nada: o diálogo viria vazio.
+        const clicavel = !!onSelecionar && !!r.recorte && r.qtd > 0;
+        const conteudo = (
+          <>
             <span className="truncate" title={r.nome}>{r.nome}</span>
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div className="h-full" style={{ width: `${w}%`, backgroundColor: r.color ?? "hsl(var(--primary))" }} />
             </div>
             <span className="text-right tabular-nums text-muted-foreground">{r.rotulo ?? `${r.qtd.toLocaleString("pt-BR")} · ${Math.round(r.pct)}%`}</span>
-          </div>
+          </>
+        );
+        const classes = cn("grid items-center gap-2 text-xs", colunas);
+        if (!clicavel) return <div key={r.key} className={classes}>{conteudo}</div>;
+        return (
+          <button
+            key={r.key}
+            type="button"
+            onClick={() => onSelecionar!(r.recorte!)}
+            title={`Ver os ${r.qtd.toLocaleString("pt-BR")} atendimentos`}
+            className={cn(
+              classes,
+              "w-full text-left rounded-sm -mx-1 px-1 py-0.5 transition-colors duration-200",
+              "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            )}
+          >
+            {conteudo}
+          </button>
         );
       })}
     </div>
   );
 }
 
-function Heatmap({ rows }: { rows: { dow: number; hora: number; qtd: number }[] }) {
+function Heatmap({ rows, onSelecionar }: { rows: { dow: number; hora: number; qtd: number }[]; onSelecionar?: (r: ChatsRecorte) => void }) {
   if (rows.length === 0) {
     return <div className="text-xs text-muted-foreground italic py-6 text-center">Sem dados no período.</div>;
   }
@@ -100,9 +121,21 @@ function Heatmap({ rows }: { rows: { dow: number; hora: number; qtd: number }[] 
               {horas.map((h) => {
                 const q = map.get(`${d}-${h}`) ?? 0;
                 const op = q === 0 ? 0 : 0.15 + 0.85 * (q / max);
+                const cor = { backgroundColor: q === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` };
+                const dica = `${dias[d]} ${h}h: ${q.toLocaleString("pt-BR")} atendimentos`;
+                // Célula vazia continua um quadrado morto — não há o que listar.
+                if (!onSelecionar || q === 0) {
+                  return <td key={h}><div className="w-5 h-5 rounded-sm" style={cor} title={dica} /></td>;
+                }
                 return (
                   <td key={h}>
-                    <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: q === 0 ? "hsl(var(--muted))" : `hsl(var(--primary) / ${op})` }} title={`${dias[d]} ${h}h: ${q.toLocaleString("pt-BR")} atendimentos`} />
+                    <button
+                      type="button"
+                      title={dica}
+                      onClick={() => onSelecionar({ label: `${dias[d]}, ${h}h`, dows: [d], horas: [h] })}
+                      className="w-5 h-5 rounded-sm transition-transform duration-200 hover:scale-125 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      style={cor}
+                    />
                   </td>
                 );
               })}
@@ -118,7 +151,7 @@ function agregarPorHora(heat: { dow: number; hora: number; qtd: number }[]): Bar
   const m = new Map<number, number>();
   heat.forEach((r) => m.set(r.hora, (m.get(r.hora) ?? 0) + r.qtd));
   const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
-  return Array.from(m.entries()).sort((a, b) => a[0] - b[0]).map(([hora, qtd]) => ({ key: `h${hora}`, nome: `${hora}h`, qtd, pct: tot > 0 ? (100 * qtd) / tot : 0 }));
+  return Array.from(m.entries()).sort((a, b) => a[0] - b[0]).map(([hora, qtd]) => ({ key: `h${hora}`, nome: `${hora}h`, qtd, pct: tot > 0 ? (100 * qtd) / tot : 0, recorte: { label: `${hora}h`, horas: [hora] } }));
 }
 
 function agregarPorDiaSemana(heat: { dow: number; hora: number; qtd: number }[]): BarRow[] {
@@ -127,7 +160,32 @@ function agregarPorDiaSemana(heat: { dow: number; hora: number; qtd: number }[])
   const ordem = [1, 2, 3, 4, 5, 6, 0];
   const labels: Record<number, string> = { 0: "Dom", 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
   const tot = Array.from(m.values()).reduce((a, b) => a + b, 0);
-  return ordem.map((d) => ({ key: `d${d}`, nome: labels[d], qtd: m.get(d) ?? 0, pct: tot > 0 ? (100 * (m.get(d) ?? 0)) / tot : 0 }));
+  return ordem.map((d) => ({ key: `d${d}`, nome: labels[d], qtd: m.get(d) ?? 0, pct: tot > 0 ? (100 * (m.get(d) ?? 0)) / tot : 0, recorte: { label: labels[d], dows: [d] } }));
+}
+
+/** Tile de número. Vira botão quando há recorte para abrir. */
+function TileClicavel({ titulo, valor, rodape, recorte, onSelecionar }: {
+  titulo: string; valor: string; rodape?: string;
+  recorte: ChatsRecorte | null; onSelecionar: (r: ChatsRecorte) => void;
+}) {
+  const conteudo = (
+    <>
+      <p className="text-xs text-muted-foreground">{titulo}</p>
+      <p className="text-2xl font-semibold tabular-nums">{valor}</p>
+      {rodape && <p className="text-xs text-muted-foreground mt-1">{rodape}</p>}
+    </>
+  );
+  const base = "rounded-lg border border-border bg-card p-4";
+  if (!recorte) return <div className={base}>{conteudo}</div>;
+  return (
+    <button
+      type="button"
+      onClick={() => onSelecionar(recorte)}
+      className={cn(base, "text-left w-full transition-colors duration-200 hover:border-primary/50 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring")}
+    >
+      {conteudo}
+    </button>
+  );
 }
 
 const SENT_LABEL: Record<string, string> = { positive: "Positivo", neutral: "Neutro", negative: "Negativo" };
@@ -180,6 +238,10 @@ export function ChatsTab() {
   const [sentiments, setSentiments] = useState<string[]>([]);
   const [resolucoes, setResolucoes] = useState<string[]>([]);
   const [verLista, setVerLista] = useState(false);
+  /** Recorte do card clicado. NULL enquanto o diálogo mostra o total da aba. */
+  const [recorte, setRecorte] = useState<ChatsRecorte | null>(null);
+  const abrirRecorte = (r: ChatsRecorte) => { setRecorte(r); setVerLista(true); };
+  const fecharLista = (aberto: boolean) => { setVerLista(aberto); if (!aberto) setRecorte(null); };
   const { data, isLoading, isError, error } = useAtendimentoChats({ closedReasons, hasTicket, sentiments, resolucoes });
 
   const { data: timeline } = useAtendimentoChatsTimeline();
@@ -199,6 +261,11 @@ export function ChatsTab() {
   const semAnaliseRow = data?.por_resolucao.find((r) => r.resolucao === "(sem)");
   const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
   const semAtendenteQtd = data?.por_atendente.find((r) => r.user_id === null)?.qtd ?? 0;
+  // `ofensores` ja vem ordenado por volume: o 1o e o "Maior consumo" e os 10
+  // primeiros sao o "Top 10 concentram". O tile "Clientes com atendimento" nao
+  // abre nada porque conta CLIENTES, e a agregada nao devolve os ids de todos.
+  const top1Cliente = data?.ofensores.find((o) => o.cliente_id) ?? null;
+  const top10Ids = (data?.ofensores ?? []).slice(0, 10).map((o) => o.cliente_id).filter((id): id is string => !!id);
   return (
     <div className="space-y-4">
       <AvisoCategoria />
@@ -320,7 +387,7 @@ export function ChatsTab() {
                 outros quatro, que são cards simples. */}
             <button
               type="button"
-              onClick={data.total > 0 ? () => setVerLista(true) : undefined}
+              onClick={data.total > 0 ? () => { setRecorte(null); setVerLista(true); } : undefined}
               disabled={data.total === 0}
               aria-label={data.total > 0 ? `Ver os ${data.total} atendimentos` : undefined}
               className={cn(
@@ -361,12 +428,12 @@ export function ChatsTab() {
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-1">Por sentimento</h3>
               <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({sentimentTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
-              <Barras rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: sentimentTotal > 0 ? (100 * r.qtd) / sentimentTotal : 0, color: sentColor(r.sentimento) }))} />
+              <Barras onSelecionar={abrirRecorte} rows={data.por_sentimento.map((r) => ({ key: r.sentimento, nome: SENT_LABEL[r.sentimento] ?? r.sentimento, qtd: r.qtd, pct: sentimentTotal > 0 ? (100 * r.qtd) / sentimentTotal : 0, color: sentColor(r.sentimento), recorte: { label: `sentimento ${(SENT_LABEL[r.sentimento] ?? r.sentimento).toLowerCase()}`, sentiments: [r.sentimento] } }))} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-1">Por resolução</h3>
               <p className="text-xs text-muted-foreground mb-3">% sobre os atendimentos analisados ({resolucaoTotal.toLocaleString("pt-BR")} de {data.total.toLocaleString("pt-BR")})</p>
-              <Barras rows={resolucaoRows.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: resolucaoTotal > 0 ? (100 * r.qtd) / resolucaoTotal : 0, color: resolColor(r.resolucao) }))} />
+              <Barras onSelecionar={abrirRecorte} rows={resolucaoRows.map((r) => ({ key: r.resolucao, nome: RESOL_LABEL[r.resolucao] ?? r.resolucao, qtd: r.qtd, pct: resolucaoTotal > 0 ? (100 * r.qtd) / resolucaoTotal : 0, color: resolColor(r.resolucao), recorte: { label: `resolução ${(RESOL_LABEL[r.resolucao] ?? r.resolucao).toLowerCase()}`, resolucoes: [r.resolucao] } }))} />
               {semAnaliseQtd > 0 && (
                 <p className="text-xs text-muted-foreground mt-3">
                   Sem análise: {semAnaliseQtd.toLocaleString("pt-BR")} atendimentos ({Math.round((100 * semAnaliseQtd) / data.total)}% do total)
@@ -378,7 +445,7 @@ export function ChatsTab() {
               {data.csat.distribuicao.length === 0 ? (
                 <div className="text-xs text-muted-foreground italic py-6 text-center">Nenhuma resposta de CSAT no período.</div>
               ) : (
-                <Barras rows={data.csat.distribuicao.map((r) => ({ key: `n${r.nota}`, nome: `Nota ${r.nota}`, qtd: r.qtd, pct: data.csat.respondidos > 0 ? (100 * r.qtd) / data.csat.respondidos : 0 }))} />
+                <Barras onSelecionar={abrirRecorte} rows={data.csat.distribuicao.map((r) => ({ key: `n${r.nota}`, nome: `Nota ${r.nota}`, qtd: r.qtd, pct: data.csat.respondidos > 0 ? (100 * r.qtd) / data.csat.respondidos : 0, recorte: { label: `CSAT nota ${r.nota}`, csatScores: [r.nota] } }))} />
               )}
               <p className="text-xs text-muted-foreground mt-3">{data.csat.enviados.toLocaleString("pt-BR")} enviados → {data.csat.respondidos.toLocaleString("pt-BR")} respondidos ({data.csat.response_rate}%)</p>
             </div>
@@ -387,7 +454,7 @@ export function ChatsTab() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Atendimentos por Categoria</h3>
-              <Barras rows={data.por_categoria.slice(0, 15).map((r) => ({ key: r.category_id ?? "sem", nome: nomeCategoria(r.category_id, r.nome), qtd: r.qtd, pct: r.pct, color: r.category_id ? undefined : "hsl(var(--muted-foreground))" }))} colunas="grid-cols-[minmax(0,1.5fr)_minmax(0,1.5fr)_90px]" />
+              <Barras onSelecionar={abrirRecorte} rows={data.por_categoria.slice(0, 15).map((r) => ({ key: r.category_id ?? "sem", nome: nomeCategoria(r.category_id, r.nome), qtd: r.qtd, pct: r.pct, color: r.category_id ? undefined : "hsl(var(--muted-foreground))", recorte: { label: nomeCategoria(r.category_id, r.nome), categoryIds: [r.category_id ?? SEM_CATEGORIA_ID] } }))} colunas="grid-cols-[minmax(0,1.5fr)_minmax(0,1.5fr)_90px]" />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-1">Tempo gasto por Categoria</h3>
@@ -400,7 +467,7 @@ export function ChatsTab() {
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-1">Atendimentos por Atendente</h3>
               <p className="text-xs text-muted-foreground mb-3">% sobre o total de atendimentos ({data.total.toLocaleString("pt-BR")})</p>
-              <Barras rows={data.por_atendente.slice(0, 15).map((r) => ({ key: r.user_id ?? "sem-atendente", nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0, color: r.user_id ? undefined : "hsl(var(--muted-foreground))" }))} />
+              <Barras onSelecionar={abrirRecorte} rows={data.por_atendente.slice(0, 15).map((r) => ({ key: r.user_id ?? "sem-atendente", nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0, color: r.user_id ? undefined : "hsl(var(--muted-foreground))", recorte: r.user_id ? { label: r.nome, agentId: r.user_id } : { label: "sem atendente", semAgente: true } }))} />
               {semAtendenteQtd > 0 && (
                 <p className="text-xs text-muted-foreground mt-3">
                   Sem atendente: {semAtendenteQtd.toLocaleString("pt-BR")} atendimentos ({Math.round((100 * semAtendenteQtd) / data.total)}% do total) que nunca foram atribuídos a ninguém.
@@ -409,7 +476,7 @@ export function ChatsTab() {
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Por Status</h3>
-              <Barras rows={data.por_status.map((r) => ({ key: r.status, nome: r.status, qtd: r.qtd, pct: r.pct }))} />
+              <Barras onSelecionar={abrirRecorte} rows={data.por_status.map((r) => ({ key: r.status, nome: r.status, qtd: r.qtd, pct: r.pct, recorte: { label: `status ${r.status}`, status: [r.status] } }))} />
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -417,22 +484,27 @@ export function ChatsTab() {
               <p className="text-xs text-muted-foreground">Clientes com atendimento</p>
               <p className="text-2xl font-semibold tabular-nums">{data.concentracao.clientes_com_chat.toLocaleString("pt-BR")}</p>
             </div>
-            <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Maior consumo</p>
-              <p className="text-2xl font-semibold tabular-nums">{data.concentracao.top1_qtd.toLocaleString("pt-BR")}</p>
-              <p className="text-xs text-muted-foreground mt-1">{Math.round(data.concentracao.top1_pct)}% de 1 cliente</p>
-            </div>
-            <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-xs text-muted-foreground">Top 10 concentram</p>
-              <p className="text-2xl font-semibold tabular-nums">{Math.round(data.concentracao.top10_pct)}%</p>
-            </div>
+<TileClicavel
+              titulo="Maior consumo"
+              valor={data.concentracao.top1_qtd.toLocaleString("pt-BR")}
+              rodape={`${Math.round(data.concentracao.top1_pct)}% de 1 cliente`}
+              recorte={top1Cliente ? { label: top1Cliente.nome, clienteIds: [top1Cliente.cliente_id!] } : null}
+              onSelecionar={abrirRecorte}
+            />
+            <TileClicavel
+              titulo="Top 10 concentram"
+              valor={`${Math.round(data.concentracao.top10_pct)}%`}
+              rodape={top10Ids.length > 0 ? `${top10Ids.length} clientes` : undefined}
+              recorte={top10Ids.length > 0 ? { label: `top ${top10Ids.length} clientes`, clienteIds: top10Ids } : null}
+              onSelecionar={abrirRecorte}
+            />
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="text-sm font-semibold mb-3">Ranking de Ofensores — atendimentos por cliente</h3>
             {data.ofensores.length === 0 ? (
               <div className="text-xs text-muted-foreground italic py-6 text-center">Vincule clientes aos atendimentos para ver este ranking.</div>
             ) : (
-              <Barras rows={data.ofensores.slice(0, 15).map((r) => ({ key: String(r.cliente_id ?? r.nome), nome: r.nome, qtd: r.qtd, pct: data.concentracao.chats_com_cliente > 0 ? (100 * r.qtd) / data.concentracao.chats_com_cliente : 0 }))} />
+              <Barras onSelecionar={abrirRecorte} rows={data.ofensores.slice(0, 15).map((r) => ({ key: String(r.cliente_id ?? r.nome), nome: r.nome, qtd: r.qtd, pct: data.concentracao.chats_com_cliente > 0 ? (100 * r.qtd) / data.concentracao.chats_com_cliente : 0, recorte: r.cliente_id ? { label: r.nome, clienteIds: [r.cliente_id] } : undefined }))} />
             )}
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
@@ -455,7 +527,18 @@ export function ChatsTab() {
                     {data.custo_receita.slice(0, 15).map((r) => (
                       <tr key={String(r.cliente_id ?? r.nome)} className="border-b border-border/50 last:border-0">
                         <td className="py-2 px-3">{r.nome}</td>
-                        <td className="py-2 px-3 text-right tabular-nums">{r.atendimentos.toLocaleString("pt-BR")}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">
+                          {r.cliente_id ? (
+                            <button
+                              type="button"
+                              onClick={() => abrirRecorte({ label: r.nome, clienteIds: [r.cliente_id!] })}
+                              title={`Ver os ${r.atendimentos.toLocaleString("pt-BR")} atendimentos`}
+                              className="rounded-sm px-1 -mx-1 underline decoration-dotted underline-offset-2 transition-colors duration-200 hover:text-primary hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            >
+                              {r.atendimentos.toLocaleString("pt-BR")}
+                            </button>
+                          ) : r.atendimentos.toLocaleString("pt-BR")}
+                        </td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.mrr.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                         <td className="py-2 px-3 text-right tabular-nums font-medium">{r.atend_por_mil.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{r.receita_por_atend.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
@@ -469,16 +552,16 @@ export function ChatsTab() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Atendimentos por Hora do Dia</h3>
-              <Barras rows={agregarPorHora(data.heatmap)} />
+              <Barras onSelecionar={abrirRecorte} rows={agregarPorHora(data.heatmap)} />
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Atendimentos por Dia da Semana</h3>
-              <Barras rows={agregarPorDiaSemana(data.heatmap)} />
+              <Barras onSelecionar={abrirRecorte} rows={agregarPorDiaSemana(data.heatmap)} />
             </div>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="text-sm font-semibold mb-3">Picos — Dia × Horário</h3>
-            <Heatmap rows={data.heatmap} />
+            <Heatmap rows={data.heatmap} onSelecionar={abrirRecorte} />
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
             <h3 className="text-sm font-semibold mb-1">Ticket médio por atendimento — tendência (12 meses)</h3>
@@ -490,7 +573,8 @@ export function ChatsTab() {
 
       <ChatsListaDialog
         open={verLista}
-        onOpenChange={setVerLista}
+        onOpenChange={fecharLista}
+        recorte={recorte}
         closedReasons={closedReasons}
         hasTicket={hasTicket}
         sentiments={sentiments}

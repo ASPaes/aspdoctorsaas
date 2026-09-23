@@ -5,7 +5,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, ExternalLink, MessagesSquare, Users } from "lucide-react";
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
-import { useAtendimentoChatsLista, type ChatListaItem } from "./useAtendimentoChatsLista";
+import { useAtendimentoChatsLista, type ChatListaItem, type ChatsRecorte } from "./useAtendimentoChatsLista";
 import { fmtEspera } from "./TempoRealTab";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,8 @@ interface Props {
   hasTicket: "all" | "with" | "without";
   sentiments: string[];
   resolucoes: string[];
+  /** Recorte de um card. NULL = o total da aba inteiro. */
+  recorte?: ChatsRecorte | null;
 }
 
 const SENTIMENTO: Record<string, { texto: string; classe: string }> = {
@@ -47,12 +49,12 @@ function fmtData(iso: string): string {
 }
 
 export function ChatsListaDialog({
-  open, onOpenChange, closedReasons, hasTicket, sentiments, resolucoes,
+  open, onOpenChange, closedReasons, hasTicket, sentiments, resolucoes, recorte,
 }: Props) {
   const navigate = useNavigate();
   const [chatAberto, setChatAberto] = useState<ChatListaItem | null>(null);
   const { data, isLoading, isError } = useAtendimentoChatsLista({
-    closedReasons, hasTicket, sentiments, resolucoes, enabled: open,
+    closedReasons, hasTicket, sentiments, resolucoes, recorte, enabled: open,
   });
 
   const abrirAoVivo = (conversationId: string) => {
@@ -69,11 +71,12 @@ export function ChatsListaDialog({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessagesSquare className="h-4 w-4" />
-              Atendimentos do período
+              {recorte ? `Atendimentos · ${recorte.label}` : "Atendimentos do período"}
             </DialogTitle>
             <DialogDescription>
-              Os atendimentos que formam o total do card, com os mesmos filtros da aba.
-              Clique em um para ver a conversa.
+              {recorte
+                ? `Os ${data ? data.total.toLocaleString("pt-BR") : ""} atendimentos que formam esse número, com os mesmos filtros da aba. Clique em um para ver a conversa.`
+                : "Os atendimentos que formam o total do card, com os mesmos filtros da aba. Clique em um para ver a conversa."}
             </DialogDescription>
           </DialogHeader>
 

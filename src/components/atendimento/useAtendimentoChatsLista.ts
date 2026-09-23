@@ -4,6 +4,30 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useAtendimentoFilter } from "@/contexts/AtendimentoFilterContext";
 
+/**
+ * Recorte de um card: o subconjunto que formou UM numero da aba (uma barra, uma
+ * nota de CSAT, uma celula do mapa de calor). Cada campo vira um parametro da
+ * RPC de lista; `label` so alimenta o titulo do dialogo.
+ *
+ * O recorte SOBRESCREVE o filtro da aba nos campos que os dois tem em comum
+ * (sentimento, resolucao) em vez de intersectar, e isso e seguro porque a barra
+ * clicada ja e resultado do filtro da aba — a agregada e a lista concordam nos
+ * 167 recortes conferidos em scripts/sql-tests/54_chats_recortes_batem.sql.
+ */
+export interface ChatsRecorte {
+  label: string;
+  sentiments?: string[];
+  resolucoes?: string[];
+  categoryIds?: string[];
+  status?: string[];
+  csatScores?: number[];
+  agentId?: string;
+  semAgente?: boolean;
+  clienteIds?: string[];
+  horas?: number[];
+  dows?: number[];
+}
+
 /** Uma linha da lista que abre pelo card "Total de Atendimentos". */
 export interface ChatListaItem {
   attendance_id: string;
@@ -11,7 +35,7 @@ export interface ChatListaItem {
   conversation_id: string | null;
   contato: string;
   telefone: string | null;
-  cliente_id: number | null;
+  cliente_id: string | null;
   cliente_nome: string | null;
   agente: string | null;
   departamento: string | null;
@@ -55,9 +79,10 @@ export function useAtendimentoChatsLista(opts: {
   hasTicket: "all" | "with" | "without";
   sentiments: string[];
   resolucoes: string[];
+  recorte?: ChatsRecorte | null;
   enabled: boolean;
 }) {
-  const { closedReasons, hasTicket, sentiments, resolucoes, enabled } = opts;
+  const { closedReasons, hasTicket, sentiments, resolucoes, recorte, enabled } = opts;
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const { selectedUnidadeId, viewKey, unidadeFilterReady } = useUnidadeFilter();
@@ -77,6 +102,7 @@ export function useAtendimentoChatsLista(opts: {
       departmentId, agentId, segmentoIds, areaIds, estadoIds, cidadeIds,
       fornecedorIds, produtoIds, closedReasons, hasTicket, sentiments,
       resolucoes, tipoAtendimento, plantao, categoryIds, subcategoryIds,
+      recorte ?? null,
     ],
     enabled: enabled && !!tid && unidadeFilterReady,
     refetchOnWindowFocus: false,
@@ -88,18 +114,24 @@ export function useAtendimentoChatsLista(opts: {
         p_date_to: dateRange.to.toISOString(),
         p_department_id: departmentId ?? null,
         p_unidade_base_id: selectedUnidadeId ?? null,
-        p_agent_id: agentId ?? null,
+        p_agent_id: recorte?.agentId ?? agentId ?? null,
         p_segmento_ids: orNull(segmentoIds), p_area_ids: orNull(areaIds), p_estado_ids: orNull(estadoIds),
         p_cidade_ids: orNull(cidadeIds), p_fornecedor_ids: orNull(fornecedorIds), p_produto_ids: orNull(produtoIds),
         p_closed_reasons: closedReasons.length ? closedReasons : null,
         p_has_ticket: hasTicket === "all" ? null : hasTicket === "with",
         p_is_group: pIsGroup,
-        p_sentiments: sentiments.length ? sentiments : null,
-        p_resolucoes: resolucoes.length ? resolucoes : null,
+        p_sentiments: recorte?.sentiments ?? (sentiments.length ? sentiments : null),
+        p_resolucoes: recorte?.resolucoes ?? (resolucoes.length ? resolucoes : null),
         p_plantao: pPlantao,
         p_limit: LIMITE,
-        p_category_ids: categoryIds.length ? categoryIds : null,
+        p_category_ids: recorte?.categoryIds ?? (categoryIds.length ? categoryIds : null),
         p_subcategory_ids: subcategoryIds.length ? subcategoryIds : null,
+        p_csat_scores: recorte?.csatScores ?? null,
+        p_sem_agente: recorte?.semAgente ?? null,
+        p_cliente_ids: recorte?.clienteIds ?? null,
+        p_horas: recorte?.horas ?? null,
+        p_dows: recorte?.dows ?? null,
+        p_status: recorte?.status ?? null,
       });
       if (error) throw error;
       const d = (data ?? {}) as any;
@@ -112,7 +144,7 @@ export function useAtendimentoChatsLista(opts: {
           conversation_id: i.conversation_id ?? null,
           contato: String(i.contato ?? "Sem nome"),
           telefone: i.telefone ?? null,
-          cliente_id: i.cliente_id === null || i.cliente_id === undefined ? null : Number(i.cliente_id),
+          cliente_id: i.cliente_id ?? null,
           cliente_nome: i.cliente_nome ?? null,
           agente: i.agente ?? null,
           departamento: i.departamento ?? null,
