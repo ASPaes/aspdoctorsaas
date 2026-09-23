@@ -19,6 +19,8 @@ import type { AssignmentRule } from "@/components/whatsapp/hooks/useAssignmentRu
 
 interface AssignmentRuleCardProps {
   rule: AssignmentRule;
+  /** false = somente leitura: o RLS recusaria a escrita. */
+  canManage: boolean;
   onEdit: (rule: AssignmentRule) => void;
   onDelete: (id: string) => void;
   onToggleActive: (id: string, isActive: boolean) => void;
@@ -39,6 +41,7 @@ const OVERFLOW_LABELS: Record<string, string> = {
 
 export function AssignmentRuleCard({
   rule,
+  canManage,
   onEdit,
   onDelete,
   onToggleActive,
@@ -130,10 +133,12 @@ export function AssignmentRuleCard({
             )}
           </div>
         </div>
-        <Switch
-          checked={rule.is_active}
-          onCheckedChange={(v) => onToggleActive(rule.id, v)}
-        />
+        {canManage && (
+          <Switch
+            checked={rule.is_active}
+            onCheckedChange={(v) => onToggleActive(rule.id, v)}
+          />
+        )}
       </div>
 
       {/* Setor */}
@@ -237,26 +242,28 @@ export function AssignmentRuleCard({
       )}
 
       {/* Footer */}
-      <div className="flex gap-2 pt-2 border-t border-border">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onEdit(rule)}
-          className="flex-1"
-        >
-          <Settings2 className="h-3 w-3 mr-1" />
-          Editar
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onDelete(rule.id)}
-          className="flex-1 text-destructive hover:text-destructive"
-        >
-          <Trash2 className="h-3 w-3 mr-1" />
-          Excluir
-        </Button>
-      </div>
+      {canManage && (
+        <div className="flex gap-2 pt-2 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onEdit(rule)}
+            className="flex-1"
+          >
+            <Settings2 className="h-3 w-3 mr-1" />
+            Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDelete(rule.id)}
+            className="flex-1 text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            Excluir
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

@@ -3,6 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 
+/** O RLS de assignment_rules só deixa admin, head e super admin gravarem. Quando
+ *  barra, o UPDATE/DELETE volta com 0 linhas e o PostgREST responde
+ *  "Cannot coerce the result to a single JSON object" — texto de banco na tela. */
+const SEM_PERMISSAO = "Você não tem permissão para alterar as regras de distribuição. Fale com o administrador do seu tenant.";
+
 export type AssignmentStrategy = 'fixed' | 'round_robin' | 'least_loaded' | 'skill_based';
 export type OverflowPolicy = 'queue' | 'fallback_agent' | 'manual';
 
@@ -54,8 +59,9 @@ export const useAssignmentRules = () => {
 
   const createRule = useMutation({
     mutationFn: async (rule: Partial<AssignmentRule> & { name: string; tenant_id: string }) => {
-      const { data, error } = await supabase.from('assignment_rules').insert(rule as any).select().single();
+      const { data, error } = await supabase.from('assignment_rules').insert(rule as any).select().maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error(SEM_PERMISSAO);
       return data;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['assignment-rules'] }); toast.success("Regra criada com sucesso"); },
@@ -64,8 +70,9 @@ export const useAssignmentRules = () => {
 
   const updateRule = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<AssignmentRule> & { id: string }) => {
-      const { data, error } = await supabase.from('assignment_rules').update(updates as any).eq('id', id).select().single();
+      const { data, error } = await supabase.from('assignment_rules').update(updates as any).eq('id', id).select().maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error(SEM_PERMISSAO);
       return data;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['assignment-rules'] }); toast.success("Regra atualizada"); },
@@ -74,8 +81,9 @@ export const useAssignmentRules = () => {
 
   const deleteRule = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('assignment_rules').delete().eq('id', id);
+      const { data, error } = await supabase.from('assignment_rules').delete().eq('id', id).select('id');
       if (error) throw error;
+      if (!data || data.length === 0) throw new Error(SEM_PERMISSAO);
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['assignment-rules'] }); toast.success("Regra excluída"); },
     onError: (e: any) => { toast.error(e.message || "Erro ao excluir regra"); },
@@ -83,8 +91,9 @@ export const useAssignmentRules = () => {
 
   const toggleRuleActive = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      const { data, error } = await supabase.from('assignment_rules').update({ is_active } as any).eq('id', id).select().single();
+      const { data, error } = await supabase.from('assignment_rules').update({ is_active } as any).eq('id', id).select().maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error(SEM_PERMISSAO);
       return data;
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['assignment-rules'] }); toast.success("Status atualizado"); },
