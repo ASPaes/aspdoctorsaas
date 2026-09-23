@@ -198,6 +198,7 @@ export function ChatsTab() {
   const resolucaoTotal = resolucaoRows.reduce((a, r) => a + r.qtd, 0);
   const semAnaliseRow = data?.por_resolucao.find((r) => r.resolucao === "(sem)");
   const semAnaliseQtd = semAnaliseRow?.qtd ?? 0;
+  const semAtendenteQtd = data?.por_atendente.find((r) => r.user_id === null)?.qtd ?? 0;
   return (
     <div className="space-y-4">
       <AvisoCategoria />
@@ -397,8 +398,14 @@ export function ChatsTab() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="rounded-lg border border-border bg-card p-4">
-              <h3 className="text-sm font-semibold mb-3">Atendimentos por Atendente</h3>
-              <Barras rows={data.por_atendente.slice(0, 15).map((r) => ({ key: r.nome, nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0 }))} />
+              <h3 className="text-sm font-semibold mb-1">Atendimentos por Atendente</h3>
+              <p className="text-xs text-muted-foreground mb-3">% sobre o total de atendimentos ({data.total.toLocaleString("pt-BR")})</p>
+              <Barras rows={data.por_atendente.slice(0, 15).map((r) => ({ key: r.user_id ?? "sem-atendente", nome: r.nome, qtd: r.qtd, pct: data.total > 0 ? (100 * r.qtd) / data.total : 0, color: r.user_id ? undefined : "hsl(var(--muted-foreground))" }))} />
+              {semAtendenteQtd > 0 && (
+                <p className="text-xs text-muted-foreground mt-3">
+                  Sem atendente: {semAtendenteQtd.toLocaleString("pt-BR")} atendimentos ({Math.round((100 * semAtendenteQtd) / data.total)}% do total) que nunca foram atribuídos a ninguém.
+                </p>
+              )}
             </div>
             <div className="rounded-lg border border-border bg-card p-4">
               <h3 className="text-sm font-semibold mb-3">Por Status</h3>
