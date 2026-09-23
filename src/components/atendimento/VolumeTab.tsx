@@ -13,8 +13,14 @@ const CANAL_LABEL: Record<string, string> = {
   billing_automation: "Cobrança (auto)",
   ticket: "Ticket",
   scheduled: "Retorno agendado",
+  group_auto: "Grupo (auto)",
+  group_manual: "Grupo (manual)",
   "(sem origem)": "Sem origem",
 };
+
+/** Chave de ajuda por canal. `(sem origem)` vira `sem_origem` porque a chave do dicionário não aceita parênteses. */
+const canalHelpKey = (canal: string) =>
+  `atendimento_canal_${canal === "(sem origem)" ? "sem_origem" : canal}`;
 
 export function VolumeTab() {
   const { data, isLoading, isError, error } = useAtendimentoVolume();
@@ -181,9 +187,12 @@ export function VolumeTab() {
                     {data.canais.map((c) => (
                       <div
                         key={c.canal}
-                        className="grid grid-cols-[140px_1fr_60px] items-center gap-2 text-xs"
+                        className="grid grid-cols-[150px_1fr_60px] items-center gap-2 text-xs"
                       >
-                        <span className="truncate">{CANAL_LABEL[c.canal] ?? c.canal}</span>
+                        <span className="flex items-center justify-between gap-1 min-w-0 pr-1">
+                          <span className="truncate">{CANAL_LABEL[c.canal] ?? c.canal}</span>
+                          <KpiHelpPopover kpiKey={canalHelpKey(c.canal)} labelSize="sm" />
+                        </span>
                         <div className="h-2 rounded-full bg-muted overflow-hidden">
                           <div
                             className="h-full bg-primary"

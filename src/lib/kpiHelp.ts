@@ -1259,6 +1259,67 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     why_it_matters: "Mostra de onde a demanda entra — cliente, agente, automação de cobrança, ticket, etc.",
     formula: "contagem por created_from no período",
   },
+  // ── Atendimento — cada canal de abertura (um por valor de created_from) ──
+  atendimento_canal_customer: {
+    title: "Canal: Cliente",
+    definition: "O cliente mandou mensagem dentro do horário de expediente e isso abriu o atendimento.",
+    why_it_matters: "É a demanda espontânea — o volume que chega sozinho e dita o dimensionamento da equipe.",
+    formula: "created_from = 'customer'",
+  },
+  atendimento_canal_out_of_hours: {
+    title: "Canal: Fora do horário",
+    definition: "O cliente mandou mensagem fora da janela de expediente do setor. Mesmo caso de \"Cliente\", só que fora do horário.",
+    why_it_matters: "É a fila que a equipe encontra ao abrir o dia — e o indício de que o cliente procura fora do expediente.",
+    formula: "created_from = 'out_of_hours'",
+  },
+  atendimento_canal_agent: {
+    title: "Canal: Agente",
+    definition: "A empresa falou primeiro, pela plataforma: chat do DoctorSaaS, template/HSM ou Meta. Nasce já em andamento, atribuído a quem enviou.",
+    why_it_matters: "Mede a iniciativa da equipe feita pelo caminho oficial, com registro e SLA desde o primeiro minuto.",
+    formula: "created_from = 'agent'",
+  },
+  atendimento_canal_operator: {
+    title: "Canal: Operador",
+    definition: "Alguém respondeu pelo celular ou WhatsApp Web, por fora da plataforma, sem ter atendimento aberto. O sistema descobre pelo webhook e abre o atendimento depois. Nem sempre é conversa nova — pode ser resposta a uma conversa antiga já encerrada.",
+    why_it_matters: "É o termômetro do atendimento feito por fora do sistema. Quanto maior, mais conversa acontece sem registro, sem fila e sem SLA.",
+    formula: "created_from = 'operator'",
+  },
+  atendimento_canal_billing_automation: {
+    title: "Canal: Cobrança (auto)",
+    definition: "A régua automática de cobrança disparou a mensagem e o atendimento nasceu dela.",
+    why_it_matters: "Separa o volume gerado pela automação do volume gerado por gente — cobrança infla o total sem ser demanda de suporte.",
+    formula: "created_from = 'billing_automation'",
+  },
+  atendimento_canal_ticket: {
+    title: "Canal: Ticket",
+    definition: "O atendimento foi aberto a partir de um ticket, pelo botão que inicia a conversa com o cliente.",
+    why_it_matters: "Mostra quanto do chat nasce de demanda já registrada em ticket, e não de mensagem solta.",
+    formula: "created_from = 'ticket'",
+  },
+  atendimento_canal_scheduled: {
+    title: "Canal: Retorno agendado",
+    definition: "Um retorno tinha sido agendado para uma data e hora; chegou o momento e o atendimento reabriu sozinho.",
+    why_it_matters: "Confirma que os retornos combinados com o cliente estão voltando à fila em vez de cair no esquecimento.",
+    formula: "created_from = 'scheduled'",
+  },
+  atendimento_canal_group_auto: {
+    title: "Canal: Grupo (auto)",
+    definition: "Atendimento de grupo aberto automaticamente porque um agente enviou mensagem no grupo sem ter atendimento ativo.",
+    why_it_matters: "Separa o atendimento em grupo que nasceu de reflexo do que foi aberto de propósito.",
+    formula: "created_from = 'group_auto'",
+  },
+  atendimento_canal_group_manual: {
+    title: "Canal: Grupo (manual)",
+    definition: "O agente clicou em iniciar atendimento no grupo, deliberadamente.",
+    why_it_matters: "É o uso consciente do atendimento em grupo — o que se espera que cresça conforme a equipe adota o recurso.",
+    formula: "created_from = 'group_manual'",
+  },
+  atendimento_canal_sem_origem: {
+    title: "Canal: Sem origem",
+    definition: "Atendimentos antigos, criados antes de o sistema registrar a origem, ou gravados direto no banco sem preencher o campo.",
+    why_it_matters: "É resíduo histórico. Se aparecer em volume no período recente, alguma rotina está criando atendimento sem informar a origem.",
+    formula: "created_from IS NULL",
+  },
   atendimento_top_motivos: {
     title: "Top Motivos",
     definition: "Tags de assunto mais frequentes (geradas por IA a partir do conteúdo do atendimento).",

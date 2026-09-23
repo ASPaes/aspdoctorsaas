@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 23/09
+
+- ⬆️ **O quadro "Canais de Abertura" agora explica cada origem, uma por uma** — Em **Atendimento › Dashboard › Volume**, o quadro **Canais de Abertura** mostra de onde os atendimentos nasceram, mas só tinha uma explicação geral no título — e a dúvida mais comum era a diferença entre **Agente** e **Operador**, que parecem a mesma coisa. Agora cada linha tem o seu próprio **?**, com a definição do canal, por que ele importa e como é contado. Os dois casos que confundiam: **Agente** é quando a equipe falou primeiro **pelo próprio sistema** (chat, modelo de mensagem ou Meta), e **Operador** é quando alguém respondeu **pelo celular ou WhatsApp Web, por fora da plataforma** — o sistema percebe depois e abre o atendimento sozinho. Duas origens de atendimento em grupo, que apareciam com o nome técnico em inglês ao filtrar por **Grupos**, passam a se chamar **Grupo (auto)** e **Grupo (manual)**.
+
 ### 22/09
 
 - 🆕 **A caixa de entrada pode passar a mostrar todo e-mail que chegar, não só o de cliente conhecido** — Em **Configurações › E-mail › Parâmetros de Recebidos**, a nova seção **Caixa de entrada** traz a chave **Mostrar também e-mail sem vínculo com cliente**, desligada por padrão. Hoje a lista de **E-mails › Recebidos** mostra só o que o robô consegue encaixar: resposta de um ticket, e-mail para um endereço que abre ticket e remetente que está na ficha de algum cliente. O resto é descartado na leitura e nunca chega a aparecer. Com a chave ligada, tudo o que chegar nas caixas que já são lidas fica guardado e aparece na lista como **Registrado**, sem abrir ticket e sem ir para a Triagem; quando dá para reconhecer o cliente pelo remetente, o nome dele aparece junto. Propaganda, resposta automática, e-mail que sai das suas próprias caixas e remetente bloqueado continuam de fora. A chave vale do momento em que você liga: o e-mail descartado antes disso não chegou a ser gravado, então não tem como ele aparecer depois.
