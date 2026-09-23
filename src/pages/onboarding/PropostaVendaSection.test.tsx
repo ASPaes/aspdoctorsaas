@@ -111,6 +111,13 @@ describe("PropostaVendaSection", () => {
     expect(document.body.textContent).toContain("Inserir um modelo de perguntas");
   });
 
+  it("sem nenhum modelo cadastrado, diz onde cadastrar em vez de esconder o seletor", async () => {
+    templates.mockReturnValueOnce([]);
+    render(<PropostaVendaSection journeyId="j1" />);
+    await assentar();
+    expect(document.body.textContent).toContain("Configuração › Resumo da venda");
+  });
+
   it("com proposta importada, não mostra campo nenhum para escrever", async () => {
     jornada.mockReturnValueOnce({
       proposta_payload: { cliente: { nome_fantasia: "PORCAO" }, proposta: {} },

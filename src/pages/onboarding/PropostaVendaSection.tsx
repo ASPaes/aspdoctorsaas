@@ -414,7 +414,15 @@ function ObservacaoDaVenda({
 
   return (
     <div className="space-y-3">
-      {oferecidos.length > 0 && (
+      {oferecidos.length === 0 ? (
+        // Esconder a linha inteira quando não há modelo deixava a aba como um
+        // campo em branco, sem pista de que existem modelos de perguntas — e
+        // empresa nenhuma começa com modelo cadastrado.
+        <p className="text-[11px] text-muted-foreground">
+          Nenhum modelo de perguntas para este pipeline. Cadastre em{" "}
+          <span className="text-foreground">Implantação › Configuração › Resumo da venda</span>.
+        </p>
+      ) : (
         <div className="flex flex-wrap items-center gap-2">
           {/* O seletor é uma AÇÃO ("inserir este modelo"), não o estado do
               campo: fica sempre em "", para que escolher o MESMO modelo de novo
