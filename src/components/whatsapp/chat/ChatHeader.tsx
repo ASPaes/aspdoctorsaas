@@ -980,9 +980,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
             {isGroupConv && groupAttendance && (
               <div className="flex items-center gap-1.5">
-                <Badge variant="secondary" className="whitespace-nowrap">
-                  Em atendimento{assignedOperatorName ? ` · ${assignedOperatorName}` : ""}
-                </Badge>
+                {/* Mesmo chip e mesma transferência do 1:1. O dono do atendimento de
+                    grupo mora em support_attendances — a conversa de grupo tem
+                    assigned_to sempre NULL (enforce_group_rules zera no BEFORE). */}
+                <QueueIndicator
+                  conversationId={conversation.id}
+                  assignedTo={groupAttendance.assigned_to}
+                  onTransferClick={() => setIsTransferOpen(true)}
+                  assignedOperatorName={assignedOperatorName}
+                  contactId={(conversation as any).contact_id ?? conversation.contact?.id}
+                  clienteId={groupLinkedCliente?.id ?? null}
+                />
                 <Button
                   size="sm"
                   variant="outline"
@@ -1366,7 +1374,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         open={isTransferOpen}
         onOpenChange={setIsTransferOpen}
         conversationId={conversation.id}
-        currentAssignee={conversation.assigned_to || null}
+        // O dono efetivo é o do atendimento: em grupo, conversation.assigned_to é
+        // sempre NULL e sem isto o agente atual apareceria na lista de destinos.
+        currentAssignee={attendance?.assigned_to ?? conversation.assigned_to ?? null}
+        isGroup={isGroupConv}
         onDepartmentTransferred={onDepartmentTransferred}
       />
       <CreateCSTicketFromChat

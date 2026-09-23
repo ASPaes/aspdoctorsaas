@@ -18,6 +18,8 @@ interface TransferDialogProps {
   onOpenChange: (open: boolean) => void;
   conversationId: string;
   currentAssignee: string | null;
+  /** Grupo transfere só para agente: ver a aba Setor abaixo. */
+  isGroup?: boolean;
   onDepartmentTransferred?: () => void;
 }
 
@@ -65,7 +67,7 @@ function useDepartments() {
   });
 }
 
-export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, onDepartmentTransferred }: TransferDialogProps) {
+export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, isGroup = false, onDepartmentTransferred }: TransferDialogProps) {
   const [tab, setTab] = useState<string>("agent");
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
@@ -110,14 +112,19 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
         </DialogHeader>
 
         <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="agent" className="gap-1.5">
-              <User className="h-3.5 w-3.5" /> Agente
-            </TabsTrigger>
-            <TabsTrigger value="department" className="gap-1.5">
-              <Building2 className="h-3.5 w-3.5" /> Setor
-            </TabsTrigger>
-          </TabsList>
+          {/* Grupo transfere só para agente: não entra em fila de setor porque o motor
+              de distribuição sai fora em is_group — o atendimento ficaria em waiting
+              sem ninguém para pegar. Com uma aba só, a TabsList vira enfeite. */}
+          {!isGroup && (
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="agent" className="gap-1.5">
+                <User className="h-3.5 w-3.5" /> Agente
+              </TabsTrigger>
+              <TabsTrigger value="department" className="gap-1.5">
+                <Building2 className="h-3.5 w-3.5" /> Setor
+              </TabsTrigger>
+            </TabsList>
+          )}
 
           <TabsContent value="agent" className="space-y-4 pt-2">
             <div className="space-y-2">
@@ -158,6 +165,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
             )}
           </TabsContent>
 
+          {!isGroup && (
           <TabsContent value="department" className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label>Transferir para setor</Label>
@@ -178,6 +186,7 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
               A conversa será desvinculada do agente atual e voltará para a fila do setor selecionado.
             </p>
           </TabsContent>
+          )}
         </Tabs>
 
         <div className="space-y-2">
