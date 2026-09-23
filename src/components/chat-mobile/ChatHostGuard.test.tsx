@@ -14,6 +14,16 @@ vi.mock("@/hooks/usePermissions", () => ({
   usePermissions: () => mockPermissoes(),
 }));
 
+/**
+ * O portão é o mesmo que protege /whatsapp no app. O teste checa a CHAVE: foi
+ * justamente trocar a chave (`nav.chat` aposentada pelo RBAC v2) sem ninguém
+ * conferir que deixou um admin ser barrado em produção.
+ */
+const mockPortao = vi.fn();
+vi.mock("@/hooks/usePortao", () => ({
+  usePortao: (chave: string) => mockPortao(chave),
+}));
+
 describe("ChatHostGuard", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -45,7 +55,8 @@ describe("ChatHostGuard", () => {
   }
 
   it("mostra o chat para quem tem a permissao", () => {
-    mockPermissoes.mockReturnValue({ can: () => true, isLoading: false });
+    mockPermissoes.mockReturnValue({ isLoading: false });
+    mockPortao.mockReturnValue(true);
 
     montar();
 
@@ -54,7 +65,8 @@ describe("ChatHostGuard", () => {
   });
 
   it("avisa antes de levar para o app quem nao atende", () => {
-    mockPermissoes.mockReturnValue({ can: () => false, isLoading: false });
+    mockPermissoes.mockReturnValue({ isLoading: false });
+    mockPortao.mockReturnValue(false);
 
     montar();
 
@@ -69,7 +81,8 @@ describe("ChatHostGuard", () => {
   });
 
   it("nao decide nada enquanto as permissoes carregam", () => {
-    mockPermissoes.mockReturnValue({ can: () => false, isLoading: true });
+    mockPermissoes.mockReturnValue({ isLoading: true });
+    mockPortao.mockReturnValue(false);
 
     montar();
 
@@ -77,5 +90,14 @@ describe("ChatHostGuard", () => {
 
     expect(replace).not.toHaveBeenCalled();
     expect(container.textContent).not.toContain("Este endereço é só do Chat");
+  });
+it("pergunta pela chave do chat que o app usa hoje", () => {
+    mockPermissoes.mockReturnValue({ isLoading: false });
+    mockPortao.mockReturnValue(true);
+
+    montar();
+
+    // nav.chat foi aposentada pelo RBAC v2 e nao existe em tenant nenhum.
+    expect(mockPortao).toHaveBeenCalledWith("atendimento_chat");
   });
 });
