@@ -94,7 +94,10 @@ O modo observação tem:
 - Botão **Salvar** explícito, habilitado só com alteração pendente. **Sem
   autosave**: `onboarding_journeys` está na publication do Realtime e todo UPDATE
   gera WAL + fanout; salvar a cada tecla multiplicaria escrita numa tabela quente.
-- Aviso de saída com alteração não salva (o sheet fecha por clique fora).
+- Marca "Alterações não salvas" ao lado do rodapé enquanto houver texto sem
+  salvar. Não é guarda de saída: o sheet fecha por clique fora e interceptar
+  isso exigiria mexer no controle do sheet inteiro, que serve a outras dez
+  seções. A marca é o aviso; salvar continua sendo um clique.
 - Rodapé: "Editado por <nome> em dd/mm/aaaa hh:mm", com o nome vindo de
   `profiles.funcionario_id → funcionarios.nome` (não existe `full_name` em profiles).
 - Salvar grava `resumo_venda_texto`, `resumo_venda_template_id` (o último inserido,
