@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, lazy, Suspense } from "react";
 import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import PropostaVendaSection, { useTemProposta } from "./PropostaVendaSection";
+import PropostaVendaSection from "./PropostaVendaSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnboardingPhases } from "@/hooks/useOnboardingPhases";
 import AcompanhamentoSection from "./AcompanhamentoSection";
@@ -625,8 +625,6 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
   const [returnPauseSla, setReturnPauseSla] = useState(true);
 
   const [activeTab, setActiveTab] = useState<"atividade" | "timeline" | "geral" | "proposta">("atividade");
-  // A aba "Resumo da venda" so existe em jornada vinda do sistema comercial.
-  const temProposta = useTemProposta(journeyId, open);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
   const [quickTagName, setQuickTagName] = useState("");
   const [quickTagColor, setQuickTagColor] = useState("#0ea5e9");
@@ -2641,10 +2639,8 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="timeline" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Timeline</button>
                   <button onClick={() => setActiveTab("geral")}
                     className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="geral" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Visão geral</button>
-                  {temProposta && (
-                    <button onClick={() => setActiveTab("proposta")}
-                      className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="proposta" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Resumo da venda</button>
-                  )}
+                  <button onClick={() => setActiveTab("proposta")}
+                    className={`px-4 py-1.5 text-xs rounded-md transition-colors ${activeTab==="proposta" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}>Resumo da venda</button>
                 </div>
               </div>
 
