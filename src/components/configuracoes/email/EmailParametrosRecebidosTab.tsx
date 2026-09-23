@@ -294,6 +294,57 @@ export default function EmailParametrosRecebidosTab() {
         </div>
       </Secao>
 
+      <Secao titulo="Caixa de entrada" descricao="O que aparece na lista de E-mails recebidos.">
+        <div className="divide-y">
+          <div className="flex items-start justify-between gap-4 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Mostrar também e-mail sem vínculo com cliente</p>
+              <p className="max-w-[70ch] text-[13px] text-muted-foreground">
+                Desligado, a caixa mostra só o que o robô sabe encaixar: resposta de ticket, e-mail para um endereço
+                que abre ticket e remetente que está na ficha de um cliente. Ligado, tudo o que chega nas caixas lidas
+                fica guardado e aparece na lista, sem abrir ticket e sem ir para a Triagem.
+              </p>
+              <p className="mt-1.5 flex max-w-[70ch] items-start gap-1.5 text-[13px] text-warning">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Vale do momento em que você liga. O e-mail descartado antes disso nunca chegou a ser gravado, então não
+                tem como ele aparecer depois.
+              </p>
+            </div>
+            <Switch
+              checked={dados.parametros.registrar_todos}
+              disabled={p.salvarParametros.isPending}
+              onCheckedChange={(v) =>
+                p.salvarParametros.mutate(
+                  { registrar_todos: v },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        v
+                          ? "A caixa passa a mostrar todo e-mail que chegar."
+                          : "A caixa volta a mostrar só o e-mail ligado a cliente ou ticket.",
+                      ),
+                    onError: falhou,
+                  },
+                )
+              }
+              aria-label="Mostrar também e-mail sem vínculo com cliente"
+            />
+          </div>
+          <div className="flex items-start justify-between gap-4 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">O que fica de fora mesmo ligado</p>
+              <p className="max-w-[70ch] text-[13px] text-muted-foreground">
+                Propaganda e resposta automática, e-mail que sai das suas próprias caixas e remetente bloqueado aqui em
+                cima. A leitura também continua só nas caixas que já têm a leitura ligada.
+              </p>
+            </div>
+            <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              Sempre assim
+            </span>
+          </div>
+        </div>
+      </Secao>
       <Secao titulo="Quando o cliente responde">
         <div className="divide-y">
           <div className="flex items-start justify-between gap-4 px-4 py-3">

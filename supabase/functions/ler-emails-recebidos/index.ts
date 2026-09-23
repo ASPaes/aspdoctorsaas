@@ -13,7 +13,9 @@ import { caminhoDoAnexo, extrairAnexos, selecionarAnexos, type AnexoEmail } from
  *   1. resposta a um e-mail que saiu do DoctorSaaS (identificação no endereço
  *      com sufixo ou no `[#TOKEN]` do assunto);
  *   2. e-mail novo para um endereço que abre ticket (Parâmetros de Recebidos);
- *   3. se a caixa permitir, e-mail novo de quem está na ficha de um cliente.
+ *   3. se a caixa permitir, e-mail novo de quem está na ficha de um cliente;
+ *   4. desde 22/09/2026, TUDO o que chegar, quando o tenant liga "registrar_todos"
+ *      em Parâmetros de Recebidos (DEM-0456). Nunca abre ticket sozinho.
  * O resto é ignorado, e o corpo dele nem é baixado.
  *
  * Desde 13/09/2026 o robô GUARDA primeiro e PROCESSA depois: a linha nasce em
@@ -154,6 +156,20 @@ Deno.serve(async (req) => {
   // endereços de cada tenant: para achar o destino e para nunca abrir ticket de e-mail nosso
   const tenants = [...new Set(contas.map((c) => c.tenant_id as string))];
   const { data: enderecosDasContas } = await supabase.from('email_accounts').select('tenant_id, email').in('tenant_id', tenants);
+  // DEM-0456: tenant que pediu para ver todos guarda tambem o e-mail sem vinculo
+  const { data: parametrosDosTenants, error: erroParametros } = await supabase
+    .from('email_recebidos_parametros')
+    .select('tenant_id, registrar_todos, aceitar_dominio_cliente')
+    .in('tenant_id', tenants);
+  if (erroParametros) console.warn(`[ler-emails-recebidos] parametros nao lidos: ${erroParametros.message}`);
+  const registramTudo = new Set(
+    (parametrosDosTenants ?? []).filter((p) => p.registrar_todos).map((p) => p.tenant_id as string),
+  );
+  // tenant sem linha de parametros aceita o dominio, o mesmo padrao do banco
+  const aceitamDominio = new Map<string, boolean>(
+    (parametrosDosTenants ?? []).map((p) => [p.tenant_id as string, p.aceitar_dominio_cliente !== false]),
+  );
+
   const nossos = new Map<string, Set<string>>();
   const conhecidos = new Map<string, Set<string>>();
   const abrem = new Map<string, Set<string>>();
@@ -172,6 +188,8 @@ Deno.serve(async (req) => {
   for (const conta of contas) {
     const resultado: Resultado = { conta: conta.email, lidas: 0, registradas: 0, ignoradas: 0 };
     const caixaAbreTicket = contasQueAbremTicket.has(conta.id);
+    const registrarTodos = registramTudo.has(conta.tenant_id as string);
+    const aceitaDominio = aceitamDominio.get(conta.tenant_id as string) ?? true;
 
     const { data: reservou, error: erroReserva } = await supabase.rpc('fn_email_ingestao_reservar', {
       p_account_id: conta.id,
@@ -286,11 +304,30 @@ Deno.serve(async (req) => {
             .eq('tenant_id', conta.tenant_id)
             .ilike('email', de.email)
             .maybeSingle();
-          if (!cliente) {
+          if (cliente) {
+            clienteId = cliente.id;
+            acao = 'registrado';
+          } else if (registrarTodos) {
+            const guardado = await guardarSemVinculo(supabase, conta.tenant_id, de.email, aceitaDominio);
+            if (!guardado) {
+              resultado.ignoradas++;
+              continue;
+            }
+            clienteId = guardado.clienteId;
+            status = guardado.status;
+            acao = 'registrado';
+          } else {
             resultado.ignoradas++;
             continue;
           }
-          clienteId = cliente.id;
+        } else if (registrarTodos) {
+          const guardado = await guardarSemVinculo(supabase, conta.tenant_id, de.email, aceitaDominio);
+          if (!guardado) {
+            resultado.ignoradas++;
+            continue;
+          }
+          clienteId = guardado.clienteId;
+          status = guardado.status;
           acao = 'registrado';
         } else {
           // sem identificação e sem endereço que abre ticket: nem baixa o corpo
@@ -405,6 +442,36 @@ Deno.serve(async (req) => {
     avisos_enviados: avisos,
   });
 });
+
+/**
+ * DEM-0456: e-mail que nao encaixa em nenhuma regra, guardado so porque o tenant
+ * pediu para ver todos. Nunca abre ticket e nunca vai para a Triagem. Devolve
+ * null quando o remetente esta bloqueado, que continua sendo descartado.
+ *
+ * As duas decisoes saem das mesmas funcoes que o banco usa no caminho normal,
+ * para bloqueio e reconhecimento de cliente nao terem duas regras diferentes.
+ */
+async function guardarSemVinculo(
+  supabase: SupabaseClient,
+  tenantId: string,
+  remetente: string,
+  aceitaDominio: boolean,
+): Promise<{ clienteId: string | null; status: string } | null> {
+  const { data: bloqueado, error: erroBloqueio } = await supabase.rpc('fn_email_remetente_bloqueado', {
+    p_tenant_id: tenantId,
+    p_email: remetente,
+  });
+  if (erroBloqueio) console.warn(`[ler-emails-recebidos] bloqueio de ${remetente}: ${erroBloqueio.message}`);
+  if (bloqueado === true) return null;
+
+  const { data: achado } = await supabase.rpc('fn_email_cliente_do_remetente', {
+    p_tenant_id: tenantId,
+    p_email: remetente,
+    p_aceitar_dominio: aceitaDominio,
+  });
+  const clienteId = (Array.isArray(achado) ? achado[0] : achado)?.cliente_id ?? null;
+  return { clienteId, status: clienteId ? 'avulso' : 'desconhecido' };
+}
 
 /** sobe os anexos aceitos; a falha de um arquivo vira ignorado com motivo e não derruba os outros */
 async function guardarAnexos(

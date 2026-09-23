@@ -55,6 +55,8 @@ export interface ParametrosRecebidos {
   aceitar_dominio_cliente: boolean;
   dias_reabrir: number;
   confirmar_abertura: boolean;
+  /** DEM-0456: guarda tambem o e-mail sem vinculo com cliente; vale do momento em que liga */
+  registrar_todos: boolean;
 }
 
 export interface SetorTicket {
@@ -75,6 +77,7 @@ export const PADRAO_PARAMETROS: ParametrosRecebidos = {
   aceitar_dominio_cliente: true,
   dias_reabrir: 7,
   confirmar_abertura: true,
+  registrar_todos: false,
 };
 
 const tabela = (nome: string) => supabase.from(nome as any) as any;
@@ -114,7 +117,7 @@ export function useParametrosRecebidos() {
     queryFn: async () => {
       const [parametros, enderecos, regras, bloqueados, setores, iniciais, estado, membros, perfis] = await Promise.all([
         tabela("email_recebidos_parametros")
-          .select("aceitar_dominio_cliente, dias_reabrir, confirmar_abertura")
+          .select("aceitar_dominio_cliente, dias_reabrir, confirmar_abertura, registrar_todos")
           .eq("tenant_id", tid)
           .maybeSingle(),
         tabela("email_enderecos_destino")
