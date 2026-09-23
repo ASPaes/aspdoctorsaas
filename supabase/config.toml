@@ -358,3 +358,19 @@ verify_jwt = true
 # ninguem a dispara de fora. Sem esta entrada o CI publicaria com FALSE.
 [functions.dispatch-scheduled-emails]
 verify_jwt = true
+
+# Conector do modulo Financeiro: le os titulos a receber do Omie (via DoctorOMIE)
+# e alimenta fin_titulos. Chamada pelo pg_cron, que nao tem JWT de usuario, entao
+# verify_jwt = FALSE e a auth mora dentro da function: segredo dedicado no vault
+# (obter_segredo_cron_fin_sync), comparado com o Bearer recebido. Mesma receita do
+# recon-espelho-pull-cron. Sem esta entrada o CI publicaria com FALSE assim mesmo,
+# mas declarado nao se perde numa revisao futura.
+[functions.fin-sync-titulos]
+verify_jwt = false
+
+# Link do boleto de um titulo, para a tela e, depois, para a 2a via no chat.
+# verify_jwt = TRUE: quem pede e um usuario logado, e a function ainda confere o
+# titulo com o TOKEN DELE (o RLS decide o que ele enxerga). Sem esta entrada o CI
+# publicaria com FALSE e abriria a busca de boleto para qualquer um.
+[functions.fin-titulo-boleto]
+verify_jwt = true

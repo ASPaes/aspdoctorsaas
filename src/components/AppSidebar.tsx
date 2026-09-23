@@ -3,7 +3,8 @@ import { useState, useEffect, Fragment } from "react";
 import { usePermissions } from "@/hooks/usePermissions";
 import { usePortao } from "@/hooks/usePortao";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3 } from "lucide-react";
+import { useFinanceiroAccess } from "@/hooks/useFinanceiroAccess";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3, Wallet } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -70,6 +71,8 @@ export function AppSidebar() {
    *  série. Hoje só a flag manda, então o portão nasce ligado para todos. */
   const podeAbrirImplantacao = usePortao("nav.onboarding");
   const podeVerDashboardImplantacao = usePortao("onb.dashboard");
+  // Financeiro em desenvolvimento: só super admin e só com a empresa liberada.
+  const { canAccess: canFinanceiro } = useFinanceiroAccess();
 
   const getGroupOpen = (title: string) => {
     const v = localStorage.getItem(`sidebar.group.${title}`);
@@ -180,6 +183,17 @@ export function AppSidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [temNovo]);
 
+
+  const financeiroMenu = canFinanceiro && (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild tooltip="Financeiro">
+        <NavLink to="/financeiro" end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
+          <Wallet className="h-4 w-4" />
+          <span>Financeiro</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
 
   const onboardingMenu = canOnboarding && podeAbrirImplantacao && (
     collapsed ? (
@@ -359,6 +373,7 @@ export function AppSidebar() {
                   return (
                     <Fragment key={item.title}>
                       {onboardingMenu}
+                      {financeiroMenu}
                       {leaf}
                     </Fragment>
                   );

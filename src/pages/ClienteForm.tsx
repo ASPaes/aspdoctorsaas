@@ -37,6 +37,7 @@ import ParametrosAtendimentoSection from "@/components/clientes/ParametrosAtendi
 import VendaProdutoTab from "@/components/clientes/VendaProdutoTab";
 import FinanceiroTab from "@/components/clientes/FinanceiroTab";
 import FinanceiroCard from "@/components/clientes/FinanceiroCard";
+import TitulosDoClienteCard from "@/components/financeiro/TitulosDoClienteCard";
 import FiliaisSection from "@/components/clientes/FiliaisSection";
 import CertificadoA1Section from "@/components/clientes/CertificadoA1Section";
 import ClienteProdutosSection from "@/components/clientes/ClienteProdutosSection";
@@ -911,6 +912,10 @@ export default function ClienteForm() {
               onOpenMrrModal={() => setMrrModalOpen(true)}
             />
           )}
+
+          {/* Títulos vindos do sistema de cobrança. O card se esconde sozinho
+              para quem não tem o módulo Financeiro liberado. */}
+          {isEditing && id && <TitulosDoClienteCard clienteId={id} />}
 
           {isEditing && id && (
             <div className="space-y-2">

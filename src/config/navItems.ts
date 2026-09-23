@@ -27,6 +27,10 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
   // "Implantação" (onboarding) é injetado aqui no AppSidebar via onboardingMenu (gated por useOnboardingAccess).
+  // "Financeiro" NÃO entra aqui: é injetado no AppSidebar via useFinanceiroAccess,
+  // do mesmo jeito que "Implantação". Item de topo desta lista só é filtrado por
+  // `can(resource)`, e `superAdminOnly` não vale para ele — deixar aqui faria o
+  // módulo aparecer para quem não deve.
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
   { title: "E-mails", url: "/emails", icon: Mail, resource: "nav.emails" },
   { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
