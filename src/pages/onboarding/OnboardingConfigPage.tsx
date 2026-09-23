@@ -133,7 +133,10 @@ export default function OnboardingConfigPage() {
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className="flex-1 flex flex-col min-h-0">
-        <TabsList className="mx-4 mt-3 self-start">
+        {/* 11 abas nao cabem em uma linha de notebook: a TabsList base e
+            `inline-flex h-10` sem wrap nem overflow, e a ultima ficaria cortada.
+            Mesmo tratamento das pills de fase acima. */}
+        <TabsList className="mx-4 mt-3 self-start flex-wrap h-auto">
           {podeAba.jornadas && <TabsTrigger value="jornadas">Jornadas</TabsTrigger>}
           {podeAba.pipelines && <TabsTrigger value="pipelines">Pipelines & Etapas</TabsTrigger>}
           {podeAba.distribuicao && <TabsTrigger value="distribuicao">Distribuição</TabsTrigger>}

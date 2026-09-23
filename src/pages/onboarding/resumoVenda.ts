@@ -70,14 +70,34 @@ export function pipelinesParaTemplate(
  * com template preso faria a tela reabrir dizendo que usa um modelo que não
  * está mais escrito ali.
  */
-export function montarUpdateResumo(texto: string, templateId: string | null, userId: string) {
+export function montarUpdateResumo(
+  texto: string,
+  templateId: string | null,
+  userId: string | null | undefined,
+) {
   const limpo = texto.trim();
   return {
     resumo_venda_texto: limpo === "" ? null : texto,
     resumo_venda_template_id: limpo === "" ? null : templateId,
     resumo_venda_updated_at: new Date().toISOString(),
-    resumo_venda_updated_by: userId,
+    // Sessão sem usuário grava null: a coluna é nullable e sem FK, e string
+    // vazia faria o Postgres devolver "invalid input syntax for type uuid".
+    resumo_venda_updated_by: userId || null,
   };
+}
+
+/**
+ * Tem alteração pendente? Não basta comparar o texto: escolher um template de
+ * corpo vazio (todo template nasce assim) num campo vazio muda o vínculo sem
+ * mudar uma letra, e o Salvar ficaria desabilitado para sempre.
+ */
+export function estaSujo(
+  texto: string,
+  textoInicial: string,
+  templateId: string | null,
+  templateInicial: string | null,
+): boolean {
+  return texto !== textoInicial || templateId !== templateInicial;
 }
 
 /**

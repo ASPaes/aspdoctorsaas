@@ -20,7 +20,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  modoDoResumo, templatesDoPipeline, montarUpdateResumo, houveConflito, type TemplateResumo,
+  modoDoResumo, templatesDoPipeline, montarUpdateResumo, houveConflito, estaSujo,
+  type TemplateResumo,
 } from "./resumoVenda";
 
 const brl = (n: number) =>
@@ -311,8 +312,15 @@ function TabelaModulos({ itens }: { itens: any[] }) {
 }
 
 // Modo observação: jornada que não veio do sistema comercial. O vendedor escolhe
-// um template (opcional) e escreve. Sem autosave: onboarding_journeys está na
-// publication do Realtime e cada UPDATE vira WAL + fanout.
+// um template (opcional) e escreve.
+//
+// Sem autosave, por dois motivos. `onboarding_journeys` é tabela quente do
+// módulo inteiro — salvar a cada tecla multiplicaria escrita nela por nada. E a
+// gravação carrega a trava de concorrência por `resumo_venda_updated_at`: com
+// autosave, comercial e implantador na mesma jornada se atropelariam a cada
+// tecla. (Ao contrário do que dizia o comentário anterior, esta tabela NÃO está
+// na publication do Realtime — conferido em produção: das tabelas `onboarding*`,
+// só `onboarding_journey_tags` está.)
 function ObservacaoDaVenda({
   journeyId, inicial, templateInicial, pipelineId, editadoEm, editadoPor,
 }: {
@@ -349,6 +357,7 @@ function ObservacaoDaVenda({
     },
   });
   const oferecidos = templatesDoPipeline(templates, pipelineId);
+  const emUso = templates.find((t) => t.id === templateId) ?? null;
 
   const { data: autor } = useQuery({
     queryKey: ["resumo-venda-autor", editadoPor],
@@ -372,13 +381,13 @@ function ObservacaoDaVenda({
     setTemplateId(t.id);
   }
 
-  const sujo = texto !== inicial;
+  const sujo = estaSujo(texto, inicial, templateId, templateInicial);
 
   async function salvar() {
     setSalvando(true);
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const patch = montarUpdateResumo(texto, templateId, userData?.user?.id ?? "");
+      const patch = montarUpdateResumo(texto, templateId, userData?.user?.id);
       // Trava de concorrência: o UPDATE só passa se ninguém salvou depois que
       // esta tela carregou. Comercial e implantador abrem a mesma jornada.
       let q = (supabase.from("onboarding_journeys" as any) as any)
@@ -391,7 +400,11 @@ function ObservacaoDaVenda({
         return;
       }
       toast.success("Resumo da venda salvo");
-      qc.invalidateQueries({ queryKey: ["journey-proposta", journeyId] });
+      // Esperado de propósito: enquanto o refetch não chega, `inicial` e
+      // `editadoEm` ainda são os antigos. Liberar o botão antes disso deixava um
+      // segundo clique bater na trava de concorrência e acusar conflito que não
+      // existe — e o refetch atrasado apagava o que fosse digitado no meio.
+      await qc.invalidateQueries({ queryKey: ["journey-proposta", journeyId] });
     } catch (e: any) {
       toast.error(e.message || "Erro ao salvar");
     } finally {
@@ -403,10 +416,14 @@ function ObservacaoDaVenda({
     <div className="space-y-3">
       {oferecidos.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">Template</span>
-          <Select value={templateId ?? undefined} onValueChange={aplicarTemplate}>
+          {/* O seletor é uma AÇÃO ("inserir este modelo"), não o estado do
+              campo: fica sempre em "", para que escolher o MESMO modelo de novo
+              volte a inserir (Select controlado do Radix não dispara quando o
+              valor não muda) e para nunca renderizar uma caixa vazia quando o
+              modelo gravado saiu da lista. O que está em uso aparece ao lado. */}
+          <Select value="" onValueChange={aplicarTemplate}>
             <SelectTrigger className="h-8 w-[260px] text-xs">
-              <SelectValue placeholder="Escolher um modelo de perguntas" />
+              <SelectValue placeholder="Inserir um modelo de perguntas" />
             </SelectTrigger>
             <SelectContent>
               {oferecidos.map((t) => (
@@ -414,6 +431,11 @@ function ObservacaoDaVenda({
               ))}
             </SelectContent>
           </Select>
+          {emUso && (
+            <span className="text-[11px] text-muted-foreground">
+              Modelo em uso: <span className="text-foreground">{emUso.nome}</span>
+            </span>
+          )}
         </div>
       )}
 
@@ -444,7 +466,7 @@ export default function PropostaVendaSection({
   journeyId,
   enabled = true,
 }: { journeyId: string | null; enabled?: boolean }) {
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["journey-proposta", journeyId],
     enabled: !!journeyId && enabled,
     staleTime: 5 * 60_000,          // proposta nao muda depois de importada
@@ -488,8 +510,25 @@ export default function PropostaVendaSection({
     },
   });
 
-  // Enquanto a jornada nao carregou nao ha o que desenhar.
-  if (!data) return null;
+  // A aba agora existe sempre, entao o carregamento precisa mostrar alguma
+  // coisa: antes o botao so aparecia com proposta, e devolver null aqui deixaria
+  // um retangulo vazio para quem clica na aba assim que a gaveta abre.
+  if (!data) {
+    return (
+      <div className="p-5 space-y-5">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <FileText className="h-4 w-4" /> Resumo da venda
+        </h3>
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Não foi possível carregar esta jornada.</p>
+        )}
+      </div>
+    );
+  }
 
   // Jornada que nao veio do sistema comercial: a aba e um campo de observacao.
   if (modoDoResumo(payload) === "observacao") {

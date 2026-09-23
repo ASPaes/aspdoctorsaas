@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  modoDoResumo, templatesDoPipeline, pipelinesParaTemplate, montarUpdateResumo, houveConflito,
+  modoDoResumo, templatesDoPipeline, pipelinesParaTemplate, montarUpdateResumo, houveConflito, estaSujo,
   type TemplateResumo, type PipelineResumo, type FaseResumo,
 } from "./resumoVenda";
 
@@ -96,5 +96,31 @@ describe("montarUpdateResumo", () => {
     expect(u.resumo_venda_template_id).toBe("t1");
     expect(u.resumo_venda_updated_by).toBe("u1");
     expect(Number.isNaN(Date.parse(u.resumo_venda_updated_at))).toBe(false);
+  });
+});
+
+describe("estaSujo", () => {
+  it("texto alterado é alteração pendente", () => {
+    expect(estaSujo("novo", "velho", null, null)).toBe(true);
+  });
+
+  it("trocar só o template também é alteração pendente", () => {
+    // Acontece de verdade: template recém-criado nasce com corpo vazio, então
+    // escolhê-lo num campo vazio não muda uma letra do texto — e sem isto o
+    // Salvar ficava desabilitado e o vínculo nunca era gravado.
+    expect(estaSujo("", "", "t1", null)).toBe(true);
+  });
+
+  it("nada mudou, nada a salvar", () => {
+    expect(estaSujo("igual", "igual", "t1", "t1")).toBe(false);
+  });
+});
+
+describe("montarUpdateResumo sem usuário", () => {
+  it("sessão sem usuário grava null, não string vazia", () => {
+    // String vazia numa coluna uuid faz o Postgres devolver
+    // "invalid input syntax for type uuid" cru no toast.
+    expect(montarUpdateResumo("x", null, null).resumo_venda_updated_by).toBeNull();
+    expect(montarUpdateResumo("x", null, undefined).resumo_venda_updated_by).toBeNull();
   });
 });

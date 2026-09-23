@@ -94,6 +94,16 @@ update public.resources
    set grupo = 'Configuração', grupo_ordem = 30, parent_key = null
  where key = 'onb.cfg.resumo_venda';
 
+-- O padrão por papel. As dez abas irmãs têm as 3 linhas aqui (conferido em
+-- produção: onb.cfg.pipelines e onb.cfg.indicadores = 3 cada); sem elas a aba
+-- nova nasceria NEGADA para quem cai neste ramo da cascata de permissão —
+-- usuário sem grupo, grupo criado depois desta migration, ou tenant com
+-- rbac_enabled sem rbac_v2_enabled (o caminho v1 nem olha group_permissions).
+insert into public.role_permissions (role, resource_key, can_view, can_insert, can_update, can_delete)
+select v.role, 'onb.cfg.resumo_venda', true, false, false, false
+from (values ('admin'),('head'),('user')) as v(role)
+on conflict (role, resource_key) do nothing;
+
 -- Nasce com o mesmo acesso que o grupo já tem em Pipelines & Etapas: a aba nova
 -- não pode tirar nem dar acesso que ninguém decidiu.
 insert into public.group_permissions (group_id, resource_key, can_view, can_insert, can_update, can_delete)

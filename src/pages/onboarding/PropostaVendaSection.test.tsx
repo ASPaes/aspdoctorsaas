@@ -59,7 +59,12 @@ function render(ui: React.ReactNode) {
 }
 
 async function assentar() {
-  await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  // Duas voltas: a consulta dos templates só dispara depois que a da jornada
+  // resolve, e uma volta só deixava o seletor fora da árvore no momento da
+  // asserção.
+  for (let i = 0; i < 4; i++) {
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+  }
 }
 
 describe("PropostaVendaSection", () => {
@@ -87,6 +92,23 @@ describe("PropostaVendaSection", () => {
     await assentar();
     expect((document.querySelector("textarea") as HTMLTextAreaElement).value)
       .toBe("Vendeu PDV + Financeiro");
+  });
+
+  it("template gravado que não está mais na lista não deixa o seletor em branco", async () => {
+    // Acontece quando o admin desativa o template ou muda o pipeline dele: o
+    // Radix não cai no placeholder sozinho quando o value não casa com item
+    // nenhum, e o seletor ficaria uma caixa vazia sem explicação.
+    jornada.mockReturnValueOnce({
+      proposta_payload: null,
+      resumo_venda_texto: "algo escrito",
+      resumo_venda_template_id: "t-apagado",
+      resumo_venda_updated_at: "2026-09-22T12:00:00Z",
+      resumo_venda_updated_by: null,
+      pipeline_onboarding_id: "p1",
+    });
+    render(<PropostaVendaSection journeyId="j1" />);
+    await assentar();
+    expect(document.body.textContent).toContain("Inserir um modelo de perguntas");
   });
 
   it("com proposta importada, não mostra campo nenhum para escrever", async () => {

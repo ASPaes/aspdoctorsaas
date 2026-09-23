@@ -132,7 +132,9 @@ export function SaleSummaryTemplatesPanel() {
           tenant_id: effectiveTenantId,
           nome: novo.trim(),
           corpo: "",
-          pipeline_id: pipelinesOferecidos[0]?.id ?? null,
+          // Nasce servindo a todos os pipelines. Amarrar no primeiro da lista
+          // esconderia o template dos outros sem ninguém ter pedido isso.
+          pipeline_id: null,
           ativo: true,
           position: maxPos + 1,
         })
@@ -280,12 +282,20 @@ export function SaleSummaryTemplatesPanel() {
                   value={edicao.pipeline_id ?? TODOS}
                   onValueChange={(v) => setRascunho({ ...edicao, pipeline_id: v === TODOS ? null : v })}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione o pipeline" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={TODOS}>Todos os pipelines</SelectItem>
                     {pipelinesOferecidos.map((p) => (
                       <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
                     ))}
+                    {/* O pipeline gravado pode ter sido desativado depois. Sem
+                        esta linha o campo abriria em branco e a lista ao lado
+                        continuaria mostrando o nome dele. */}
+                    {edicao.pipeline_id && !pipelinesOferecidos.some((p) => p.id === edicao.pipeline_id) && (
+                      <SelectItem value={edicao.pipeline_id}>
+                        {nomeDoPipeline(edicao.pipeline_id)} (inativo)
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
