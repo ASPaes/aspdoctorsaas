@@ -36,18 +36,43 @@ const LOG = '[fin-regua-motor]';
 const SITUACOES_COBRAVEIS = ['a_vencer', 'vence_hoje', 'atrasado'];
 
 /**
- * Ritmo de envio. Conservador de propósito.
+ * Ritmo de envio: UMA mensagem por vez, com intervalo sorteado entre envios.
  *
- * 20 mensagens a cada 5 minutos são 4 por minuto, ritmo que um humano até
- * alcançaria. A tentação é subir para escoar mais rápido, e é justamente o que
- * o WhatsApp lê como disparo em massa. O custo de ir devagar é a fila demorar
- * algumas horas; o custo de ir rápido é o número do atendimento ser banido.
+ * ⚠️ A versão anterior mandava em lotes de 20 a cada 5 minutos, o que dá uma
+ * mensagem a cada 15 segundos em rajada. Está errado, e a correção veio de
+ * duas fontes que concordam: a recomendação de campo para números não oficiais
+ * é **no mínimo 30 segundos entre mensagens**, com faixa de 45 a 180 segundos
+ * e intervalo **aleatório**, porque cadência fixa é em si um sinal de robô. O
+ * pico absoluto tolerado é 1 mensagem a cada 2 a 3 segundos, que é o teto do
+ * que não derruba na hora, não o ritmo de trabalho.
+ *
+ * O que está em jogo não é a fila demorar: é o número do atendimento da
+ * empresa ser banido pelo WhatsApp. Um número banido não para só a cobrança,
+ * para o suporte inteiro.
  */
-const TETO_POR_RODADA = 20;
-const MINUTOS_ENTRE_RODADAS = 5;
+const INTERVALO_MIN_SEG = 45;
+const INTERVALO_MAX_SEG = 90;
+
+/**
+ * Teto diário, para aquecimento.
+ *
+ * Número que nunca disparou em volume não pode começar em 341 mensagens num
+ * dia. A prática é começar em 10 a 30 por dia e subir ao longo de uma ou duas
+ * semanas. Este teto é o que impede a primeira rodada de virar a última.
+ */
+const TETO_DIARIO_INICIAL = 30;
 
 /** Janela de envio do projeto: 07:30 às 19:00, seg a sex. */
 const MINUTOS_DA_JANELA = (19 * 60) - (7 * 60 + 30);
+
+/**
+ * A linha de saída, acrescentada pelo motor a toda mensagem da régua.
+ *
+ * Não fica no texto do toque de propósito: é obrigação legal, e obrigação que
+ * depende de alguém lembrar de digitar acaba faltando justamente na mensagem
+ * nova.
+ */
+const LINHA_OPTOUT = 'Se não quiser mais receber estes lembretes, responda SAIR.';
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {
@@ -180,7 +205,9 @@ Deno.serve(async (req) => {
   const hoje: string = typeof body?.data_referencia === 'string'
     ? body.data_referencia.slice(0, 10)
     : new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const teto: number = Number.isFinite(body?.teto) ? Math.max(1, Number(body.teto)) : TETO_POR_RODADA;
+  const tetoDiario: number = Number.isFinite(body?.teto_diario)
+    ? Math.max(1, Number(body.teto_diario))
+    : TETO_DIARIO_INICIAL;
 
   try {
     const { data: quiet } = await service.rpc('is_wa_quiet_hours', { p_now: new Date().toISOString() });
@@ -209,6 +236,20 @@ Deno.serve(async (req) => {
       const liberados = new Set(
         (cfg?.fin_regua_telefones_teste ?? []).map((t: string) => chaveTelefone(t)).filter(Boolean),
       );
+
+      // Quem pediu para sair. Carregado uma vez por tenant, e não por título:
+      // é lista curta e consultar por cliente dentro do laço seria uma ida ao
+      // banco por candidato.
+      const optouts = await buscarTodos((de, ate) =>
+        service
+          .from('fin_cobranca_optout')
+          .select('chave_telefone')
+          .eq('tenant_id', tenant.id)
+          .is('revogado_em', null)
+          .order('chave_telefone')
+          .range(de, ate),
+      );
+      const bloqueados = new Set(optouts.map((o: any) => o.chave_telefone));
 
       const candidatos: any[] = [];
       // Contado à parte porque já processado deixou de virar candidato: quem
@@ -356,6 +397,10 @@ Deno.serve(async (req) => {
           if (!chave) {
             decisao = 'suprimido';
             motivo = 'cliente sem telefone de WhatsApp válido';
+          } else if (bloqueados.has(chave)) {
+            // Antes de qualquer outro motivo: é o único que é uma decisão DELE.
+            decisao = 'suprimido';
+            motivo = 'cliente pediu para não receber (opt-out)';
           } else if ((contagemTelefone.get(chave) ?? 0) > 1) {
             decisao = 'suprimido';
             motivo = 'telefone compartilhado com outro cliente';
@@ -382,6 +427,11 @@ Deno.serve(async (req) => {
             mensagem += `\n\nSão ${lista.length} faturas:\n` +
               lista.map((t) => `• ${fmtBRL(Number(t.valor))}${t.numero_documento ? ` (nº ${t.numero_documento})` : ''}`).join('\n');
           }
+          // A saída é acrescentada pelo código, não pelo texto do toque, porque
+          // é obrigação legal e não pode depender de alguém lembrar de escrevê-la
+          // em cada mensagem nova. Vale só para a régua: a 2ª via é o cliente
+          // que pediu, e oferecer saída de algo que ele acabou de pedir é ruído.
+          mensagem += `\n\n${LINHA_OPTOUT}`;
 
           candidatos.push({
             toque: toque.rotulo,
@@ -425,19 +475,28 @@ Deno.serve(async (req) => {
       //
       // A cobrança da Digi Office é concentrada: medido em 23/09/2026, o dia 25
       // sozinho tem 590 títulos de 546 clientes. Sem ritmo, o toque D-3 desse
-      // lote dispararia 546 mensagens de um número só, de uma vez. O WhatsApp
-      // bane número por rajada, e o número que seria banido é o do atendimento.
+      // lote dispararia 546 mensagens de um número só, de uma vez.
       //
-      // O ritmo não precisa de tabela nova: o motor roda de N em N minutos,
-      // manda no máximo `teto` por rodada, e quem ficou de fora entra na
-      // próxima — porque `fin_cobranca_envios` já diz quem foi. Retomar de onde
-      // parou é o comportamento natural, não um recurso a mais.
-      const rodadas = Math.ceil(mensagensEnviaria / teto);
+      // Uma por vez, com intervalo sorteado. O estado não precisa de tabela
+      // nova: `fin_cobranca_envios` já diz quem foi, então retomar de onde
+      // parou é o comportamento natural.
+      //
+      // ESTE PLANO EXPÕE UM PROBLEMA QUE NÃO SE RESOLVE COM RITMO: no
+      // intervalo seguro, 341 mensagens levam horas, e o teto de aquecimento
+      // as espalha por vários dias. Cobrança que chega dias depois do
+      // vencimento previsto não é a cobrança que se quis mandar. Quando
+      // `cabe_na_janela` der false, a resposta certa não é acelerar: é a API
+      // oficial da Meta com template de utilidade, que não tem esse limite.
+      const segundosMedios = (INTERVALO_MIN_SEG + INTERVALO_MAX_SEG) / 2;
+      const hojeCabe = Math.min(mensagensEnviaria, tetoDiario);
+      const minutosParaEscoar = Math.round((hojeCabe * segundosMedios) / 60);
+
       saida.push({
         tenant: tenant.nome,
         tenant_id: tenant.id,
         regua_liberada: cfg?.fin_regua_liberada === true,
         toques_ativos: (toques ?? []).length,
+        opt_outs_ativos: bloqueados.size,
         resumo: {
           por_decisao: porDecisao,
           ja_processados: resumoJaProcessado,
@@ -446,11 +505,14 @@ Deno.serve(async (req) => {
           valor_alcancavel: valorEnviaria,
         },
         plano_de_ritmo: {
-          teto_por_rodada: teto,
-          minutos_entre_rodadas: MINUTOS_ENTRE_RODADAS,
-          rodadas_necessarias: rodadas,
-          minutos_para_escoar: rodadas > 0 ? (rodadas - 1) * MINUTOS_ENTRE_RODADAS : 0,
-          cabe_na_janela: (rodadas > 0 ? (rodadas - 1) * MINUTOS_ENTRE_RODADAS : 0) <= MINUTOS_DA_JANELA,
+          uma_por_vez: true,
+          intervalo_segundos: `${INTERVALO_MIN_SEG} a ${INTERVALO_MAX_SEG}, sorteado`,
+          teto_diario: tetoDiario,
+          sairiam_hoje: hojeCabe,
+          ficariam_para_os_proximos_dias: Math.max(0, mensagensEnviaria - hojeCabe),
+          dias_para_escoar: tetoDiario > 0 ? Math.ceil(mensagensEnviaria / tetoDiario) : 0,
+          minutos_para_escoar_hoje: minutosParaEscoar,
+          cabe_na_janela: minutosParaEscoar <= MINUTOS_DA_JANELA,
         },
         candidatos,
       });

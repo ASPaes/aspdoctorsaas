@@ -115,6 +115,36 @@ function pedeReenvio(texto: string): boolean {
   return /(pdf|arquivo|anexo|documento|manda de novo|manda novamente|reenvia|reenviar|envia de novo|nao abriu|nao abre|nao consigo abrir|link quebrado|nao carregou)/.test(t);
 }
 
+/**
+ * O cliente está pedindo para NÃO receber mais cobrança automática?
+ *
+ * Aqui a régua é o oposto da do pedido de boleto: estreita, quase literal. Um
+ * falso positivo desliga a cobrança de um cliente adimplente sem ninguém saber,
+ * e ele simplesmente para de ser lembrado até alguém notar meses depois. Por
+ * isso "sair" solto NÃO basta: "vou sair agora", "acabei de sair da reunião" e
+ * "quero sair do plano" são frases normais de atendimento.
+ *
+ * O que dispara: a mensagem ser praticamente só a palavra de saída, ou conter
+ * uma frase que não tem outra leitura ("não quero receber mensagem",
+ * "parar de enviar").
+ */
+function pedeOptOut(texto: string): boolean {
+  const t = String(texto ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[.!?,;]+$/g, '')
+    .trim();
+  if (!t || t.length > 120) return false;
+
+  // Mensagem curta que é só o comando. `sair` sozinho conta; dentro de frase,
+  // não.
+  if (/^(sair|parar|pare|stop|cancelar|descadastrar|remover|nao perturbe)$/.test(t)) return true;
+
+  // Frases sem outra leitura possível.
+  return /(nao quero (mais )?receber|nao desejo receber|parem? de (me )?(enviar|mandar)|pare de (me )?(enviar|mandar)|nao me (envie|mande) mais|me (tire|tira|remova|remove) (da|dessa|desta) lista|descadastr|tirar meu numero)/.test(t);
+}
+
 /** Tira do texto um CNPJ ou CPF, se houver. */
 function extrairDocumento(texto: string): string | null {
   const digitos = texto.replace(/\D/g, '');
@@ -189,6 +219,59 @@ Deno.serve(async (req) => {
       .eq('id', tenantId)
       .maybeSingle();
     if (!tenant?.financeiro_enabled) return json({ ok: true, atendido: false, motivo: 'modulo_desligado' });
+
+    // ─── Opt-out ────────────────────────────────────────────────────────────
+    //
+    // ⚠️ ANTES DO PORTÃO DE TESTE, e isso é o ponto inteiro. O portão existe
+    // para o robô não FALAR com quem não devia; sair é o contrário — é o
+    // cliente mandando parar, e tem que funcionar sempre, inclusive enquanto a
+    // régua está fechada e inclusive para quem nunca recebeu nada daqui.
+    //
+    // Mora aqui, e não no motor da régua, porque o pedido chega como mensagem
+    // recebida, e esta function é a única do Financeiro que o motor de
+    // atendimento já chama para TODA mensagem. Pôr a detecção no `_shared`
+    // custaria republicar as 87 functions do repo.
+    //
+    // Não existe opt-in do outro lado: lembrete de pagamento de cliente com
+    // contrato ativo se sustenta em execução de contrato. Só a saída se
+    // registra.
+    if (pedeOptOut(texto)) {
+      const chave = chaveTelefone(telefone);
+      if (chave) {
+        const { data: contato } = await supabase
+          .from('whatsapp_contacts')
+          .select('cliente_id')
+          .eq('id', contactId)
+          .maybeSingle();
+
+        // `simular` também vale aqui: um teste a seco não pode descadastrar
+        // ninguém de verdade.
+        if (!simular) await supabase.from('fin_cobranca_optout').upsert(
+          {
+            tenant_id: tenantId,
+            chave_telefone: chave,
+            telefone_original: telefone,
+            cliente_id: contato?.cliente_id ?? null,
+            conversation_id: conversationId,
+            origem: 'cliente',
+            texto_recebido: texto.slice(0, 300),
+            criado_em: new Date().toISOString(),
+            // Pedir para sair de novo reativa o bloqueio de quem tinha voltado.
+            revogado_em: null,
+            revogado_por: null,
+          },
+          { onConflict: 'tenant_id,chave_telefone' },
+        );
+
+        await enviar(
+          supabase,
+          { tenantId, conversationId, contactId, instanceId, telefone, simular },
+          'Pronto, não vou mais te mandar lembretes de cobrança por aqui. Se precisar de alguma coisa, é só escrever que alguém te atende.',
+          false,
+        );
+        return json({ ok: true, atendido: true, motivo: 'opt_out' });
+      }
+    }
 
     // ⚠️ PORTÃO DE TESTE. Enquanto `fin_2via_liberado` for false, o robô só
     // responde a quem está na lista de telefones de teste. É a regra do
