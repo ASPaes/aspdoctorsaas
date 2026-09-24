@@ -35,6 +35,20 @@ const LOG = '[fin-regua-motor]';
 /** Situações que ainda comportam cobrança. Pago e cancelado nunca entram. */
 const SITUACOES_COBRAVEIS = ['a_vencer', 'vence_hoje', 'atrasado'];
 
+/**
+ * Ritmo de envio. Conservador de propósito.
+ *
+ * 20 mensagens a cada 5 minutos são 4 por minuto, ritmo que um humano até
+ * alcançaria. A tentação é subir para escoar mais rápido, e é justamente o que
+ * o WhatsApp lê como disparo em massa. O custo de ir devagar é a fila demorar
+ * algumas horas; o custo de ir rápido é o número do atendimento ser banido.
+ */
+const TETO_POR_RODADA = 20;
+const MINUTOS_ENTRE_RODADAS = 5;
+
+/** Janela de envio do projeto: 07:30 às 19:00, seg a sex. */
+const MINUTOS_DA_JANELA = (19 * 60) - (7 * 60 + 30);
+
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {
     status,
@@ -76,6 +90,47 @@ function chaveTelefone(bruto: string | null): string {
  * digitação de quem escreveu o texto, e o cliente receberia uma frase pela
  * metade sem ninguém saber por quê.
  */
+/**
+ * Busca paginada.
+ *
+ * ⚠️ O PostgREST corta em 1000 linhas e o `.limit(N)` do client NÃO sobrescreve
+ * isso — é a armadilha que o projeto documenta em `fetchAllRows`. Aqui ela é
+ * silenciosa e cara: o lote do dia 25 da Digi Office tem 590 títulos hoje, mas
+ * passa de 1000 no dia em que a base crescer, e o que aconteceria é a régua
+ * simplesmente não cobrar os que sobraram, sem erro nenhum.
+ */
+async function buscarTodos(construir: (de: number, ate: number) => any, pagina = 1000): Promise<any[]> {
+  const tudo: any[] = [];
+  for (let i = 0; i < 50; i++) {
+    const { data, error } = await construir(i * pagina, (i + 1) * pagina - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    tudo.push(...data);
+    if (data.length < pagina) break;
+  }
+  return tudo;
+}
+
+/**
+ * Consulta por lista de ids, em blocos.
+ *
+ * Dois limites ao mesmo tempo: o corte de 1000 linhas na resposta e o tamanho
+ * máximo da URL, porque o `.in()` do PostgREST vai na query string.
+ *
+ * ⚠️ 400 UUIDs JÁ É DEMAIS. Medido em 23/09/2026 com o lote do dia 25: a
+ * requisição morre com "error sending request" antes de chegar ao banco, sem
+ * erro de SQL e sem pista do motivo. 100 dá ~4 KB de URL e passa folgado.
+ */
+async function buscarPorIds(construir: (bloco: string[]) => any, ids: string[]): Promise<any[]> {
+  const tudo: any[] = [];
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await construir(ids.slice(i, i + 100));
+    if (error) throw error;
+    if (data?.length) tudo.push(...data);
+  }
+  return tudo;
+}
+
 function renderizar(modelo: string, dados: Record<string, string>): string {
   return modelo.replace(/\{(\w+)\}/g, (inteiro, chave) =>
     Object.prototype.hasOwnProperty.call(dados, chave) ? dados[chave] : inteiro,
@@ -125,7 +180,7 @@ Deno.serve(async (req) => {
   const hoje: string = typeof body?.data_referencia === 'string'
     ? body.data_referencia.slice(0, 10)
     : new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const limite: number = Number.isFinite(body?.limite) ? Math.max(1, Number(body.limite)) : 500;
+  const teto: number = Number.isFinite(body?.teto) ? Math.max(1, Number(body.teto)) : TETO_POR_RODADA;
 
   try {
     const { data: quiet } = await service.rpc('is_wa_quiet_hours', { p_now: new Date().toISOString() });
@@ -156,6 +211,9 @@ Deno.serve(async (req) => {
       );
 
       const candidatos: any[] = [];
+      // Contado à parte porque já processado deixou de virar candidato: quem
+      // já foi cobrado não é uma decisão de hoje, é histórico.
+      let resumoJaProcessado = 0;
 
       for (const toque of toques ?? []) {
         // vencimento = hoje - dias_offset (ver comentário do cabeçalho)
@@ -163,43 +221,72 @@ Deno.serve(async (req) => {
         alvo.setUTCDate(alvo.getUTCDate() - toque.dias_offset);
         const vencimentoAlvo = alvo.toISOString().slice(0, 10);
 
-        const { data: titulos } = await service
-          .from('fin_titulos')
-          .select('id, cliente_id, vencimento, valor, situacao, numero_documento, parcela, boleto_gerado')
-          .eq('tenant_id', tenant.id)
-          .eq('vencimento', vencimentoAlvo)
-          .in('situacao', SITUACOES_COBRAVEIS)
-          .limit(limite);
+        const titulos = await buscarTodos((de, ate) =>
+          service
+            .from('fin_titulos')
+            .select('id, cliente_id, vencimento, valor, situacao, numero_documento, parcela, boleto_gerado')
+            .eq('tenant_id', tenant.id)
+            .eq('vencimento', vencimentoAlvo)
+            .in('situacao', SITUACOES_COBRAVEIS)
+            .order('id')
+            .range(de, ate),
+        );
 
-        if (!titulos?.length) continue;
+        if (!titulos.length) continue;
 
         // Quem já foi cobrado NESTE toque sai da lista. A consulta é por
         // dias_offset, igual à chave única da tabela — se fosse por toque_id,
         // recriar o toque ressuscitaria a cobrança de quem já recebeu.
-        const { data: jaEnviados } = await service
-          .from('fin_cobranca_envios')
-          .select('titulo_id, status, motivo')
-          .eq('tenant_id', tenant.id)
-          .eq('dias_offset', toque.dias_offset)
-          .in('titulo_id', titulos.map((t: any) => t.id));
+        // Consulta pela DATA, não pela lista de ids: 590 UUIDs numa query
+        // string passam de 20 KB e o PostgREST recusa a requisição inteira
+        // ("error sending request"), medido em 23/09/2026 com o lote do dia 25.
+        //
+        // Este filtro é otimização, não é a garantia. A garantia de não cobrar
+        // duas vezes é a chave única (tenant, titulo, dias_offset), e o caminho
+        // de envio, quando existir, grava a linha ANTES de mandar: assim duas
+        // rodadas simultâneas colidem no banco em vez de no WhatsApp do
+        // cliente.
+        const jaEnviados = await buscarTodos((de, ate) =>
+          service
+            .from('fin_cobranca_envios')
+            .select('titulo_id, status, motivo')
+            .eq('tenant_id', tenant.id)
+            .eq('dias_offset', toque.dias_offset)
+            .eq('vencimento', vencimentoAlvo)
+            .order('titulo_id')
+            .range(de, ate),
+        );
 
-        const jaPor = new Map((jaEnviados ?? []).map((e: any) => [e.titulo_id, e]));
+        const jaPor = new Map(jaEnviados.map((e: any) => [e.titulo_id, e]));
 
-        const clienteIds = [...new Set(titulos.map((t: any) => t.cliente_id).filter(Boolean))];
-        const { data: clientes } = clienteIds.length
-          ? await service
+        // Título já processado sai ANTES do agrupamento, e a ordem importa: se
+        // saísse depois, um cliente com duas faturas, uma já cobrada e outra
+        // não, seria descartado inteiro ou cobrado duas vezes pela mesma.
+        const pendentes = titulos.filter((t: any) => !jaPor.has(t.id));
+        const jaProcessados = titulos.length - pendentes.length;
+        if (!pendentes.length) {
+          resumoJaProcessado += jaProcessados;
+          continue;
+        }
+        resumoJaProcessado += jaProcessados;
+
+        const clienteIds = [...new Set(pendentes.map((t: any) => t.cliente_id).filter(Boolean))];
+        const clientes = await buscarPorIds(
+          (bloco) =>
+            service
               .from('clientes')
               .select('id, razao_social, nome_fantasia, telefone_whatsapp')
-              .in('id', clienteIds)
-          : { data: [] as any[] };
+              .in('id', bloco),
+          clienteIds as string[],
+        );
 
-        const clientePor = new Map((clientes ?? []).map((c: any) => [c.id, c]));
+        const clientePor = new Map(clientes.map((c: any) => [c.id, c]));
 
         // Telefone que aparece em mais de um cliente. Mandar cobrança para um
         // número compartilhado mostra a dívida de uma empresa para outra, e no
         // levantamento de 23/09/2026 eram 74 clientes em 658. Não é caso raro.
         const contagemTelefone = new Map<string, number>();
-        for (const c of clientes ?? []) {
+        for (const c of clientes) {
           const k = chaveTelefone(c.telefone_whatsapp);
           if (k) contagemTelefone.set(k, (contagemTelefone.get(k) ?? 0) + 1);
         }
@@ -207,26 +294,58 @@ Deno.serve(async (req) => {
         // Conversa existente do cliente. Sem ela não há para onde mandar: a
         // `dispatch-scheduled-messages`, que é o envio programado que já existe
         // no projeto, também exige conversa pronta e não cria nenhuma.
-        const { data: contatos } = clienteIds.length
-          ? await service
+        const contatos = await buscarPorIds(
+          (bloco) =>
+            service
               .from('whatsapp_contacts')
               .select('id, cliente_id, phone_number, whatsapp_conversations(id, is_group, status)')
-              .in('cliente_id', clienteIds)
-          : { data: [] as any[] };
+              .in('cliente_id', bloco),
+          clienteIds as string[],
+        );
 
         const conversaPor = new Map<string, any>();
-        for (const ct of contatos ?? []) {
+        for (const ct of contatos) {
           const convs = (ct.whatsapp_conversations ?? []).filter((c: any) => !c.is_group);
           if (convs.length && !conversaPor.has(ct.cliente_id)) {
             conversaPor.set(ct.cliente_id, { conversation_id: convs[0].id, phone_number: ct.phone_number });
           }
         }
 
-        for (const t of titulos) {
-          const cliente = clientePor.get(t.cliente_id);
-          const conversa = conversaPor.get(t.cliente_id);
+        // ── Uma mensagem por CLIENTE, não por título ──
+        //
+        // Correção de 23/09/2026, achada pela própria simulação: o motor pensa
+        // por título, o cliente pensa por empresa. No lote real do dia 25, 44
+        // dos 546 clientes receberiam duas mensagens seguidas, uma por fatura.
+        // Duas mensagens iguais em sequência parecem sistema quebrado, e é o
+        // tipo de coisa que nenhum teste com um número só revelaria.
+        //
+        // Agrupar é seguro porque todos os títulos de um toque têm o MESMO
+        // vencimento, por construção: o alvo é uma data exata.
+        const porCliente = new Map<string, any[]>();
+        const semCliente: any[] = [];
+        for (const t of pendentes) {
+          if (!t.cliente_id || !clientePor.has(t.cliente_id)) { semCliente.push(t); continue; }
+          const lista = porCliente.get(t.cliente_id) ?? [];
+          lista.push(t);
+          porCliente.set(t.cliente_id, lista);
+        }
+
+        for (const t of semCliente) {
+          candidatos.push({
+            toque: toque.rotulo, dias_offset: toque.dias_offset,
+            decisao: 'suprimido', motivo: 'título sem cliente vinculado',
+            cliente: null, telefone: null, vencimento: t.vencimento,
+            valor: Number(t.valor), faturas: 1, conversation_id: null, mensagem: null,
+          });
+        }
+
+        for (const [clienteId, lista] of porCliente) {
+          const cliente = clientePor.get(clienteId);
+          const conversa = conversaPor.get(clienteId);
           const telefone = cliente?.telefone_whatsapp ?? null;
           const chave = chaveTelefone(telefone);
+          const total = lista.reduce((s, t) => s + Number(t.valor), 0);
+          const nome = cliente?.nome_fantasia || cliente?.razao_social || '';
 
           // A ordem importa: o primeiro motivo que se aplica é o que é
           // reportado. Do mais definitivo para o mais circunstancial, para a
@@ -234,14 +353,7 @@ Deno.serve(async (req) => {
           let decisao = 'enviaria';
           let motivo: string | null = null;
 
-          if (jaPor.has(t.id)) {
-            const e = jaPor.get(t.id);
-            decisao = 'ja_processado';
-            motivo = e.status === 'enviado' ? 'já cobrado neste toque' : `${e.status}: ${e.motivo ?? ''}`;
-          } else if (!t.cliente_id || !cliente) {
-            decisao = 'suprimido';
-            motivo = 'título sem cliente vinculado';
-          } else if (!chave) {
+          if (!chave) {
             decisao = 'suprimido';
             motivo = 'cliente sem telefone de WhatsApp válido';
           } else if ((contagemTelefone.get(chave) ?? 0) > 1) {
@@ -255,42 +367,91 @@ Deno.serve(async (req) => {
             motivo = 'régua não liberada e telefone fora da lista de teste';
           }
 
+          // O texto do toque continua sendo o do Alexandre; a itemização é
+          // acrescentada só quando há mais de uma fatura. Assim ele não precisa
+          // escrever duas versões de cada mensagem, e o caso de uma fatura (a
+          // esmagadora maioria) sai exatamente como ele escreveu.
+          let mensagem = renderizar(toque.mensagem, {
+            cliente: nome,
+            valor: fmtBRL(total),
+            vencimento: fmtData(lista[0].vencimento),
+            documento: lista.map((t) => t.numero_documento).filter(Boolean).join(', '),
+            quantidade: String(lista.length),
+          });
+          if (lista.length > 1) {
+            mensagem += `\n\nSão ${lista.length} faturas:\n` +
+              lista.map((t) => `• ${fmtBRL(Number(t.valor))}${t.numero_documento ? ` (nº ${t.numero_documento})` : ''}`).join('\n');
+          }
+
           candidatos.push({
             toque: toque.rotulo,
             dias_offset: toque.dias_offset,
             decisao,
             motivo,
-            cliente: cliente?.nome_fantasia || cliente?.razao_social || null,
+            cliente: nome || null,
             telefone,
-            vencimento: t.vencimento,
-            valor: Number(t.valor),
-            situacao: t.situacao,
-            documento: t.numero_documento,
-            boleto_gerado: t.boleto_gerado,
+            vencimento: lista[0].vencimento,
+            valor: total,
+            faturas: lista.length,
+            // Todos os títulos que esta ÚNICA mensagem cobre. Quando o envio
+            // existir, é uma linha em fin_cobranca_envios para cada um: a trava
+            // de não cobrar duas vezes é por título, mesmo que a mensagem seja
+            // uma só.
+            titulo_ids: lista.map((t) => t.id),
             conversation_id: conversa?.conversation_id ?? null,
-            mensagem: renderizar(toque.mensagem, {
-              cliente: cliente?.nome_fantasia || cliente?.razao_social || '',
-              valor: fmtBRL(Number(t.valor)),
-              vencimento: fmtData(t.vencimento),
-              documento: t.numero_documento ?? '',
-            }),
+            mensagem,
           });
         }
       }
 
       const porDecisao: Record<string, number> = {};
       let valorEnviaria = 0;
+      let mensagensEnviaria = 0;
+      let faturasEnviaria = 0;
+      // `bloqueado_portao` entra na conta de propósito: o portão é temporário e
+      // some no dia da liberação, então planejar ritmo só sobre quem passa hoje
+      // devolveria "0 rodadas" justamente enquanto o plano ainda importa. O que
+      // fica de fora são as supressões, que são definitivas.
       for (const c of candidatos) {
         porDecisao[c.decisao] = (porDecisao[c.decisao] ?? 0) + 1;
-        if (c.decisao === 'enviaria') valorEnviaria += c.valor;
+        if (c.decisao === 'enviaria' || c.decisao === 'bloqueado_portao') {
+          valorEnviaria += c.valor;
+          mensagensEnviaria += 1;
+          faturasEnviaria += c.faturas ?? 1;
+        }
       }
 
+      // ── O plano de ritmo ──
+      //
+      // A cobrança da Digi Office é concentrada: medido em 23/09/2026, o dia 25
+      // sozinho tem 590 títulos de 546 clientes. Sem ritmo, o toque D-3 desse
+      // lote dispararia 546 mensagens de um número só, de uma vez. O WhatsApp
+      // bane número por rajada, e o número que seria banido é o do atendimento.
+      //
+      // O ritmo não precisa de tabela nova: o motor roda de N em N minutos,
+      // manda no máximo `teto` por rodada, e quem ficou de fora entra na
+      // próxima — porque `fin_cobranca_envios` já diz quem foi. Retomar de onde
+      // parou é o comportamento natural, não um recurso a mais.
+      const rodadas = Math.ceil(mensagensEnviaria / teto);
       saida.push({
         tenant: tenant.nome,
         tenant_id: tenant.id,
         regua_liberada: cfg?.fin_regua_liberada === true,
         toques_ativos: (toques ?? []).length,
-        resumo: { por_decisao: porDecisao, valor_enviaria: valorEnviaria },
+        resumo: {
+          por_decisao: porDecisao,
+          ja_processados: resumoJaProcessado,
+          mensagens_alcancaveis: mensagensEnviaria,
+          faturas_cobertas: faturasEnviaria,
+          valor_alcancavel: valorEnviaria,
+        },
+        plano_de_ritmo: {
+          teto_por_rodada: teto,
+          minutos_entre_rodadas: MINUTOS_ENTRE_RODADAS,
+          rodadas_necessarias: rodadas,
+          minutos_para_escoar: rodadas > 0 ? (rodadas - 1) * MINUTOS_ENTRE_RODADAS : 0,
+          cabe_na_janela: (rodadas > 0 ? (rodadas - 1) * MINUTOS_ENTRE_RODADAS : 0) <= MINUTOS_DA_JANELA,
+        },
         candidatos,
       });
     }
