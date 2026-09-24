@@ -1232,7 +1232,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         </div>
 
         {/* Row 2: Context chips — single line, overflow hidden */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 pl-10">
+        {/* O recuo de 40px alinha os selos sob o nome, atras do avatar. Em tela de
+            320px ele come 12,5% da faixa e empurra "Tag" para fora, e no celular
+            nao ha nada acima com que alinhar: o cabecalho e mais apertado. */}
+        <div className={`flex items-center gap-1.5 overflow-x-auto scrollbar-none mt-0.5 ${isMobileVariant ? "pl-1" : "pl-10"}`}>
           <SignatureControl conversationId={conversation.id} />
 
           {/* Fonte é o hook, não o prop: a conversa selecionada é snapshot e não
