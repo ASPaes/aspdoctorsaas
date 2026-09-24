@@ -228,8 +228,35 @@ Deno.serve(async (req) => {
     const documento = extrairDocumento(texto);
     const aguardandoCnpj = sessaoViva?.estado === 'aguardando_cnpj';
 
-    // Dentro de uma conversa recém-atendida, "pdf" e "manda de novo" são pedido.
-    const reenvio = sessaoViva?.estado === 'entregue' && pedeReenvio(texto);
+    // Dentro de uma conversa que já recebeu boleto, "pdf" e "manda de novo" são
+    // pedido.
+    //
+    // A âncora NÃO é a sessão, e isso é uma correção de 24/09/2026. A sessão
+    // vive 30 minutos; o cliente que recebe o boleto de manhã e escreve "não
+    // abriu o pdf" à tarde cairia no aviso de fora do expediente, que foi
+    // exatamente o que aconteceu no teste do Alexandre. A âncora é a entrega:
+    // esta conversa recebeu uma 2ª via nas últimas 24h?
+    //
+    // Por que não simplesmente aceitar "pdf" em qualquer conversa: numa
+    // conversa que nunca teve boleto, "me manda o pdf" é o manual, o contrato,
+    // qualquer coisa — e responder "não encontrei fatura em aberto" ali seria
+    // pior do que não responder.
+    let entregouRecente = sessaoViva?.estado === 'entregue';
+    if (!entregouRecente && pedeReenvio(texto)) {
+      const desde = new Date(agora.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: entregas } = await supabase
+        .from('whatsapp_messages')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('conversation_id', conversationId)
+        .eq('is_from_me', true)
+        .gte('created_at', desde)
+        .contains('metadata', { origem: 'fin_segunda_via' })
+        .limit(1);
+      entregouRecente = (entregas?.length ?? 0) > 0;
+    }
+
+    const reenvio = entregouRecente && pedeReenvio(texto);
 
     // Sem sessão viva esperando documento, só entra quem pediu.
     if (!aguardandoCnpj && !reenvio && !pedeSegundaVia(texto)) {
@@ -370,9 +397,37 @@ Deno.serve(async (req) => {
     let link: string | null = null;
     if (alvo) link = await obterLinkBoleto(supabase, alvo);
 
-    const texto_resposta = montarMensagem(titulos, link, alvo);
+    // PDF anexado é o plano A, o link é o plano B, e a ordem importa: o arquivo
+    // é preparado ANTES de o texto sair, porque é o texto que anuncia "segue em
+    // anexo". Preparar depois arriscava anunciar um anexo que não viria.
+    //
+    // O que pode falhar aqui (download, upload, assinatura) já está resolvido
+    // quando a primeira mensagem sai; sobra só o envio ao provedor, e mesmo
+    // esse tem saída: se não sair, o link vai numa mensagem seguinte.
+    const pdf = link && alvo ? await prepararPdfBoleto(supabase, tenantId, alvo, link) : null;
 
-    await enviar(supabase, { tenantId, conversationId, contactId, instanceId, telefone, simular }, texto_resposta, true);
+    const ctxEnvio = { tenantId, conversationId, contactId, instanceId, telefone, simular };
+    const texto_resposta = montarMensagem(titulos, link, alvo, !!pdf);
+
+    await enviar(supabase, ctxEnvio, texto_resposta, true);
+
+    let anexoEnviado = false;
+    if (pdf && alvo) {
+      const legenda = `Boleto de ${fmtBRL(alvo.valor)}, vencimento ${fmtData(alvo.vencimento)}`;
+      anexoEnviado = await enviar(supabase, ctxEnvio, legenda, true, pdf);
+      if (!anexoEnviado) {
+        // O texto já prometeu o anexo e o link já está lá em cima, então aqui
+        // não se repete o link: só se desfaz a promessa. Promessa não cumprida
+        // sem explicação é o que faz o cliente ficar esperando.
+        await enviar(
+          supabase,
+          ctxEnvio,
+          'Não consegui anexar o arquivo aqui. Use o link da mensagem anterior para abrir o boleto.',
+          true,
+        );
+      }
+    }
+
     await salvarSessao(supabase, tenantId, conversationId, {
       estado: 'entregue',
       tentativas: 0,
@@ -388,6 +443,7 @@ Deno.serve(async (req) => {
       identificado_por: motivoIdent,
       titulos: titulos.length,
       com_link: !!link,
+      anexo: anexoEnviado,
       ...(simular ? { mensagem: texto_resposta } : {}),
     });
   } catch (e) {
@@ -401,7 +457,23 @@ Deno.serve(async (req) => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-function montarMensagem(titulos: Titulo[], link: string | null, alvo: Titulo | null): string {
+/**
+ * `comAnexo` diz se o PDF vai junto; o link entra SEMPRE.
+ *
+ * Decisão do Alexandre em 24/09/2026, depois de ver os dois funcionando: manda
+ * os dois. Ele sabe que a URL do Omie tem ~300 caracteres e ocupa dez linhas no
+ * celular — foi ele quem reclamou disso. O peso maior é dar ao cliente as duas
+ * saídas, porque quem não abre anexo abre link e vice-versa.
+ *
+ * O código de barras fica em todos os casos: é o que se copia e cola no app do
+ * banco, e não tem substituto.
+ */
+function montarMensagem(
+  titulos: Titulo[],
+  link: string | null,
+  alvo: Titulo | null,
+  comAnexo = false,
+): string {
   // ⚠️ NÃO MANDA O CARNÊ INTEIRO, e isso apareceu no primeiro teste com dado de
   // verdade: um cliente com contrato parcelado tinha 36 faturas em aberto, com
   // vencimento até 2029, e a mensagem virava "36 faturas, total de R$ 16.654".
@@ -440,7 +512,11 @@ function montarMensagem(titulos: Titulo[], link: string | null, alvo: Titulo | n
 
   if (link && alvo) {
     const qual = alvo.vencido ? 'da fatura mais antiga' : 'dessa fatura';
-    partes.push(`Boleto ${qual}:\n${link}`);
+    partes.push(
+      comAnexo
+        ? `Boleto ${qual} em anexo. Se preferir abrir pelo navegador:\n${link}`
+        : `Boleto ${qual}:\n${link}`,
+    );
     if (alvo.codigo_barras) partes.push(`Código de barras:\n${alvo.codigo_barras}`);
   } else {
     partes.push('O boleto ainda não está gerado no sistema. Já vou pedir para o financeiro te enviar.');
@@ -499,6 +575,77 @@ async function obterLinkBoleto(supabase: any, titulo: Titulo): Promise<string | 
   }
 }
 
+/**
+ * Baixa o PDF do boleto no Omie e guarda no Storage do projeto.
+ *
+ * POR QUE NÃO MANDAR A URL DO OMIE DIRETO PARA O PROVEDOR: ela é assinada e
+ * vale 24 h. Funciona no envio, mas a bolha do chat guarda esse endereço e no
+ * dia seguinte o operador que abrir a conversa vê um anexo quebrado. Guardando
+ * aqui, o histórico continua abrindo. É também o que nos deixa mandar ao
+ * provedor uma URL nossa em vez de uma URL de terceiro.
+ *
+ * Devolve `null` em qualquer tropeço — e tropeço aqui não é erro de verdade,
+ * é só o sinal de que a resposta sai com o link em vez do anexo.
+ */
+async function prepararPdfBoleto(
+  supabase: any,
+  tenantId: string,
+  titulo: Titulo,
+  link: string,
+): Promise<{ signedUrl: string; path: string; fileName: string; bytes: number } | null> {
+  try {
+    const resp = await fetch(link);
+    if (!resp.ok) {
+      console.warn(LOG, 'PDF: download falhou', resp.status);
+      return null;
+    }
+
+    // O CDN do Omie responde HTML quando a assinatura venceu ou o arquivo sumiu.
+    // Sem esta checagem mandaríamos uma página de erro renomeada para .pdf.
+    const tipo = (resp.headers.get('content-type') ?? '').toLowerCase();
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    const pareceHtml = tipo.includes('html');
+    const assinaturaPdf =
+      bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46; // %PDF
+    if (pareceHtml || !assinaturaPdf) {
+      console.warn(LOG, 'PDF: conteudo nao e PDF', { tipo, tamanho: bytes.length });
+      return null;
+    }
+    if (bytes.length > 15 * 1024 * 1024) {
+      console.warn(LOG, 'PDF: grande demais para WhatsApp', bytes.length);
+      return null;
+    }
+
+    const fileName = `boleto-${fmtData(titulo.vencimento).replace(/\//g, '-')}.pdf`;
+    const path = `${tenantId}/boletos/${titulo.id}.pdf`;
+
+    // upsert: o boleto pode ser pedido de novo, e o do Omie pode ter sido
+    // regerado com outra multa. O arquivo mais novo é o que vale.
+    const { error: erroUpload } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(path, bytes, { contentType: 'application/pdf', upsert: true });
+    if (erroUpload) {
+      console.warn(LOG, 'PDF: upload falhou', erroUpload.message);
+      return null;
+    }
+
+    // Curta de propósito: serve só para o provedor buscar o arquivo agora. Quem
+    // abre depois é o chat, pelo `media_path`.
+    const { data: assinada } = await supabase.storage
+      .from('whatsapp-media')
+      .createSignedUrl(path, 600);
+    if (!assinada?.signedUrl) {
+      console.warn(LOG, 'PDF: nao consegui assinar a URL');
+      return null;
+    }
+
+    return { signedUrl: assinada.signedUrl, path, fileName, bytes: bytes.length };
+  } catch (e) {
+    console.warn(LOG, 'PDF: erro ao preparar', (e as Error)?.message);
+    return null;
+  }
+}
+
 async function salvarSessao(
   supabase: any,
   tenantId: string,
@@ -525,16 +672,21 @@ async function salvarSessao(
  * `marcarCobranca` liga a marca que faz o motor levar a resposta do cliente
  * direto ao Financeiro. Só as mensagens que falam de fatura levam essa marca;
  * um "me manda o CNPJ" não deve sequestrar a conversa para o financeiro.
+ *
+ * Com `anexo`, sai um documento em vez de texto. Devolve `false` quando o envio
+ * não saiu — é o que deixa quem chamou cair no plano B em vez de deixar o
+ * cliente sem resposta.
  */
 async function enviar(
   supabase: any,
   ctx: { tenantId: string; conversationId: string; contactId: string; instanceId: string | null; telefone: string; simular?: boolean },
   texto: string,
   marcarCobranca: boolean,
-) {
+  anexo?: { signedUrl: string; path: string; fileName: string; bytes: number },
+): Promise<boolean> {
   if (ctx.simular) {
-    console.log(LOG, 'SIMULACAO, mensagem que sairia:\n' + texto);
-    return;
+    console.log(LOG, 'SIMULACAO, mensagem que sairia:\n' + texto + (anexo ? `\n[anexo: ${anexo.fileName}]` : ''));
+    return true;
   }
 
   const { data: conversa } = await supabase
@@ -546,7 +698,7 @@ async function enviar(
   const instanceId = ctx.instanceId ?? conversa?.instance_id;
   if (!instanceId) {
     console.error(LOG, 'conversa sem instancia, nao da para responder', ctx.conversationId);
-    return;
+    return false;
   }
 
   const { data: instancia } = await supabase
@@ -556,16 +708,29 @@ async function enviar(
     .maybeSingle();
   if (!instancia) {
     console.error(LOG, 'instancia nao encontrada', instanceId);
-    return;
+    return false;
   }
 
   const secrets = await getInstanceSecrets(supabase, instanceId);
   const adapter = getAdapter(instancia.provider_type || 'self_hosted');
-  const envio = await adapter.send(secrets, instancia, {
-    to: ctx.telefone,
-    messageType: 'text',
-    content: texto,
-  });
+
+  let envio: { messageId: string; raw: unknown };
+  try {
+    envio = await adapter.send(secrets, instancia, {
+      to: ctx.telefone,
+      messageType: anexo ? 'document' : 'text',
+      content: texto,
+      ...(anexo
+        ? { mediaUrl: anexo.signedUrl, mediaMimetype: 'application/pdf', fileName: anexo.fileName }
+        : {}),
+    });
+  } catch (e) {
+    // Texto que não sai é problema de verdade e sobe. Anexo que não sai é só o
+    // plano A falhando: quem chamou manda o link.
+    if (!anexo) throw e;
+    console.warn(LOG, 'anexo nao saiu, caindo para o link:', (e as Error)?.message);
+    return false;
+  }
 
   await supabase.from('whatsapp_messages').insert({
     tenant_id: ctx.tenantId,
@@ -573,7 +738,19 @@ async function enviar(
     message_id: envio.messageId,
     remote_jid: ctx.telefone,
     content: texto,
-    message_type: 'text',
+    message_type: anexo ? 'document' : 'text',
+    ...(anexo
+      ? {
+          // `media_path` e não `media_url`: a assinada vence em 10 minutos e o
+          // chat precisa abrir o anexo meses depois.
+          media_path: anexo.path,
+          media_filename: anexo.fileName,
+          media_mimetype: 'application/pdf',
+          media_ext: 'pdf',
+          media_size_bytes: anexo.bytes,
+          media_kind: 'document',
+        }
+      : {}),
     // 'pending' e não 'sent': quem promove é o ACK do WhatsApp.
     status: 'pending',
     is_from_me: true,
@@ -589,4 +766,6 @@ async function enviar(
     .from('whatsapp_conversations')
     .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', ctx.conversationId);
+
+  return true;
 }
