@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
 import { mostrarNotificacaoDoSistema, marcarIconeDoApp } from "@/lib/notificacaoDoSistema";
+import { inscreverAparelho } from "@/lib/webPush";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
@@ -645,6 +646,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       supabase.removeChannel(channel);
     };
   }, [uid, tenantId, queryClient, refreshUnreadCount, handleNotificationArrival]);
+
+  // Inscreve este aparelho no Web Push — e o que faz o aviso chegar com o app
+  // FECHADO. Roda a cada carga e sempre que a permissao muda, porque o navegador
+  // renova a assinatura sozinho e o endpoint antigo simplesmente para de
+  // funcionar, sem avisar ninguem.
+  useEffect(() => {
+    if (browserPermission !== "granted") return;
+    void inscreverAparelho(tenantId ?? null, uid ?? null);
+  }, [browserPermission, tenantId, uid]);
 
   // Favicon badge
   useEffect(() => {

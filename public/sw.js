@@ -18,7 +18,7 @@
  *    Mensagem de chat não pode vir de cache.
  */
 
-const VERSAO = "ds-v2";
+const VERSAO = "ds-v3";
 const CASCA = `casca-${VERSAO}`;
 const ARQUIVOS = `arquivos-${VERSAO}`;
 
@@ -114,4 +114,37 @@ self.addEventListener("notificationclick", (evento) => {
       return self.clients.openWindow(destino);
     })
   );
+});
+
+/*
+ * Chegada de Web Push — o aviso com o app FECHADO.
+ *
+ * Diferente do `showNotification` chamado pela página, aqui quem está rodando é
+ * só o service worker: a página pode nem existir. Por isso todo o conteúdo do
+ * aviso vem dentro do push, já criptografado pelo servidor.
+ *
+ * `userVisibleOnly: true` é a promessa feita na inscrição: TODO push precisa
+ * virar algo visível. Se o payload vier vazio ou quebrado, ainda assim mostramos
+ * um aviso genérico — sem isso o Chrome pune a origem e passa a descartar os
+ * próximos.
+ */
+self.addEventListener("push", (evento) => {
+  let dados = {};
+  try {
+    dados = evento.data ? evento.data.json() : {};
+  } catch (_) {
+    dados = {};
+  }
+
+  const titulo = dados.titulo || "Nova mensagem";
+  const opcoes = {
+    body: dados.corpo || "",
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: dados.tag || "chat",
+    renotify: true,
+    data: { url: dados.url || "/" },
+  };
+
+  evento.waitUntil(self.registration.showNotification(titulo, opcoes));
 });

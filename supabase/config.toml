@@ -387,3 +387,10 @@ verify_jwt = false
 # vault (mesmo do fin-sync-titulos).
 [functions.fin-regua-motor]
 verify_jwt = false
+
+# Chamada pelo gatilho de notification_recipients, que manda a chave anon — um
+# JWT valido do projeto. Com verify_jwt = true o portao do gateway barra quem
+# chega sem chave nenhuma; o que impede aviso falso e a propria function, que so
+# aceita `recipient_id` e busca o texto no banco.
+[functions.send-web-push]
+verify_jwt = true
