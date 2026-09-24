@@ -443,6 +443,8 @@ export default function EmailsRecebidosTab() {
                 const ligado = !!linha.referencia_id;
                 const cliente = nomeDoClienteRecebido(linha);
                 const naTriagem = linha.acao === "triagem" && !filtros.lixeira;
+                // ninguém abriu ainda: é o que o badge da barra lateral conta
+                const naoLido = !linha.lido_em && !linha.arquivado_em && !filtros.lixeira;
                 return (
                   <TableRow
                     key={linha.id}
@@ -479,7 +481,15 @@ export default function EmailsRecebidosTab() {
                       <span className="block text-muted-foreground">{hora}</span>
                     </TableCell>
                     <TableCell className="align-top">
-                      <span className="font-medium">{linha.assunto || "(sem assunto)"}</span>
+                      {naoLido && (
+                        <span
+                          className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary align-middle"
+                          title="Ainda não aberto"
+                        />
+                      )}
+                      <span className={cn("font-medium", naoLido && "font-semibold text-foreground")}>
+                        {linha.assunto || "(sem assunto)"}
+                      </span>
                       <AnexosDoEmail linha={linha} />
                       {linha.corpo_texto && (
                         <span className="mt-0.5 block max-w-[420px] truncate text-[11.5px] text-muted-foreground">

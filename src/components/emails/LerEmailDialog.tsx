@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Archive, ArchiveRestore, FolderInput, Forward, Loader2, Mail, Paperclip, Reply, ReplyAll } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { ListaDeAnexos } from "./AnexosDoEmail";
 import { useArquivarEmails } from "./useArquivarEmails";
 import { MoverParaPasta } from "./MenuPastas";
 import { useMoverParaPasta } from "./usePastasEmail";
+import { useMarcarEmailLido } from "./useNaoLidos";
 import { EscreverEmailDialog, type PedidoEscrita } from "./EscreverEmailDialog";
 import type { ModoEscrita } from "./respostaEmail";
 
@@ -73,6 +74,7 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
   const escuro = resolvedTheme === "dark";
   const arquivar = useArquivarEmails(tipo === "enviado" ? "enviados" : "recebidos");
   const mover = useMoverParaPasta(tipo === "enviado" ? "enviados" : "recebidos");
+  const marcarLido = useMarcarEmailLido();
   const [escrevendo, setEscrevendo] = useState<PedidoEscrita | null>(null);
 
   /** monta o original que a tela de escrever usa para o assunto, o Para e a citação */
@@ -113,6 +115,17 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
       return data as any;
     },
   });
+
+  /**
+   * Abriu, leu (DEM-0461). Este quadro é o ponto único de abertura de e-mail:
+   * lista de Recebidos, linha do tempo do chamado e jornada de implantação
+   * passam todos por aqui. A leitura é da equipe, então basta mandar uma vez.
+   */
+  const marcar = marcarLido.mutate;
+  useEffect(() => {
+    if (tipo !== "recebido" || !id) return;
+    marcar({ ids: [id] });
+  }, [tipo, id, marcar]);
 
   const cliente = email?.clientes?.nome_fantasia || email?.clientes?.razao_social || null;
   const quando = email ? dataHora(tipo === "enviado" ? email.created_at : email.recebido_em) : "";

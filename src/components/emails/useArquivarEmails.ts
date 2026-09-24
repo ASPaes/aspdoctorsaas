@@ -30,6 +30,9 @@ export function useArquivarEmails(tabela: "enviados" | "recebidos") {
       queryClient.invalidateQueries({ queryKey: [tabela === "enviados" ? "emails_enviados" : "emails_recebidos"] });
       // a contagem das abas por setor não pode continuar somando o que saiu da lista
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos_contagem"] });
+      // arquivar e mandar para a lixeira tiram o e-mail da conta de não lidos
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos"] });
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos_ticket"] });
     },
   });
 }

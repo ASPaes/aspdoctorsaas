@@ -41,6 +41,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useReleasesNovidade } from "@/hooks/useReleasesNovidade";
+import { useRecebidosNaoLidos } from "@/components/emails/useNaoLidos";
 
 
 const ROLE_LABELS: Record<string, string> = {
@@ -64,6 +65,8 @@ export function AppSidebar() {
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const { temNovo, marcarVisto } = useReleasesNovidade();
+  // e-mail que chegou e ninguém abriu (DEM-0461); o RLS já recorta por pessoa
+  const { data: emailsNaoLidos = 0 } = useRecebidosNaoLidos();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const { canAccess: canOnboarding } = useOnboardingAccess();
@@ -359,12 +362,27 @@ export function AppSidebar() {
                     </Collapsible>
                   );
                 }
+                const naoLidos = item.resource === "nav.emails" ? emailsNaoLidos : 0;
                 const leaf = can(item.resource!, "view") ? (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild tooltip={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={naoLidos > 0 ? `${item.title} · ${naoLidos} não lido${naoLidos > 1 ? "s" : ""}` : item.title}
+                    >
                       <NavLink to={item.url!} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
-                        <item.icon className="h-4 w-4" />
+                        {/* recolhida a barra não cabe o número: vira um ponto */}
+                        <span className="relative inline-flex">
+                          <item.icon className="h-4 w-4" />
+                          {naoLidos > 0 && collapsed && (
+                            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary ring-2 ring-sidebar" />
+                          )}
+                        </span>
                         <span>{item.title}</span>
+                        {naoLidos > 0 && !collapsed && (
+                          <span className="ml-auto min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-primary-foreground">
+                            {naoLidos > 99 ? "99+" : naoLidos}
+                          </span>
+                        )}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

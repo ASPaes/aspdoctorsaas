@@ -31,6 +31,8 @@ import { useUserDepartment } from "@/hooks/useUserDepartment";
 import { usePersistedFilters } from "@/hooks/usePersistedFilters";
 
 import { TicketsKanbanView } from "@/components/tickets/TicketsKanbanView";
+import { EmailPendenteBadge } from "@/components/tickets/EmailPendenteBadge";
+import { useNaoLidosPorTicket } from "@/components/emails/useNaoLidos";
 import { CsatReportModal } from "@/components/tickets/CsatReportModal";
 
 
@@ -1000,6 +1002,8 @@ export default function SupportTickets() {
   });
 
   const filteredTickets = useMemo(() => tickets, [tickets]);
+  // retorno de cliente por e-mail ainda não aberto, por chamado (DEM-0461)
+  const { data: emailsPendentes = {} } = useNaoLidosPorTicket(filteredTickets.map((t: any) => t.id));
 
   const ticketMetrics = useMemo(() => {
     const total = filteredTickets.length;
@@ -1958,6 +1962,7 @@ export default function SupportTickets() {
                     <div className="shrink-0 flex flex-col items-end gap-1.5 min-w-0 max-w-[180px]">
                       <div className="flex items-center gap-1.5">
                         <ChannelIcon canal={t.canal_origem} />
+                        <EmailPendenteBadge quantidade={emailsPendentes[t.id] ?? 0} />
                         <span className="text-xs text-muted-foreground">{formatDate(t.aberto_em)}</span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] text-muted-foreground truncate max-w-full">

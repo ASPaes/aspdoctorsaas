@@ -33,6 +33,8 @@ export interface EmailRecebido {
   pasta_id: string | null;
   email_pastas?: { nome: string; cor: string } | null;
   acao: AcaoRecebido | null;
+  /** quando alguém abriu; leitura é da equipe, não de cada pessoa (DEM-0461) */
+  lido_em: string | null;
   acao_detalhe: string | null;
   department_id: string | null;
   ticket_id: string | null;
@@ -129,7 +131,7 @@ export const nomeDoClienteRecebido = (e: EmailRecebido) =>
  */
 const COLUNAS =
   "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, arquivado_em, " +
-  "acao, acao_detalhe, department_id, ticket_id, anexos, anexos_ignorados, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), " +
+  "acao, acao_detalhe, department_id, ticket_id, lido_em, anexos, anexos_ignorados, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), " +
   "support_departments(name), support_tickets!email_recebidos_ticket_id_fkey(ticket_code), " +
   "email_envios!email_recebidos_envio_id_fkey(assunto, created_at), pasta_id, email_pastas(nome, cor)";
 
@@ -271,6 +273,9 @@ export function useLixeiraRecebidos() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos"] });
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos_contagem"] });
+      // o que entra, sai da lista ou vira ignorado muda a conta de não lidos
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos"] });
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos_ticket"] });
     },
   });
 }
@@ -292,6 +297,9 @@ export function useResolverTriagem() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos"] });
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos_contagem"] });
+      // o que entra, sai da lista ou vira ignorado muda a conta de não lidos
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos"] });
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos_ticket"] });
     },
   });
 }
@@ -317,6 +325,9 @@ export function useLerAgora() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos"] });
       queryClient.invalidateQueries({ queryKey: ["emails_recebidos_contagem"] });
+      // o que entra, sai da lista ou vira ignorado muda a conta de não lidos
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos"] });
+      queryClient.invalidateQueries({ queryKey: ["emails_nao_lidos_ticket"] });
       queryClient.invalidateQueries({ queryKey: ["emails_estado_leitura"] });
     },
   });

@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MessageCircle, Phone, User, Mail, Lock, Code2 } from "lucide-react";
+import { useNaoLidosPorTicket } from "@/components/emails/useNaoLidos";
+import { EmailPendenteBadge } from "./EmailPendenteBadge";
 
 interface KanbanColumn {
   id: string;
@@ -66,6 +68,8 @@ function formatDate(iso: string | null): string {
 }
 
 function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, getAgentName }: Props) {
+  // uma consulta para o quadro inteiro; por card seria uma chamada por card
+  const { data: emailsPendentes = {} } = useNaoLidosPorTicket(tickets.map((t) => t.id));
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -173,6 +177,7 @@ function TicketsKanbanView({ tickets, columns, onTicketClick, onStatusChange, ge
                           {t.ticket_code}
                         </span>
                         {t.canal_origem && <ChannelIcon canal={t.canal_origem} />}
+                        <EmailPendenteBadge quantidade={emailsPendentes[t.id] ?? 0} />
                         {(() => {
                           const col = columns.find(c => c.id === t.status_id);
                           const terminal = col?.is_terminal ?? false;

@@ -22,6 +22,7 @@ import { CreateChildTicketDialog } from "@/components/tickets/CreateChildTicketD
 import { AttendanceChatHistoryModal } from "@/components/tickets/AttendanceChatHistoryModal";
 import { StartConversationFromTicketDialog } from "@/components/tickets/StartConversationFromTicketDialog";
 import { useAbrirEnvioEmail } from "@/components/whatsapp/chat/email/useAbrirEnvioEmail";
+import { useMarcarEmailLido } from "@/components/emails/useNaoLidos";
 // a tela de leitura traz o editor de resposta junto: só baixa quando alguém abre um e-mail
 const LerEmailDialog = lazy(() => import("@/components/emails/LerEmailDialog").then((m) => ({ default: m.LerEmailDialog })));
 import { TicketAttachments } from "@/components/tickets/TicketAttachments";
@@ -695,6 +696,18 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   /** e-mail aberto pela ocorrência: a mesma tela de leitura de E-mails, com Responder */
   const [emailAberto, setEmailAberto] = useState<{ tipo: "enviado" | "recebido"; id: string } | null>(null);
+
+  /**
+   * Abrir o chamado já é ler o retorno do cliente (DEM-0461): o texto do e-mail
+   * aparece inteiro na linha do tempo, então o badge do card sai aqui. Se
+   * dependesse do clique em "Ver e-mail", ele nunca mais saía.
+   */
+  const marcarLido = useMarcarEmailLido();
+  const marcarLidoDoTicket = marcarLido.mutate;
+  useEffect(() => {
+    if (!open || !ticketId) return;
+    marcarLidoDoTicket({ ticketId });
+  }, [open, ticketId, marcarLidoDoTicket]);
 
   // botão E-mail do cabeçalho: mesma conferência de contas do chat, e a tela só
   // baixa no clique (ela carrega o editor de texto inteiro)
