@@ -19,6 +19,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 23/09
 
+- 🆕 **O chat instalado no telefone avisa na barra de notificações e mostra o número no ícone** — Com o chat instalado na tela inicial e as notificações permitidas, mensagem nova passa a aparecer na barra do aparelho, como no WhatsApp, e tocar no aviso abre a conversa na janela que já estava aberta. O ícone do app também passa a mostrar quantas mensagens estão sem ler. Antes, nada aparecia no telefone: o aviso era criado de um jeito que o Android recusa, e a falha acontecia em silêncio. Vale com o chat aberto ou minimizado; com o aplicativo fechado de vez o aviso ainda não chega.
+
+- 🔧 **Dois toques na imagem fechavam em vez de ampliar** — Abrindo uma foto no chat pelo telefone, o gesto de dar dois toques para ampliar — o mesmo do WhatsApp — fechava a imagem no primeiro toque. Agora os dois toques ampliam, e um toque só continua fechando. Com a foto ampliada, tocar ao lado dela deixou de fechar por engano enquanto você arrasta.
+
+- 🔧 **Dois áudios tocavam ao mesmo tempo** — Dar play num áudio enquanto outro estava tocando deixava os dois falando juntos. Agora começar um áudio pausa o anterior, como no WhatsApp. Vale também para vídeo.
+
 - 🔧 **No celular, as mensagens enviadas apareciam cortadas pelo lado direito** — Bastava a conversa ter uma imagem grande, ou um aviso comprido do sistema, para a lista inteira ficar mais larga que a tela: as mensagens do cliente, encostadas na esquerda, continuavam certas, e as suas, encostadas na direita, saíam pela borda com o texto pela metade. Agora a conversa nunca passa da largura do aparelho, e imagem grande é reduzida para caber. Vale também para as demais listas do chat — busca de mensagens, encaminhar, participantes do grupo, histórico do contato e as outras.
 
 - 🔧 **No celular, o nome do grupo ficava pela metade no cabeçalho** — Em conversa de grupo ainda sem atendimento, o botão **Iniciar atendimento** e o ícone de participantes ocupavam metade da linha e o nome virava reticências logo no começo. O botão passa a se chamar só **Iniciar** no telefone, e o ícone de participantes sai da linha — a opção **Participantes do grupo** continua nos três pontos. Com isso um nome como "Implantação Gula Restaurante e Bar Ltda" aparece inteiro.
