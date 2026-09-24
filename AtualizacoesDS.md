@@ -19,7 +19,11 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 23/09
 
-- 🔧 **No celular, o fim da conversa sumia atrás do campo de mensagem** — Ao escrever uma resposta longa no telefone, o campo cresce para caber o texto — e a última mensagem da conversa ficava escondida por baixo dele, sem jeito de ver sem apagar o que estava escrito. Como quem responde por último costuma ser o atendente, a mensagem que sumia era quase sempre a enviada, e a do cliente parecia certa. Agora a conversa acompanha o campo e o fim continua à vista. Quem tinha subido para reler o histórico não é puxado para baixo.
+- 🔧 **No celular, as mensagens enviadas apareciam cortadas pelo lado direito** — Bastava a conversa ter uma imagem grande, ou um aviso comprido do sistema, para a lista inteira ficar mais larga que a tela: as mensagens do cliente, encostadas na esquerda, continuavam certas, e as suas, encostadas na direita, saíam pela borda com o texto pela metade. Agora a conversa nunca passa da largura do aparelho, e imagem grande é reduzida para caber. Vale também para as demais listas do chat — busca de mensagens, encaminhar, participantes do grupo, histórico do contato e as outras.
+
+- 🔧 **No celular, o nome do grupo ficava pela metade no cabeçalho** — Em conversa de grupo ainda sem atendimento, o botão **Iniciar atendimento** e o ícone de participantes ocupavam metade da linha e o nome virava reticências logo no começo. O botão passa a se chamar só **Iniciar** no telefone, e o ícone de participantes sai da linha — a opção **Participantes do grupo** continua nos três pontos. Com isso um nome como "Implantação Gula Restaurante e Bar Ltda" aparece inteiro.
+
+- 🔧 **No celular, o fim da conversa sumia atrás do campo de mensagem** — Ao escrever uma resposta longa no telefone, o campo cresce para caber o texto — e a última mensagem da conversa ficava escondida por baixo dele, sem jeito de ver sem apagar o que estava escrito. Agora a conversa acompanha o campo e o fim continua à vista. Quem tinha subido para reler o histórico não é puxado para baixo.
 
 - 🔧 **No celular, o nome do cliente aparecia pela metade** — No cabeçalho do atendimento, nome de empresa virava reticências logo no começo, e dava para ficar respondendo sem saber com quem se está falando. Agora o nome usa até duas linhas e aparece inteiro, mesmo em aparelho de tela estreita. No computador continua como era.
 
