@@ -26,7 +26,19 @@ export default function ChatMobileLayout() {
   return (
     <DepartmentFilterProvider>
       <QueueAlertProvider>
-        <div className="h-[100dvh] flex flex-col w-full overflow-hidden bg-background">
+        {/* Instalado na tela inicial (PWA), o app ocupa a tela inteira: sem as
+            safe-areas a barra do topo some atrás do notch e o campo de mensagem
+            fica embaixo da barra de gestos. No navegador comum esses valores
+            são zero, então nada muda. */}
+        <div
+          className="flex w-full flex-col overflow-hidden bg-background"
+          style={{
+            height: "100dvh",
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            boxSizing: "border-box",
+          }}
+        >
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-base font-semibold truncate">Chat</span>
