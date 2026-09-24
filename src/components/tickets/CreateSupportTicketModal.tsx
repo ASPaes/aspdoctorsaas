@@ -18,6 +18,7 @@ import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
 import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { formatarTelefone } from "@/components/emails/macros/camposMacro";
+import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function HelpBadge({ text }: { text: string }) {
@@ -1386,9 +1387,15 @@ export function CreateSupportTicketModal({
                       onFocus={() => { if (contatoResults.length > 0) setContatoDropdownOpen(true); }}
                       onBlur={() => setTimeout(() => setContatoDropdownOpen(false), 150)}
                       placeholder="Nome do solicitante"
-                      className="h-9 text-xs"
+                      className={cn("h-9 text-xs", contatoSelectedFone && "pr-32")}
                       disabled={!selectedCliente}
                     />
+                    {contatoSelectedFone && (
+                      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        {formatarTelefone(contatoSelectedFone)}
+                      </span>
+                    )}
                     {contatoDropdownOpen && contatoResults.length > 0 && (
                       <div className="absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto rounded-md border border-input bg-popover shadow-md">
                         {contatoResults.map((c) => (
@@ -1434,18 +1441,11 @@ export function CreateSupportTicketModal({
                     <UserPlus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                {contatoSelectedFone ? (
-                  <p className="flex items-center gap-1 text-[11px] font-medium text-foreground">
-                    <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
-                    {formatarTelefone(contatoSelectedFone)}
-                  </p>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground">
-                    {contatoSolicitante.trim()
-                      ? "Contato sem telefone cadastrado. Busca nos contatos do cliente; use + para cadastrar."
-                      : "Busca nos contatos do cliente. Use + para cadastrar."}
-                  </p>
-                )}
+                <p className="text-[10px] text-muted-foreground">
+                  {contatoSolicitante.trim() && !contatoSelectedFone
+                    ? "Contato sem telefone cadastrado. Busca nos contatos do cliente; use + para cadastrar."
+                    : "Busca nos contatos do cliente. Use + para cadastrar."}
+                </p>
               </div>
             </div>
 
