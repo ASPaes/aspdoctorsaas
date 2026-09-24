@@ -81,7 +81,7 @@ export function GroupLinkClienteModal({ open, onOpenChange, conversationId, onLi
             onChange={(e) => { setTerm(e.target.value); setSelected(null); }}
             className="px-3"
           />
-          <ScrollArea className="h-64 border rounded-md">
+          <ScrollArea viewportClassName="[&>div]:!block" className="h-64 border rounded-md">
             <div className="p-1">
               {debounced.trim().length < 2 && (
                 <div className="text-sm text-muted-foreground p-3">Digite ao menos 2 caracteres.</div>

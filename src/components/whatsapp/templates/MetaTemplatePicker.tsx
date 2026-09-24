@@ -306,7 +306,7 @@ export function MetaTemplatePicker({
           )}
 
           {!isLoading && templates && templates.length > 0 && (
-            <ScrollArea className="h-[300px] pr-3">
+            <ScrollArea viewportClassName="[&>div]:!block" className="h-[300px] pr-3">
               <div className="space-y-2">
                 {templates.map((tpl) => {
                   const tplSpec = specById.get(tpl.id);

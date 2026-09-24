@@ -1011,7 +1011,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
       {/* List */}
       {/* onScrollCapture, não onScroll: o scroll acontece no viewport interno do
           Radix, e evento de scroll não borbulha — só a fase de captura pega. */}
-      <ScrollArea className="flex-1" onScrollCapture={isMobileVariant ? handleListScroll : undefined}>
+      <ScrollArea viewportClassName="[&>div]:!block" className="flex-1" onScrollCapture={isMobileVariant ? handleListScroll : undefined}>
         {(isSearching ? isSearchLoading : isLoading) ? (
           <div className="space-y-1 p-2">
             {Array.from({ length: 8 }).map((_, i) => (

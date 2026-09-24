@@ -3,12 +3,24 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * `viewportClassName` existe por causa de um detalhe do Radix: o Viewport
+ * embrulha o conteudo num div com `min-width:100%; display:table`, e caixa de
+ * tabela CRESCE ate o item mais largo em vez de respeitar a largura disponivel.
+ * Um item largo (imagem, aviso comprido) leva junto TODA a lista, e o que esta
+ * alinhado a direita sai da tela. Medido em 390px: um item de 900px levou o
+ * wrapper a 900px e a bolha enviada passou a terminar em 916.
+ *
+ * Quem tem conteudo de largura imprevisivel passa `[&>div]:!block`, que devolve
+ * a caixa ao comportamento normal. Nao e o padrao porque tabela larga dentro de
+ * ScrollArea depende dessa rolagem lateral para existir.
+ */
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.Root> & { viewportClassName?: string }
+>(({ className, children, viewportClassName, ...props }, ref) => (
   <ScrollAreaPrimitive.Root ref={ref} className={cn("relative overflow-hidden", className)} {...props}>
-    <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit]">{children}</ScrollAreaPrimitive.Viewport>
+    <ScrollAreaPrimitive.Viewport className={cn("h-full w-full rounded-[inherit]", viewportClassName)}>{children}</ScrollAreaPrimitive.Viewport>
     <ScrollBar />
     <ScrollAreaPrimitive.Corner />
   </ScrollAreaPrimitive.Root>

@@ -194,7 +194,7 @@ export const SmartReplySuggestions = ({
         </div>
       ) : expanded ? (
         /* Expanded vertical list */
-        <ScrollArea className="max-h-48 px-3 pb-2">
+        <ScrollArea viewportClassName="[&>div]:!block" className="max-h-48 px-3 pb-2">
           <div className="flex flex-col gap-1.5">
             {suggestions.map((s, i) => {
               const cfg = toneConfig[s.tone] || toneConfig.formal;
@@ -286,7 +286,7 @@ export const SmartReplySuggestions = ({
                 </button>
               </PopoverTrigger>
               <PopoverContent side="top" align="end" className="w-80 p-2">
-                <ScrollArea className="max-h-56">
+                <ScrollArea viewportClassName="[&>div]:!block" className="max-h-56">
                   <div className="flex flex-col gap-1.5">
                     {suggestions.slice(MAX_VISIBLE_CHIPS).map((s, rawIdx) => {
                       const i = rawIdx + MAX_VISIBLE_CHIPS;

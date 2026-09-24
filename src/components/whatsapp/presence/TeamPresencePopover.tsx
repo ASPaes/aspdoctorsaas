@@ -245,7 +245,7 @@ export default function TeamPresencePopover() {
           pr-3: a barra de rolagem do Radix e absoluta (w-2.5) e ficaria por cima
           dos botoes da direita.
         */}
-        <ScrollArea className="flex-1 overflow-auto [&_[data-radix-scroll-area-viewport]>div]:!block">
+        <ScrollArea viewportClassName="[&>div]:!block" className="flex-1 overflow-auto [&_[data-radix-scroll-area-viewport]>div]:!block">
           <div className="pl-2 pr-3 py-1">
             {isLoading ? (
               <p className="text-xs text-muted-foreground text-center py-4">Carregando...</p>

@@ -110,7 +110,7 @@ export function InChatMessageSearchModal({ open, onOpenChange, conversationId, c
             />
           </div>
 
-          <ScrollArea className="flex-1 overflow-hidden -mx-1 px-1">
+          <ScrollArea viewportClassName="[&>div]:!block" className="flex-1 overflow-hidden -mx-1 px-1">
             {!hasSearch ? (
               <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
                 <FileSearch className="h-8 w-8 opacity-40" />

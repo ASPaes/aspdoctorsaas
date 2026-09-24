@@ -489,7 +489,7 @@ export function ChatMessages({
   if (isLoading) {
     return (
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full px-4 py-2">
+        <ScrollArea className="h-full px-4 py-2" viewportClassName="[&>div]:!block">
           <div className="space-y-3 py-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className={cn("flex", i % 2 === 0 ? "justify-start" : "justify-end")}>
@@ -504,7 +504,10 @@ export function ChatMessages({
 
   return (
     <div className="flex-1 min-h-0 overflow-hidden relative">
-      <ScrollArea className="h-full px-4 py-2" onScrollCapture={handleScroll}>
+      {/* [&>div]:!block: sem isso um item largo (imagem, aviso comprido) estica a
+          lista inteira e as bolhas enviadas, alinhadas a direita, saem da tela.
+          Ver a explicacao em components/ui/scroll-area.tsx. */}
+      <ScrollArea className="h-full px-4 py-2" viewportClassName="[&>div]:!block" onScrollCapture={handleScroll}>
         {/* Grab the viewport ref for scroll position detection */}
         <ScrollAreaViewportRef viewportRef={viewportRef} />
         {messages.length === 0 ? (

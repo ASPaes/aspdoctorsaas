@@ -271,7 +271,7 @@ export function ContactTicketsSection({ clienteId }: Props) {
           <DialogHeader>
             <DialogTitle>Histórico completo de tickets</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh] pr-2">
+          <ScrollArea viewportClassName="[&>div]:!block" className="max-h-[70vh] pr-2">
             {loadingAll ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground p-4">
                 <Loader2 className="h-3 w-3 animate-spin" /> Carregando...

@@ -655,7 +655,7 @@ export function ContactHistoryUnifiedModal({
                 </div>
               )}
 
-              <ScrollArea className="flex-1 min-h-0" onScrollCapture={handleScroll}>
+              <ScrollArea viewportClassName="[&>div]:!block" className="flex-1 min-h-0" onScrollCapture={handleScroll}>
                 <div ref={scrollViewportRef} className="px-4 py-2" onScroll={handleScroll}>
                   {isLoading ? (
                     <div className="space-y-3 py-8">

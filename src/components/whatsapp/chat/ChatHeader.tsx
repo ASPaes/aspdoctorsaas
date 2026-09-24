@@ -935,7 +935,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
 
           {/* Primary actions */}
           <div className="flex items-center gap-0.5 shrink-0">
-            {(conversation as any)?.is_group && (
+            {/* No celular este icone e repetido: "Participantes do grupo" ja esta na
+                folha de acoes, e aqui ele custava 32px do nome do grupo. */}
+            {(conversation as any)?.is_group && !isMobileVariant && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowParticipants(true)}>
@@ -956,7 +958,9 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                     disabled={isStartingGroupAtt}
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Iniciar atendimento
+                    {/* No celular o rotulo inteiro ocupava metade da linha e empurrava
+                        o nome do grupo para as reticencias. */}
+                    {isMobileVariant ? "Iniciar" : "Iniciar atendimento"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-64 p-3 space-y-3">

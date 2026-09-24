@@ -68,7 +68,7 @@ export function AttendanceMessagesDialog({ open, onOpenChange, attendance }: Pro
         <DialogHeader>
           <DialogTitle>Atendimento #{attendance?.attendance_code ?? "—"}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="h-[60vh] pr-3">
+        <ScrollArea viewportClassName="[&>div]:!block" className="h-[60vh] pr-3">
           {isLoading ? (
             <div className="flex items-center justify-center h-full text-muted-foreground text-xs gap-2">
               <Loader2 className="h-4 w-4 animate-spin" /> Carregando mensagens...

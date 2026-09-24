@@ -361,7 +361,7 @@ export function CleanupConversationDialog({ open, onOpenChange, conversationId, 
                   </Button>
                 </div>
 
-                <ScrollArea className="h-64 rounded-md border border-border">
+                <ScrollArea viewportClassName="[&>div]:!block" className="h-64 rounded-md border border-border">
                   <div className="p-2 space-y-1">
                     {visibleMessages.length === 0 ? (
                       <div className="p-4 text-center text-xs text-muted-foreground">

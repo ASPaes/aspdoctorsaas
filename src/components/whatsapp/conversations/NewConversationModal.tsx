@@ -473,7 +473,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
               )}
 
               {results.length > 0 && !selectedCliente && (
-                <ScrollArea className="h-[200px] border rounded-md">
+                <ScrollArea viewportClassName="[&>div]:!block" className="h-[200px] border rounded-md">
                   <div className="space-y-1 p-1">
                     {results.map((c) => (
                       <button
@@ -588,7 +588,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                   )}
 
                   {contactResults.length > 0 && (
-                    <ScrollArea className="h-[200px] border rounded-md">
+                    <ScrollArea viewportClassName="[&>div]:!block" className="h-[200px] border rounded-md">
                       <div className="space-y-1 p-1">
                         {contactResults.map((c) => (
                           <button
