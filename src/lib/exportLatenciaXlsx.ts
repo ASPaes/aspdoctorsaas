@@ -98,7 +98,7 @@ export function exportLatenciaAgenteXlsx(params: {
   const { nome, itens, from, to } = params;
 
   const aoa: any[][] = [[
-    "Agente", "Mensagem do cliente em", "Respondida em", "Latência (s)", "Latência",
+    "Agente", "Mensagem do cliente em", "Respondida em", "Latência útil (s)", "Latência útil",
     "No cálculo da mediana", "Contato", "Cliente", "Setor", "Grupo",
     "Mensagem do cliente", "Conversa (id)",
   ]];

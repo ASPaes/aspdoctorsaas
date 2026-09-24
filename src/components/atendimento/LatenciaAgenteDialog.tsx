@@ -115,7 +115,7 @@ export function LatenciaAgenteDialog({ agente, onOpenChange }: Props) {
                   )}
                 </DialogTitle>
                 <DialogDescription className="text-xs">
-                  Intervalo entre a mensagem do cliente e a primeira resposta do agente, nos filtros do período.
+                  Intervalo entre a mensagem do cliente e a primeira resposta do agente, nos filtros do período, contando só o tempo dentro do horário de atendimento do setor.
                   {data && data.p50 !== null && (
                     <> Mediana {fmtDur(data.p50)}
                       {data.p90 !== null && <> · p90 {fmtDur(data.p90)}</>}.
@@ -280,7 +280,7 @@ export function LatenciaAgenteDialog({ agente, onOpenChange }: Props) {
         open={chatAberto !== null}
         onOpenChange={(v) => !v && setChatAberto(null)}
         conversationId={chatAberto?.conversation_id ?? null}
-        attendanceCode={chatAberto ? `Respondeu em ${fmtDur(chatAberto.seg)}` : ""}
+        attendanceCode={chatAberto ? `Respondeu em ${fmtDur(chatAberto.seg)} úteis` : ""}
         contactName={chatAberto?.contato}
         openedAt={
           chatAberto ? new Date(new Date(chatAberto.cli_first).getTime() - 15 * 60_000).toISOString() : null

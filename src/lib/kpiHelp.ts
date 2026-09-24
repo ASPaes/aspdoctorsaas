@@ -1136,9 +1136,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_ag_latencia: {
     title: "Latência de Resposta",
-    definition: "Tempo mediano que o cliente espera por uma resposta do agente ao longo de toda a conversa — não só na primeira resposta, mas a cada vez que o cliente fala e aguarda retorno.",
+    definition: "Tempo mediano que o cliente espera por uma resposta do agente ao longo de toda a conversa — não só na primeira resposta, mas a cada vez que o cliente fala e aguarda retorno. Conta só o tempo dentro do horário de atendimento do setor: mensagem que chega fora do expediente só passa a contar quando o dia abre.",
     why_it_matters: "Diferente da 1ª resposta (que olha só o início), a latência mede o ritmo do agente no atendimento inteiro. Latência alta = cliente deixado no vácuo no meio da conversa.",
-    formula: "mediana do intervalo entre a mensagem do cliente e a resposta seguinte do agente, em todas as trocas (entre 1s e 4h)",
+    formula: "mediana do intervalo útil entre a mensagem do cliente e a resposta seguinte do agente, em todas as trocas (entre 1s e 4h de expediente)",
   },
   atendimento_ag_faixa: {
     title: "Faixa Mais Comum",
