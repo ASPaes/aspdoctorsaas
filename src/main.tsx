@@ -5,6 +5,7 @@ import "./index.css";
 import { bootstrapAccentColor } from "@/lib/accentColor";
 import { isStaleChunkError, reloadForStaleChunk } from "@/lib/staleChunkReload";
 import { registrarServiceWorker, ajustarManifestPeloHost } from "@/lib/pwa";
+import { capturarConviteDeInstalacao } from "@/lib/instalarApp";
 
 // Antes do primeiro render: senão o app monta verde e troca de cor quando as
 // preferências respondem (DEM-0103).
@@ -13,6 +14,10 @@ bootstrapAccentColor();
 // PWA: o endereço do chat instala com nome e cores próprios, e o service worker
 // é o que faz o telefone oferecer "Instalar aplicativo".
 ajustarManifestPeloHost();
+// Antes do React: o navegador avisa que a pagina pode ser instalada logo na
+// carga, as vezes antes de qualquer componente existir.
+capturarConviteDeInstalacao();
+
 registrarServiceWorker();
 
 // Deploy no meio da sessão: o Vite avisa aqui quando o preload de um chunk falha
