@@ -1036,7 +1036,9 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
             </p>
           </div>
         ) : (
-          <div className="space-y-px p-1">
+          <div className={cn("space-y-px", isMobileVariant ? "px-2 py-1" : "p-1")}>
+            {/* Respiro lateral no celular: com p-1 os selos da direita ficavam a
+                4px da borda da tela e pareciam cortados. */}
             {isGroupedView
               ? agentGroups.map((group) => (
                   <div key={group.key} className="mb-1">

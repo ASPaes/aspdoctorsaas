@@ -13,14 +13,23 @@ const roundBtn =
   "flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors";
 
 /**
- * Safari no iOS não renderiza PDF dentro de <iframe> — mostra uma faixa cinza e
- * nada mais. Lá o preview vira um convite a abrir em nova guia, que é o que o
- * ContratoAnexoSection já fazia pelo mesmo motivo.
+ * Nenhum telefone renderiza PDF dentro de <iframe>.
+ *
+ * No iPhone o Safari mostra uma faixa cinza e nada mais. No Android o Chrome
+ * troca o documento por um bloco com o nome do arquivo e um botão Abrir — que
+ * foi o que apareceu no teste de 24/09/2026 e parecia defeito nosso, mas é o
+ * navegador dizendo que não sabe exibir ali.
+ *
+ * Nos dois casos o preview vira um convite a abrir no visualizador do aparelho,
+ * que é o que o ContratoAnexoSection já fazia pelo mesmo motivo. Embutir um
+ * pdf.js só para isso não se paga.
  */
-function isIOS(): boolean {
+function semVisualizadorDePdf(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document);
+  const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && "ontouchend" in document);
+  const android = /Android/.test(ua);
+  return ios || android;
 }
 
 function withPdfExtension(name: string): string {
@@ -44,9 +53,9 @@ export function PdfPreviewLightbox({
   onOpenNewTab,
 }: PdfPreviewLightboxProps) {
   const downPos = useRef<{ x: number; y: number } | null>(null);
-  const ios = isIOS();
+  const semVisualizador = semVisualizadorDePdf();
 
-  const { data: blobUrl, isError, isFetching, refetch } = useProxyBlob(messageId, "inline", !ios);
+  const { data: blobUrl, isError, isFetching, refetch } = useProxyBlob(messageId, "inline", !semVisualizador);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -75,12 +84,12 @@ export function PdfPreviewLightbox({
 
   let body: React.ReactNode;
 
-  if (ios) {
+  if (semVisualizador) {
     body = (
       <div className="flex flex-col items-center gap-4 px-6 text-center">
         <FileText className="h-12 w-12 text-white/70" />
         <p className="max-w-xs text-sm text-white/80">
-          Este navegador não exibe PDF aqui. Abra em uma nova guia para visualizar.
+          Este aparelho não exibe PDF aqui dentro. Abra no visualizador do telefone.
         </p>
         <button
           type="button"
@@ -88,7 +97,7 @@ export function PdfPreviewLightbox({
           className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-black hover:bg-white/90 transition-colors"
         >
           <ExternalLink className="h-4 w-4" />
-          Abrir em nova guia
+          Abrir PDF
         </button>
       </div>
     );

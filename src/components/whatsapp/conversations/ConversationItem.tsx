@@ -360,7 +360,10 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         {isAgentAlert && (
           <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 gap-0.5 border-red-500/70 text-red-600 dark:text-red-400 animate-pulse">
             <Clock className="h-2.5 w-2.5" />
-            Aguardando você
+            {/* A coluna dos selos nao encolhe (whitespace-nowrap shrink-0), entao
+                cada letra aqui sai do nome do contato. Em tela estreita o selo
+                vira "Aguardando", que ja diz o mesmo. */}
+            Aguardando<span className="hidden sm:inline">&nbsp;você</span>
           </Badge>
         )}
         {cameFromOutOfHours && (

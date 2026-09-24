@@ -188,8 +188,16 @@ export function MediaContent({
     messageType === "audio"
       ? "h-12 w-64"
       : messageType === "video"
-      ? "h-[236px] w-[420px] max-w-full"
-      : "h-40 w-56 max-w-full";
+      // ⚠️ Largura FIXA aqui estourava a tela do telefone: 420px numa tela de 390px
+      // punha a bolha terminando em 538 — 148px fora, medido em 24/09/2026.
+      // `max-w-full` nao salva, porque o balao se dimensiona pelo conteudo e 100%
+      // do pai vira o proprio conteudo. O teto tem que vir da TELA.
+      //
+      // 62vw e o que sobra para a midia depois do balao (75% da lista), da margem
+      // da lista e do recheio do balao. No computador 62vw e bem maior que 420px,
+      // entao nada muda la.
+      ? "h-[236px] w-[min(420px,62vw)] max-w-full"
+      : "h-40 w-[min(224px,62vw)] max-w-full";
 
   let body: React.ReactNode;
 

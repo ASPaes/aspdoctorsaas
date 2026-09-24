@@ -68,7 +68,10 @@ export function ChatVideoPlayer({ src, onDownload, onError }: ChatVideoPlayerPro
     <div
       ref={wrapperRef}
       className="relative mb-1 max-w-full overflow-hidden rounded bg-black"
-      style={{ width, aspectRatio: ratio ?? 16 / 9 }}
+      // maxWidth pela TELA, nao pelo pai: o balao se dimensiona pelo conteudo,
+      // entao "100%" do pai seria o proprio video. Ver a conta do 62vw em
+      // MediaContent.tsx.
+      style={{ width, maxWidth: "62vw", aspectRatio: ratio ?? 16 / 9 }}
     >
       {/* Sem `autoPlay`: agora que o vídeo carrega sozinho, ele faria a conversa
           inteira começar a tocar de uma vez. O `preload="metadata"` traz só o

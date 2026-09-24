@@ -147,7 +147,11 @@ export function AttachmentCard({
         <Icon className="h-5 w-5 text-primary" />
       </div>
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-sm font-medium truncate" title={filename}>
+        {/* Nome de arquivo nao tem espaco para quebrar, entao `truncate` cortava
+            cedo demais no telefone: "La Traviata SavassiCardapioSomenteVisu..." nao
+            diz qual arquivo e. Duas linhas com quebra em qualquer ponto mostram o
+            suficiente para reconhecer, sem deixar o cartao crescer sem fim. */}
+        <p className="text-sm font-medium line-clamp-2 [overflow-wrap:anywhere]" title={filename}>
           {filename}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
