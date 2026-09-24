@@ -873,16 +873,22 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           )}
 
           {/* Avatar */}
+          {/* No celular o avatar de 40px tirava do nome o espaco que ele nao tem. */}
           <ContactAvatar
             name={name || ""}
             profilePictureUrl={contact?.profile_picture_url}
-            size="md"
+            size={isMobileVariant ? "sm" : "md"}
           />
 
           {/* Name + phone */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1">
-              <p className="text-sm font-semibold truncate min-w-0">{name}</p>
+              {/* No celular o nome usa ate duas linhas em vez de virar reticencias: em tela
+                  de 390px sobram 198px para ele, e nome de empresa passa disso quase
+                  sempre. No computador continua em uma linha. */}
+              <p className={isMobileVariant
+                ? "text-sm font-semibold min-w-0 leading-tight line-clamp-2 [overflow-wrap:anywhere]"
+                : "text-sm font-semibold truncate min-w-0"}>{name}</p>
               {/* No celular estes três ícones de 12px comiam o nome do contato,
                   que virava "Conta...". Editar e silenciar foram para a folha de
                   ações; o vínculo com o cliente vira o item "Detalhes". */}

@@ -335,6 +335,37 @@ export function ChatMessages({
     }
   }, [messages.length, hasScrolledToUnread]);
 
+  // A área de mensagens encolhe sem que ninguém role: o campo cresce conforme se
+  // digita (até 10 linhas) e, no celular, o teclado sobe. A lista encolhe certo,
+  // mas o scroll fica onde estava — o fim da conversa some atrás da barra de
+  // digitação. Medido em 390px com o campo em 10 linhas: 128px da última bolha
+  // tapados e 140px de rolagem faltando. Como quem responde por último costuma
+  // ser o atendente, a mensagem que sumia era sempre a enviada.
+  //
+  // Decide pela altura ANTERIOR, não por `isNearBottomRef`: no instante do
+  // encolhimento a distância até o fim já aumentou e o ref ainda não foi
+  // recalculado. Quem subiu para ler o histórico não é arrastado para baixo.
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || typeof ResizeObserver === "undefined") return;
+    let alturaAnterior = viewport.clientHeight;
+    const obs = new ResizeObserver(() => {
+      const altura = viewport.clientHeight;
+      if (altura < alturaAnterior) {
+        const distanciaAntes = viewport.scrollHeight - viewport.scrollTop - alturaAnterior;
+        if (distanciaAntes < NEAR_BOTTOM_THRESHOLD) {
+          bottomRef.current?.scrollIntoView({ behavior: "auto" });
+        }
+      }
+      alturaAnterior = altura;
+    });
+    obs.observe(viewport);
+    return () => obs.disconnect();
+    // isLoading entra nas dependencias porque o viewport so existe depois que a
+    // lista sai do esqueleto: sem isso o efeito rodava com o ref ainda vazio e o
+    // observador nunca chegava a montar.
+  }, [conversationId, isLoading]);
+
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     isNearBottomRef.current = true;
