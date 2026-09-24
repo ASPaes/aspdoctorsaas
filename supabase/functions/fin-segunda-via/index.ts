@@ -77,6 +77,22 @@ function pedeSegundaVia(texto: string): boolean {
   return true;
 }
 
+/**
+ * Chave de comparação de telefone: DDD + os 8 últimos dígitos.
+ *
+ * ⚠️ Comparar "os 10 últimos dígitos" NÃO funciona no Brasil, e este projeto já
+ * se queimou nisso: 55 31 99541-8571 (13 dígitos) e 55 31 9541-8571 (12) são o
+ * mesmo telefone, mas os 10 últimos dão "1995418571" e "3195418571". O nono
+ * dígito do celular empurra tudo. Os 8 finais mais o DDD sobrevivem às duas
+ * grafias e ao DDI escrito ou não.
+ */
+function chaveTelefone(bruto: string): string {
+  const d = String(bruto ?? '').replace(/\D/g, '');
+  const semDdi = d.length > 11 && d.startsWith('55') ? d.slice(2) : d;
+  if (semDdi.length < 10) return semDdi; // curto demais para comparar com segurança
+  return semDdi.slice(0, 2) + semDdi.slice(-8);
+}
+
 /** Tira do texto um CNPJ ou CPF, se houver. */
 function extrairDocumento(texto: string): string | null {
   const digitos = texto.replace(/\D/g, '');
@@ -170,12 +186,8 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!cfg?.fin_2via_liberado) {
-      // Compara pelos últimos 10 dígitos: é o que sobrevive ao nono dígito do
-      // celular e ao DDI escrito de jeitos diferentes.
-      const alvo = telefone.replace(/\D/g, '').slice(-10);
-      const liberados = (cfg?.fin_2via_telefones_teste ?? []).map((t: string) =>
-        String(t).replace(/\D/g, '').slice(-10),
-      );
+      const alvo = chaveTelefone(telefone);
+      const liberados = (cfg?.fin_2via_telefones_teste ?? []).map((t: string) => chaveTelefone(t));
       if (!alvo || !liberados.includes(alvo)) {
         return json({ ok: true, atendido: false, motivo: 'modo_teste' });
       }
