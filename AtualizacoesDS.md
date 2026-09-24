@@ -17,6 +17,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 24/09
+
+- 🆕 **O chat no telefone avisa mesmo com o aplicativo fechado** — Com o chat instalado na tela inicial e os avisos permitidos, mensagem nova passa a aparecer na barra de notificações do aparelho mesmo com o aplicativo fechado, como no WhatsApp, e tocar no aviso abre a conversa. Até agora o aviso só existia com o chat aberto na tela. Para ativar, abra o chat pelo telefone e toque em **Permitir** na faixa que aparece no topo — uma vez por aparelho. Continua valendo a janela de silêncio: fora do horário de envio, nada é disparado. No iPhone é preciso ter adicionado o chat à tela de início pelo Safari, que é a regra da Apple para qualquer site.
+
+- 🔧 **O telefone nunca pedia permissão para avisar** — Quem usava o chat pelo endereço do celular nunca era convidado a permitir os avisos, e por isso nenhuma notificação chegava, sem nenhuma mensagem explicando. Além disso, o aviso do aparelho só era disparado para quem tivesse escolhido um modo específico de alerta: no modo padrão o sistema só mostrava o aviso dentro da própria tela, que ninguém vê com o aplicativo em segundo plano. Agora a permissão é oferecida no próprio chat e, com a tela em segundo plano, o aviso vai para a barra do aparelho. No computador vale o mesmo: com a aba escondida, o aviso aparece na área de trabalho em vez de ficar só dentro da página.
+
 ### 23/09
 
 - ⬆️ **O contato solicitante do ticket passa a mostrar o telefone** — Em **Tickets › Novo ticket**, ao escolher o cliente o sistema já preenche o contato solicitante sozinho, mas exibia só o nome: não havia como conferir se era mesmo a pessoa certa. Agora o telefone aparece dentro do próprio campo, à direita do nome, formatado, e também ao lado de cada nome na lista de busca de contatos. Quando o contato não tem telefone cadastrado, a linha abaixo do campo avisa. Vale também quando o ticket nasce do encerramento de um atendimento no chat, aí com o número de quem estava na conversa.
