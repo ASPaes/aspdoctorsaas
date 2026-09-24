@@ -229,9 +229,42 @@ Deno.serve(async (req) => {
 
       const { data: cfg } = await service
         .from('configuracoes')
-        .select('fin_regua_liberada, fin_regua_telefones_teste')
+        .select('fin_regua_liberada, fin_regua_telefones_teste, fin_regua_instance_id')
         .eq('tenant_id', tenant.id)
         .maybeSingle();
+
+      // ── Por qual número a régua sai, e o que isso muda ──
+      //
+      // Não se adivinha entre as instâncias ativas: mandar cobrança pelo número
+      // errado faz o cliente responder num canal que ninguém lê. Sem canal
+      // definido, a régua não envia — e diz isso, em vez de escolher sozinha.
+      const { data: canal } = cfg?.fin_regua_instance_id
+        ? await service
+            .from('whatsapp_instances')
+            .select('id, instance_name, provider_type, is_active, meta_phone_number_id')
+            .eq('id', cfg.fin_regua_instance_id)
+            .maybeSingle()
+        : { data: null };
+
+      const oficial = canal?.provider_type === 'meta_cloud';
+
+      // Templates aprovados deste canal. Só importam quando o canal é oficial:
+      // fora da janela de 24h a Meta não entrega texto livre, e um toque sem
+      // template aprovado não é "um toque com texto feio", é um toque que não
+      // sai. Melhor suprimir com motivo do que tentar e falhar em 341 envios.
+      const aprovados = new Set<string>();
+      if (oficial && canal?.id) {
+        const tpls = await buscarTodos((de, ate) =>
+          service
+            .from('whatsapp_meta_templates')
+            .select('name, language, status')
+            .eq('instance_id', canal.id)
+            .eq('status', 'APPROVED')
+            .order('name')
+            .range(de, ate),
+        );
+        for (const t of tpls) aprovados.add(`${t.name}|${t.language}`);
+      }
 
       const liberados = new Set(
         (cfg?.fin_regua_telefones_teste ?? []).map((t: string) => chaveTelefone(t)).filter(Boolean),
@@ -257,6 +290,22 @@ Deno.serve(async (req) => {
       let resumoJaProcessado = 0;
 
       for (const toque of toques ?? []) {
+        // Impedimento do TOQUE inteiro, decidido antes de olhar título nenhum.
+        // Vale para todos os candidatos dele e aparece em cada um, para a lista
+        // responder "por que ninguém deste toque sairia".
+        let travaDoToque: string | null = null;
+        if (!cfg?.fin_regua_instance_id) {
+          travaDoToque = 'tenant sem número definido para a régua';
+        } else if (!canal) {
+          travaDoToque = 'número configurado para a régua não existe mais';
+        } else if (!canal.is_active) {
+          travaDoToque = `número da régua (${canal.instance_name}) está inativo`;
+        } else if (oficial && !toque.template_name) {
+          travaDoToque = 'canal oficial exige template e o toque não tem um definido';
+        } else if (oficial && !aprovados.has(`${toque.template_name}|${toque.template_language}`)) {
+          travaDoToque = `template "${toque.template_name}" (${toque.template_language}) não está aprovado na Meta`;
+        }
+
         // vencimento = hoje - dias_offset (ver comentário do cabeçalho)
         const alvo = new Date(`${hoje}T12:00:00Z`);
         alvo.setUTCDate(alvo.getUTCDate() - toque.dias_offset);
@@ -394,7 +443,10 @@ Deno.serve(async (req) => {
           let decisao = 'enviaria';
           let motivo: string | null = null;
 
-          if (!chave) {
+          if (travaDoToque) {
+            decisao = 'sem_canal';
+            motivo = travaDoToque;
+          } else if (!chave) {
             decisao = 'suprimido';
             motivo = 'cliente sem telefone de WhatsApp válido';
           } else if (bloqueados.has(chave)) {
@@ -431,7 +483,13 @@ Deno.serve(async (req) => {
           // é obrigação legal e não pode depender de alguém lembrar de escrevê-la
           // em cada mensagem nova. Vale só para a régua: a 2ª via é o cliente
           // que pediu, e oferecer saída de algo que ele acabou de pedir é ruído.
-          mensagem += `\n\n${LINHA_OPTOUT}`;
+          //
+          // ⚠️ No canal oficial NÃO se acrescenta: mensagem de template não
+          // aceita texto colado no fim. Lá o rodapé de opt-out tem que estar
+          // DENTRO do template aprovado — e é por isso que este `if` existe em
+          // vez de a linha ser incondicional. A obrigação continua sendo dos
+          // dois caminhos; o que muda é onde ela mora.
+          if (!oficial) mensagem += `\n\n${LINHA_OPTOUT}`;
 
           candidatos.push({
             toque: toque.rotulo,
@@ -487,9 +545,13 @@ Deno.serve(async (req) => {
       // vencimento previsto não é a cobrança que se quis mandar. Quando
       // `cabe_na_janela` der false, a resposta certa não é acelerar: é a API
       // oficial da Meta com template de utilidade, que não tem esse limite.
+      // No canal oficial o ritmo artificial não se aplica: quem limita é a
+      // Meta, por clientes distintos em 24h, e o degrau sobe sozinho enquanto a
+      // qualidade se mantém. Aplicar o intervalo de 45 a 90 segundos ali seria
+      // tornar lento de graça algo que não tem esse problema.
       const segundosMedios = (INTERVALO_MIN_SEG + INTERVALO_MAX_SEG) / 2;
-      const hojeCabe = Math.min(mensagensEnviaria, tetoDiario);
-      const minutosParaEscoar = Math.round((hojeCabe * segundosMedios) / 60);
+      const hojeCabe = oficial ? mensagensEnviaria : Math.min(mensagensEnviaria, tetoDiario);
+      const minutosParaEscoar = oficial ? 0 : Math.round((hojeCabe * segundosMedios) / 60);
 
       saida.push({
         tenant: tenant.nome,
@@ -497,6 +559,14 @@ Deno.serve(async (req) => {
         regua_liberada: cfg?.fin_regua_liberada === true,
         toques_ativos: (toques ?? []).length,
         opt_outs_ativos: bloqueados.size,
+        canal: canal
+          ? {
+              nome: canal.instance_name,
+              modo: oficial ? 'oficial (Meta Cloud)' : canal.provider_type,
+              ativo: canal.is_active === true,
+              templates_aprovados: oficial ? aprovados.size : null,
+            }
+          : { nome: null, modo: null, ativo: false, templates_aprovados: null },
         resumo: {
           por_decisao: porDecisao,
           ja_processados: resumoJaProcessado,
@@ -505,12 +575,14 @@ Deno.serve(async (req) => {
           valor_alcancavel: valorEnviaria,
         },
         plano_de_ritmo: {
-          uma_por_vez: true,
-          intervalo_segundos: `${INTERVALO_MIN_SEG} a ${INTERVALO_MAX_SEG}, sorteado`,
-          teto_diario: tetoDiario,
+          uma_por_vez: !oficial,
+          intervalo_segundos: oficial
+            ? 'sem intervalo artificial: quem limita é o degrau da Meta'
+            : `${INTERVALO_MIN_SEG} a ${INTERVALO_MAX_SEG}, sorteado`,
+          teto_diario: oficial ? null : tetoDiario,
           sairiam_hoje: hojeCabe,
           ficariam_para_os_proximos_dias: Math.max(0, mensagensEnviaria - hojeCabe),
-          dias_para_escoar: tetoDiario > 0 ? Math.ceil(mensagensEnviaria / tetoDiario) : 0,
+          dias_para_escoar: oficial ? 1 : (tetoDiario > 0 ? Math.ceil(mensagensEnviaria / tetoDiario) : 0),
           minutos_para_escoar_hoje: minutosParaEscoar,
           cabe_na_janela: minutosParaEscoar <= MINUTOS_DA_JANELA,
         },
