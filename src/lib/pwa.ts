@@ -16,7 +16,18 @@
 
 import { isChatHost } from "@/lib/chatHost";
 
-const CAMINHO_SW = "/sw.js";
+// ⚠️ O `?v=` não é enfeite. O .htaccess publicava TODO .js com cache de um ano
+// e "immutable", e sw.js caía nessa regra (a exceção estava escrita para
+// service-worker.js, nome que este projeto não usa). Os aparelhos ficaram presos
+// na primeira versão: o push chegava e o service worker antigo não sabia exibir,
+// então nada aparecia na barra do telefone.
+//
+// A regra do .htaccess já foi corrigida, mas quem baixou o arquivo antes tem uma
+// cópia válida por um ano — e nem o navegador nem o cache do servidor voltam a
+// buscar. Uma URL diferente é o que o navegador trata como outro script e o
+// cache não conhece. **Suba este número sempre que mexer no sw.js.**
+const VERSAO_SW = 3;
+const CAMINHO_SW = `/sw.js?v=${VERSAO_SW}`;
 
 export function registrarServiceWorker() {
   if (typeof window === "undefined") return;

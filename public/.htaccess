@@ -42,7 +42,18 @@
   <FilesMatch "\.(js|css|woff2?|ttf|eot|png|jpe?g|gif|svg|webp|ico)$">
     Header set Cache-Control "public, max-age=31536000, immutable"
   </FilesMatch>
-  <FilesMatch "(index\.html|service-worker\.js)$">
+  # ⚠️ O nome importa: a regra acima pega TODO .js, e o service worker deste
+  # projeto se chama sw.js, nao service-worker.js. Ele foi publicado com cache de
+  # um ano e "immutable", e os aparelhos ficaram presos na primeira versao: o
+  # push chegava, o service worker antigo nao sabia exibir e nada aparecia na
+  # barra do telefone. Medido em 24/09/2026 — o navegador recebia ds-v1 enquanto
+  # o servidor ja tinha a v3.
+  #
+  # O manifest entra pelo mesmo motivo: e ele que diz o nome e o icone do app
+  # instalado, e cacheado por um ano nenhuma correcao chega.
+  <FilesMatch "(index\.html|sw\.js|service-worker\.js|\.webmanifest)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header unset Expires
+    Header set Pragma "no-cache"
   </FilesMatch>
 </IfModule>
