@@ -436,8 +436,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         s.sound_enabled && !dnd && (mode === "tick" || mode === "full");
       const wantsToast =
         s.visual_enabled && (mode === "silent" || mode === "full");
+      // Com a tela em segundo plano o toast nao e visto por ninguem: ai "full"
+      // tambem precisa virar aviso do sistema, senao a mensagem chega e o
+      // telefone nao avisa nada. Era o caso do chat instalado, onde o modo
+      // padrao e "full" e o operador nao fica olhando a tela.
       const wantsNative =
-        s.visual_enabled && mode === "native" && !isVisible;
+        s.visual_enabled && !isVisible && (mode === "native" || mode === "full");
 
       if (wantsSound) {
         const vol = mode === "tick" ? 0.3 : undefined;
