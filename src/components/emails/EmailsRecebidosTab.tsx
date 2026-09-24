@@ -443,12 +443,23 @@ export default function EmailsRecebidosTab() {
                 const ligado = !!linha.referencia_id;
                 const cliente = nomeDoClienteRecebido(linha);
                 const naTriagem = linha.acao === "triagem" && !filtros.lixeira;
-                // ninguém abriu ainda: é o que o badge da barra lateral conta
-                const naoLido = !linha.lido_em && !linha.arquivado_em && !filtros.lixeira;
+                // Lido x por ler, como em qualquer caixa de e-mail: o que ninguém abriu
+                // vem escuro e em negrito, o que já foi aberto desbota (retorno do
+                // Alexandre, 23/09/2026: só a bolinha não se enxergava).
+                // Na lixeira e no arquivo a distinção não vale, e aí ninguém desbota.
+                const distingueLido = !filtros.lixeira && !filtros.arquivadas;
+                const naoLido = distingueLido && !linha.lido_em;
+                const lido = distingueLido && !!linha.lido_em;
                 return (
                   <TableRow
                     key={linha.id}
-                    className={cn(selecionados.includes(linha.id) && "bg-accent/10", naTriagem && "bg-warning/5")}
+                    className={cn(
+                      selecionados.includes(linha.id) && "bg-accent/10",
+                      naTriagem && "bg-warning/5",
+                      // desbota a linha inteira; as células sem cor própria herdam daqui
+                      lido && "text-muted-foreground",
+                      naoLido && "bg-primary/[0.04]",
+                    )}
                   >
                     {ehAdmin && (
                       <TableCell className="align-top">
@@ -476,18 +487,18 @@ export default function EmailsRecebidosTab() {
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="whitespace-nowrap align-top font-mono text-xs">
+                    <TableCell className={cn("whitespace-nowrap align-top font-mono text-xs", naoLido && "font-semibold text-foreground")}>
                       {dia}
-                      <span className="block text-muted-foreground">{hora}</span>
+                      <span className={cn("block", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{hora}</span>
                     </TableCell>
                     <TableCell className="align-top">
                       {naoLido && (
                         <span
-                          className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary align-middle"
+                          className="mr-2 inline-block h-2 w-2 shrink-0 rounded-full bg-primary align-middle"
                           title="Ainda não aberto"
                         />
                       )}
-                      <span className={cn("font-medium", naoLido && "font-semibold text-foreground")}>
+                      <span className={cn(naoLido ? "font-bold text-foreground" : "font-normal")}>
                         {linha.assunto || "(sem assunto)"}
                       </span>
                       <AnexosDoEmail linha={linha} />
@@ -499,8 +510,10 @@ export default function EmailsRecebidosTab() {
                       {naTriagem && podeTriar && <CaixaTriagem linha={linha} setores={setores} />}
                     </TableCell>
                     <TableCell className="max-w-[190px] align-top">
-                      <span className="block truncate font-mono text-xs">{linha.de_email}</span>
-                      {linha.de_nome && <span className="block truncate text-[11px] text-muted-foreground">{linha.de_nome}</span>}
+                      <span className={cn("block truncate font-mono text-xs", naoLido && "font-semibold text-foreground")}>{linha.de_email}</span>
+                      {linha.de_nome && (
+                        <span className={cn("block truncate text-[11px]", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{linha.de_nome}</span>
+                      )}
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate align-top text-sm">
                       {cliente ?? <span className="text-xs text-muted-foreground">não identificado</span>}
