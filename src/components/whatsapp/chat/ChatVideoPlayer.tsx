@@ -1,3 +1,4 @@
+import { assumirReproducao, liberarReproducao } from "./midiaExclusiva";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, Maximize2, Minimize2, Volume2, VolumeX } from "lucide-react";
 
@@ -75,6 +76,10 @@ export function ChatVideoPlayer({ src, onDownload, onError }: ChatVideoPlayerPro
           `src` direto no elemento, não em <source>: com <source> o browser não
           dispara `error` no elemento pai, e o fallback nunca aconteceria. */}
       <video
+        // So uma midia por vez: dar play aqui pausa o audio ou video anterior.
+        onPlay={(e) => assumirReproducao(e.currentTarget)}
+        onPause={(e) => liberarReproducao(e.currentTarget)}
+        onEnded={(e) => liberarReproducao(e.currentTarget)}
         ref={videoRef}
         src={src}
         controls

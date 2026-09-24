@@ -42,6 +42,10 @@ function RotateIcon({ direction }: { direction: "ccw" | "cw" }) {
   );
 }
 
+// Janela para reconhecer o segundo toque. 280ms é o usado por bibliotecas de
+// gesto; abaixo disso o dedo não acompanha, acima o fechar fica lento.
+const ESPERA_DUPLO_TOQUE_MS = 280;
+
 export function ZoomableImageLightbox({
   src,
   onClose,
@@ -51,6 +55,13 @@ export function ZoomableImageLightbox({
   onOpenNewTab,
 }: ZoomableImageLightboxProps) {
   const downPos = useRef<{ x: number; y: number } | null>(null);
+  // Fechar por toque espera um instante para ver se vem o segundo toque. Sem
+  // isso o PRIMEIRO toque do gesto de ampliar já fechava a imagem, e ampliar
+  // com dois toques — como no WhatsApp — era impossível.
+  const fecharPendente = useRef<number | null>(null);
+  const ehDuploToque = useRef(false);
+  // Ampliada, toque em área vazia é para arrastar/voltar, nunca para fechar.
+  const escala = useRef(1);
 
   const [copied, setCopied] = useState(false);
   // Rotação é só de visualização: vive em memória e zera ao trocar de imagem.
@@ -120,8 +131,21 @@ export function ZoomableImageLightbox({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  useEffect(() => () => {
+    if (fecharPendente.current != null) window.clearTimeout(fecharPendente.current);
+  }, []);
+
   const handlePointerDown = (e: React.PointerEvent) => {
     downPos.current = { x: e.clientX, y: e.clientY };
+    // Toque que chega com um fechamento a espera e o segundo do par: cancela o
+    // fechamento e deixa o zoom cuidar do gesto de ampliar.
+    if (fecharPendente.current != null) {
+      window.clearTimeout(fecharPendente.current);
+      fecharPendente.current = null;
+      ehDuploToque.current = true;
+    } else {
+      ehDuploToque.current = false;
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -132,10 +156,17 @@ export function ZoomableImageLightbox({
     // ocupa a tela inteira, então a lateral do overlay nunca é o currentTarget —
     // o que valia era a imagem e os controles, marcados com data-lightbox-keep.
     if ((e.target as HTMLElement | null)?.closest("[data-lightbox-keep]")) return;
+    if (ehDuploToque.current) return;
+    if (escala.current > 1.01) return;
     const dx = e.clientX - start.x;
     const dy = e.clientY - start.y;
     if (Math.hypot(dx, dy) < 8) {
-      onClose();
+      // Nao fecha na hora: se vier um segundo toque dentro da janela, o gesto era
+      // de ampliar. Sem isso, o primeiro toque do par ja fechava a imagem.
+      fecharPendente.current = window.setTimeout(() => {
+        fecharPendente.current = null;
+        onClose();
+      }, ESPERA_DUPLO_TOQUE_MS);
     }
   };
 
@@ -154,6 +185,7 @@ export function ZoomableImageLightbox({
         limitToBounds
         smooth={false}
         doubleClick={{ mode: "toggle", step: 2 }}
+        onTransform={(_ref, estado) => { escala.current = estado.scale; }}
         wheel={{ step: 0.15 }}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (

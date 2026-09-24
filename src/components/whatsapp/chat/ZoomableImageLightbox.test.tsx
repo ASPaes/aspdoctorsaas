@@ -22,6 +22,8 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  // O fechamento por toque virou temporizado (janela do duplo toque).
+  vi.useFakeTimers();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -30,6 +32,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
 });
 
 const pressEscape = () =>
@@ -79,6 +82,10 @@ describe("ZoomableImageLightbox — clique fora", () => {
     expect(wrapper).toBeTruthy();
     click(wrapper);
 
+    // O fechamento espera a janela do duplo toque: sem isso o primeiro toque do
+    // gesto de ampliar fechava a imagem. Ver ZoomableImageLightbox.gesto.test.tsx.
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(300); });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

@@ -18,7 +18,7 @@
  *    Mensagem de chat não pode vir de cache.
  */
 
-const VERSAO = "ds-v1";
+const VERSAO = "ds-v2";
 const CASCA = `casca-${VERSAO}`;
 const ARQUIVOS = `arquivos-${VERSAO}`;
 
@@ -86,4 +86,32 @@ self.addEventListener("fetch", (evento) => {
 // A página manda "atualiza agora" quando detecta versão nova (ver src/lib/pwa.ts).
 self.addEventListener("message", (evento) => {
   if (evento.data === "atualizar-agora") self.skipWaiting();
+});
+
+/*
+ * Clique na notificação da barra. Sem este handler o toque na notificação não
+ * faz nada — e é o service worker quem precisa responder, porque a notificação
+ * agora é criada por ele (ver src/lib/notificacaoDoSistema.ts).
+ *
+ * Foca a aba que já está aberta em vez de abrir outra, como o WhatsApp: abrir
+ * uma segunda janela do chat deixa duas conexões de tempo real no ar e o
+ * atendente sem saber qual das duas está atualizada.
+ */
+self.addEventListener("notificationclick", (evento) => {
+  evento.notification.close();
+  const destino = (evento.notification.data && evento.notification.data.url) || "/";
+
+  evento.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((janelas) => {
+      for (const janela of janelas) {
+        if ("focus" in janela) {
+          // navigate() falha em alguns casos (janela em outro escopo); focar já
+          // resolve o essencial, que é trazer o chat para a frente.
+          janela.navigate?.(destino)?.catch(() => {});
+          return janela.focus();
+        }
+      }
+      return self.clients.openWindow(destino);
+    })
+  );
 });

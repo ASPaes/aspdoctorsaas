@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
+import { mostrarNotificacaoDoSistema, marcarIconeDoApp } from "@/lib/notificacaoDoSistema";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
@@ -502,21 +503,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         "Notification" in window &&
         Notification.permission === "granted"
       ) {
-        try {
-          const n = new Notification(notif.title, {
-            body: notif.body || "",
-            icon: "/favicon.png",
-            tag: notifConvId ? `chat-${notifConvId}` : `notif-${notif.id}`,
-            requireInteraction: false,
-          });
-          n.onclick = () => {
-            window.focus();
-            if (notif.action_url) navigate(notif.action_url);
-            n.close();
-          };
-        } catch (err) {
-          console.warn("[notifications] native notify failed", err);
-        }
+        // Pelo service worker, nao pelo construtor: no Android `new Notification`
+        // lanca "Illegal constructor" e o aviso nunca chegava na barra do telefone.
+        void mostrarNotificacaoDoSistema({
+          titulo: notif.title,
+          corpo: notif.body || "",
+          tag: notifConvId ? `chat-${notifConvId}` : `notif-${notif.id}`,
+          url: notif.action_url ?? "/",
+        });
       }
     },
     [navigate, queryClient, playSound, repetirAviso]
@@ -650,6 +644,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Favicon badge
   useEffect(() => {
+    // Instalado na tela inicial, o icone do app leva a contagem como no WhatsApp.
+    marcarIconeDoApp(unreadCount);
     updateFaviconBadge(unreadCount > 0);
   }, [unreadCount]);
 

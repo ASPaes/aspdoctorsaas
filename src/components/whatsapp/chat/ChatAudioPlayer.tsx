@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useAudioPlaybackRate } from "./audioPlaybackRate";
+import { assumirReproducao, liberarReproducao } from "./midiaExclusiva";
 
 // Mudar a velocidade no player nativo custa três cliques (3 pontinhos →
 // velocidade da reprodução → opção). A pílula ao lado cicla 1x → 1,5x → 2x → 1x
@@ -33,6 +34,10 @@ export function ChatAudioPlayer({ src }: ChatAudioPlayerProps) {
     if (Math.abs(audio.playbackRate - rate) > 0.001) audio.playbackRate = rate;
   }, [rate]);
 
+  // Bolha que sai da tela (troca de conversa, rolagem que desmonta) nao pode
+  // continuar dona do registro.
+  useEffect(() => () => liberarReproducao(audioRef.current), []);
+
   const cycleRate = useCallback(() => {
     const current = audioRef.current?.playbackRate ?? rate;
     // Procura o próximo da lista acima do atual em vez de avançar um índice:
@@ -51,6 +56,10 @@ export function ChatAudioPlayer({ src }: ChatAudioPlayerProps) {
         // Troca vinda do menu de 3 pontinhos também é escolha do agente: vira
         // preferência como qualquer outra.
         onRateChange={(e) => setRate(e.currentTarget.playbackRate)}
+        // So um audio por vez, como no WhatsApp: dar play aqui pausa o anterior.
+        onPlay={(e) => assumirReproducao(e.currentTarget)}
+        onPause={(e) => liberarReproducao(e.currentTarget)}
+        onEnded={(e) => liberarReproducao(e.currentTarget)}
       >
         <source src={src} />
       </audio>
