@@ -381,3 +381,9 @@ verify_jwt = true
 # desenho do dispatch-scheduled-messages, que tambem roda sem gente.
 [functions.fin-segunda-via]
 verify_jwt = false
+
+# Motor da regua de cobranca. FALSE porque quem chama e o pg_cron, que nao tem
+# JWT de usuario; a auth mora dentro, comparando o Bearer com o segredo do
+# vault (mesmo do fin-sync-titulos).
+[functions.fin-regua-motor]
+verify_jwt = false
