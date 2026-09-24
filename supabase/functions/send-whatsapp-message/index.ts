@@ -528,6 +528,41 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!existingAtt) {
+        // DEM-0464: conversa que JA TEVE atendimento e nao tem nenhum vivo esta
+        // encerrada. Abrir um atendimento novo aqui nao e decisao de ninguem: e
+        // efeito colateral de alguem ter digitado. Foi o que aconteceu em
+        // 17/09/2026 -- aba esquecida desde a manha, "Oii" as 14h46, e o cliente
+        // recebeu "Atendimento 07917/26 aberto com sucesso" quase uma hora e
+        // meia depois do chat dele ter sido encerrado com CSAT.
+        //
+        // A tela ja trava o compositor nesse estado (composerTravado.ts); esta
+        // guarda existe para a aba que carregou o JS de antes desta versao.
+        // Medido em 30 dias de producao: 281 atendimentos abertos assim pelo
+        // mesmo agente que acabara de encerrar um na mesma conversa, 86 deles
+        // sem o cliente dizer uma palavra.
+        //
+        // Conversa que NUNCA teve atendimento nenhum e o contato ativo, em que o
+        // operador legitimamente puxa o assunto: essa continua abrindo.
+        const { count: atendimentosAnteriores } = await supabase
+          .from('support_attendances')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', body.conversationId);
+
+        if ((atendimentosAnteriores ?? 0) > 0) {
+          console.warn(`[send-whatsapp-message] DEM-0464: envio barrado em conversa encerrada conv=${body.conversationId} user=${senderUserId}`);
+          // 200 com success:false e o padrao de erro de negocio desta function
+          // (ver o rate limit do @todos): num 4xx o supabase-js devolve
+          // `data: null` e o operador leria "non-2xx status code".
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Este atendimento foi encerrado. Reabra o atendimento antes de enviar a mensagem.',
+              hint: 'attendance_closed',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         // No active attendance -- create it now (before sending agent message)
         const preNow = new Date();
         const preNowIso = preNow.toISOString();

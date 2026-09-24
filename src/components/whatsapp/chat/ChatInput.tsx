@@ -626,6 +626,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
             toast.error(err?.message || "J\u00E1 foi marcado @todos neste grupo h\u00E1 pouco.");
             return;
           }
+          // DEM-0464: o atendimento foi encerrado enquanto esta aba estava
+          // parada. A mensagem n\u00E3o saiu, ent\u00E3o devolve o texto em vez de perd\u00EA-lo.
+          if (err?.attendanceClosed === true) {
+            setMessage(content);
+            toast.error(err?.message || "Este atendimento foi encerrado. Reabra antes de enviar.");
+            return;
+          }
           toast.error(err?.message || "Erro ao enviar mensagem");
         },
       }

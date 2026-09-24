@@ -81,6 +81,10 @@ export const useWhatsAppSend = () => {
         Object.assign(sendError, {
           rateLimited: data.rateLimited === true,
           retryAfterMinutes: typeof data.retryAfterMinutes === 'number' ? data.retryAfterMinutes : undefined,
+          // DEM-0464: o servidor recusou porque o atendimento já foi encerrado.
+          // Chega aqui só numa aba que carregou o JS de antes da trava do
+          // compositor — a tela atual nem mostra a caixa de texto nesse estado.
+          attendanceClosed: data.hint === 'attendance_closed',
         });
         throw sendError;
       }
@@ -156,7 +160,18 @@ export const useWhatsAppSend = () => {
       //
       // Formato não suportado é o mesmo caso: nada subiu, e reenviar o mesmo
       // AVIF/HEIC vai falhar de novo. O toast do ChatInput diz o que fazer.
-      const semRetry = (err as any)?.rateLimited === true || (err as any)?.formatoNaoSuportado === true;
+      //
+      // DEM-0464: atendimento encerrado também. Aqui vale um passo a mais —
+      // a aba está com o estado velho, e é essa defasagem que deixou a caixa de
+      // texto aberta. Invalidar o atendimento faz o compositor travar na hora,
+      // em vez de deixar a pessoa tentar de novo.
+      if ((err as any)?.attendanceClosed === true) {
+        queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+      }
+      const semRetry =
+        (err as any)?.rateLimited === true ||
+        (err as any)?.formatoNaoSuportado === true ||
+        (err as any)?.attendanceClosed === true;
       if (semRetry && context?.tempId) {
         queryClient.setQueryData<MsgPages>(
           ['whatsapp', 'messages', newMessage.conversationId],

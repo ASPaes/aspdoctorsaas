@@ -24,6 +24,12 @@ import { useAppTimezone } from "@/hooks/useAppTimezone";
 import { ShieldAlert } from "lucide-react";
 import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { usePortao } from "@/hooks/usePortao";
+import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
+import { useAtendimentoClaim } from "../hooks/useAtendimentoClaim";
+import { ClientBlockDialog } from "./ClientBlockDialog";
+import { atendimentoEncerradoParaDigitar } from "./composerTravado";
+import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
+import { RotateCcw, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
 import { hasOpenEscLayer } from "@/lib/escapeLayers";
@@ -126,6 +132,38 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   const initialGreeting = undefined;
 
   const { messages } = useWhatsAppMessages(conversation?.id ?? null, { readOnly: true });
+
+  // DEM-0464: o compositor ignorava o estado do atendimento. Uma aba esquecida
+  // aberta num chat já encerrado continuava aceitando digitação, e a mensagem
+  // fazia a edge function ABRIR um atendimento novo no nome de quem digitou,
+  // avisando o cliente ("Atendimento XXXXX/26 aberto com sucesso"). Medido em
+  // 30 dias: 281 atendimentos assim, 86 sem o cliente dizer uma palavra.
+  //
+  // Mesma chave do QueueIndicator do cabeçalho (conversa única + fechados):
+  // as duas leituras compartilham o cache e o Realtime, sem query a mais.
+  const convIdParaAtendimento = conversation?.id ?? null;
+  const { attendanceMap, isLoading: attendanceLoading } = useAttendanceStatus(
+    convIdParaAtendimento ? [convIdParaAtendimento] : [],
+    true,
+  );
+  const atendimentoDaConversa = convIdParaAtendimento ? attendanceMap.get(convIdParaAtendimento) : undefined;
+  // As exceções (grupo, contato ativo, carregando) moram na função pura, com teste.
+  const atendimentoEncerrado = atendimentoEncerradoParaDigitar({
+    status: atendimentoDaConversa?.status,
+    carregando: attendanceLoading,
+    ehGrupo: (conversation as any)?.is_group === true,
+  });
+
+  const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  const setorDoAtendimento = atendimentoDaConversa?.department_id;
+  const souDoSetor = canSeeAllDepartments || !setorDoAtendimento || setorDoAtendimento === userDepartmentId;
+
+  const claimAtendimento = useAtendimentoClaim({
+    conversationId: conversation?.id ?? "",
+    contactId: conversation?.contact_id ?? (conversation as any)?.contact?.id ?? null,
+    clienteId: (conversation as any)?.contact?.cliente_id ?? null,
+  });
+  const podeReabrir = claimAtendimento.podeAssumir && souDoSetor;
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {
@@ -404,6 +442,30 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             <ShieldAlert className="h-4 w-4 shrink-0" />
             <span>Você não tem permissão para enviar mensagens neste chat.</span>
           </div>
+        ) : atendimentoEncerrado ? (
+          /* DEM-0464: antes daqui o compositor continuava ativo e a mensagem
+             abria um atendimento novo sozinha, sem ninguém decidir. */
+          <div className="border-t bg-muted/40 px-4 py-3 flex flex-wrap items-center gap-x-2 gap-y-2 text-sm text-muted-foreground">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            <span className="min-w-0">
+              Atendimento encerrado. Reabra para voltar a falar com o cliente.
+            </span>
+            {podeReabrir && (
+              <Button
+                size="sm"
+                className="h-7 text-xs gap-1.5 rounded-full ml-auto"
+                onClick={claimAtendimento.pedirClaim}
+                disabled={claimAtendimento.isPending || claimAtendimento.isBlocked}
+              >
+                {claimAtendimento.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <RotateCcw className="h-3 w-3" />
+                )}
+                Reabrir atendimento
+              </Button>
+            )}
+          </div>
         ) : (
           <ChatInput
             ref={chatInputRef}
@@ -424,6 +486,14 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
           />
         )}
       </div>
+
+      <ClientBlockDialog
+        open={claimAtendimento.blockDialogOpen}
+        onOpenChange={claimAtendimento.setBlockDialogOpen}
+        blocks={claimAtendimento.clientBlocks}
+        hasHardBlock={claimAtendimento.hasHardBlock}
+        onConfirm={claimAtendimento.confirmarOverride}
+      />
 
       {showDetails && (
         emCelular ? (

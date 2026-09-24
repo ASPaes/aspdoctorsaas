@@ -1,16 +1,13 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, Ban, RotateCcw } from "lucide-react";
+import { UserCheck, ArrowRightLeft, Loader2, Users, User, Clock, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
+import { useAtendimentoClaim } from "../hooks/useAtendimentoClaim";
+import { ClientBlockDialog } from "./ClientBlockDialog";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
-import { useAgentPresence } from "@/hooks/useAgentPresence";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { toast } from "sonner";
-import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { usePortao } from "@/hooks/usePortao";
 import {
   AlertDialog,
@@ -42,8 +39,7 @@ interface QueueIndicatorProps {
 }
 
 export function QueueIndicator({ conversationId, assignedTo, onTransferClick, assignedOperatorName, contactId, clienteId, compacto }: QueueIndicatorProps) {
-  const { user, profile } = useAuth();
-  const { claimConversation, unassignConversation, isAssigning, isClaiming } = useConversationAssignment();
+  const { user } = useAuth();
 
   // Use attendance status as source of truth (it updates via realtime)
   const { attendanceMap, isLoading: attendanceLoading } = useAttendanceStatus([conversationId], true);
@@ -68,72 +64,23 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const convDeptId = attendance?.department_id;
   const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
 
-  const { isBlocked } = useAgentPresence();
-
   // antes: sem restrição — qualquer operador assumia/puxava da fila e transferia.
   // O portão entra em série com as regras atuais (presença, setor, bloqueio).
-  const podeAssumir = usePortao("atend.assumir");
   const podeTransferir = usePortao("atendimento_transferir");
 
-  // Bloqueios ativos do contato/cliente desta conversa
-  const { data: allClientAlerts = [] } = useClientAlerts();
-  // Só os bloqueios marcados para o chat travam aqui: os de escopo ticket aparecem no banner, mas não impedem assumir.
-  const clientBlocks = blocksFor(resolveAlertsFor(allClientAlerts, { contactId, clienteId }), "atendimento");
-  const hasHardBlock = clientBlocks.some((b) => b.block_behavior === "hard");
-  const [blockDialogOpen, setBlockDialogOpen] = useState(false);
+  // DEM-0464: portão, presença, bloqueio de cliente e a auditoria do override
+  // moram no hook, porque o compositor bloqueado oferece o mesmo botão.
+  const claim = useAtendimentoClaim({ conversationId, contactId, clienteId });
+  const { podeAssumir, isBlocked, isPending, clientBlocks, hasHardBlock } = claim;
+
   const [takeoverDialogOpen, setTakeoverDialogOpen] = useState(false);
 
-  const doClaim = () => {
-    if (!user?.id) return;
-    claimConversation({ conversationId, reason: "Assumido manualmente" });
-  };
-
-  // Registra auditoria ao furar bloqueios "confirmação" e assume o atendimento.
-  // Falha de log não impede o atendimento.
-  const handleConfirmOverride = async () => {
-    setBlockDialogOpen(false);
-    if (user?.id && clientBlocks.length > 0) {
-      const rows = clientBlocks.map((b) => ({
-        tenant_id: b.tenant_id,
-        alert_id: b.id,
-        cliente_id: b.cliente_id,
-        contact_id: b.contact_id,
-        conversation_id: conversationId,
-        action: "bloqueio_confirmado",
-        alert_titulo: b.titulo,
-        alert_kind: b.kind,
-        alert_block_behavior: b.block_behavior,
-        performed_by: user.id,
-      }));
-      try {
-        await (supabase.from("client_alert_audit" as any) as any).insert(rows);
-      } catch (e) {
-        console.error("Falha ao registrar auditoria de bloqueio", e);
-      }
-    }
-    doClaim();
-  };
-
-  const handleClaim = () => {
-    if (!user?.id) return;
-    if (isBlocked) {
-      toast.warning("Você precisa estar Ativo para assumir atendimentos.");
-      return;
-    }
-    if (clientBlocks.length > 0) {
-      setBlockDialogOpen(true);
-      return;
-    }
-    doClaim();
-  };
-
   // Takeover: assumir chat de outro operador do setor, após confirmação.
-  // Reusa handleClaim para manter guards de presença e bloqueio de cliente.
+  // Reusa o hook para manter guards de presença e bloqueio de cliente.
   const handleConfirmTakeover = () => {
     setTakeoverDialogOpen(false);
-    handleClaim();
+    claim.pedirClaim();
   };
-
 
   // Chip display
   const chipConfig = isInQueue
@@ -180,10 +127,10 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           variant="default"
           size="sm"
           className="h-7 text-xs gap-1.5 rounded-full"
-          onClick={handleClaim}
-          disabled={isAssigning || isClaiming || isBlocked}
+          onClick={claim.pedirClaim}
+          disabled={isPending || isBlocked}
         >
-          {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
           Assumir
         </Button>
       ) : canReopen ? (
@@ -191,10 +138,10 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
           variant="default"
           size="sm"
           className="h-7 text-xs gap-1.5 rounded-full"
-          onClick={handleClaim}
-          disabled={isAssigning || isClaiming || isBlocked}
+          onClick={claim.pedirClaim}
+          disabled={isPending || isBlocked}
         >
-          {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
           Reabrir
         </Button>
       ) : (
@@ -205,9 +152,9 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
               size="sm"
               className="h-7 text-xs gap-1.5 rounded-full"
               onClick={() => setTakeoverDialogOpen(true)}
-              disabled={isAssigning || isClaiming || isBlocked}
+              disabled={isPending || isBlocked}
             >
-              {(isAssigning || isClaiming) ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+              {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
               Assumir
             </Button>
           )}
@@ -248,45 +195,13 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Ban className="h-4 w-4 text-destructive" />
-              {hasHardBlock ? "Atendimento bloqueado" : "Cliente com bloqueio"}
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  {hasHardBlock
-                    ? "Este cliente tem um bloqueio que impede assumir o atendimento:"
-                    : "Este cliente tem um bloqueio. Confirme que está ciente antes de prosseguir:"}
-                </p>
-                <div className="space-y-2">
-                  {clientBlocks.map((b) => (
-                    <div key={b.id} className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                      <p className="font-medium text-sm text-foreground">{b.titulo}</p>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{b.mensagem}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            {hasHardBlock ? (
-              <AlertDialogAction onClick={() => setBlockDialogOpen(false)}>Entendi</AlertDialogAction>
-            ) : (
-              <>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleConfirmOverride}>
-                  Assumir mesmo assim
-                </AlertDialogAction>
-              </>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ClientBlockDialog
+        open={claim.blockDialogOpen}
+        onOpenChange={claim.setBlockDialogOpen}
+        blocks={clientBlocks}
+        hasHardBlock={hasHardBlock}
+        onConfirm={claim.confirmarOverride}
+      />
     </div>
   );
 }
