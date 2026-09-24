@@ -67,7 +67,7 @@ function pedeSegundaVia(texto: string): boolean {
     .trim();
   if (!t || t.length > 300) return false; // texto longo é desabafo, não pedido
 
-  const pedido = /(boleto|fatura|2\s*via|2a via|segunda via|codigo de barras|linha digitavel|nota fiscal|nfse|nfe|recibo|pagar|pagamento)/;
+  const pedido = /(boleto|fatura|2\s*via|2a via|segunda via|codigo de barras|linha digitavel|nota fiscal|nfse|nfe|recibo|pagar|pagamento|pix|cobranca|duplicata|titulo)/;
   if (!pedido.test(t)) return false;
 
   // Quem está avisando que JÁ pagou não quer a 2ª via, quer falar com gente.
@@ -91,6 +91,28 @@ function chaveTelefone(bruto: string): string {
   const semDdi = d.length > 11 && d.startsWith('55') ? d.slice(2) : d;
   if (semDdi.length < 10) return semDdi; // curto demais para comparar com segurança
   return semDdi.slice(0, 2) + semDdi.slice(-8);
+}
+
+/**
+ * Pedido de reenvio DENTRO de uma conversa que o robô acabou de atender.
+ *
+ * Aqui a régua é mais larga de propósito: quem acabou de receber o boleto e
+ * escreve "pdf", "não abriu" ou "manda de novo" está falando da mesma coisa.
+ * Fora de uma sessão viva essas palavras não significam nada, e por isso esta
+ * checagem só vale quando o estado é `entregue`.
+ *
+ * Medido em 24/09/2026, no teste do Alexandre: ele pediu "me manda pdf" logo
+ * depois de receber o boleto e caiu no aviso de fora do expediente, porque
+ * "pdf" não estava em lista nenhuma.
+ */
+function pedeReenvio(texto: string): boolean {
+  const t = texto
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+  if (!t || t.length > 120) return false;
+  return /(pdf|arquivo|anexo|documento|manda de novo|manda novamente|reenvia|reenviar|envia de novo|nao abriu|nao abre|nao consigo abrir|link quebrado|nao carregou)/.test(t);
 }
 
 /** Tira do texto um CNPJ ou CPF, se houver. */
@@ -206,14 +228,18 @@ Deno.serve(async (req) => {
     const documento = extrairDocumento(texto);
     const aguardandoCnpj = sessaoViva?.estado === 'aguardando_cnpj';
 
+    // Dentro de uma conversa recém-atendida, "pdf" e "manda de novo" são pedido.
+    const reenvio = sessaoViva?.estado === 'entregue' && pedeReenvio(texto);
+
     // Sem sessão viva esperando documento, só entra quem pediu.
-    if (!aguardandoCnpj && !pedeSegundaVia(texto)) {
+    if (!aguardandoCnpj && !reenvio && !pedeSegundaVia(texto)) {
       return json({ ok: true, atendido: false, motivo: 'sem_pedido' });
     }
 
-    // Já entregou a lista há pouco e o cliente mandou outra coisa: não repete.
-    // Quem cuida do que vem depois é o motor, que manda para o Financeiro.
-    if (sessaoViva?.estado === 'entregue' && !pedeSegundaVia(texto)) {
+    // Já entregou a lista há pouco e o cliente mandou outra coisa, que não é
+    // pedido nem reenvio: não repete. Quem cuida do que vem depois é o motor,
+    // que manda a conversa para o Financeiro.
+    if (sessaoViva?.estado === 'entregue' && !reenvio && !pedeSegundaVia(texto)) {
       return json({ ok: true, atendido: false, motivo: 'ja_entregue' });
     }
 
