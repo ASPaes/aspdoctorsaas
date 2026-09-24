@@ -231,11 +231,53 @@ Deno.serve(async (req) => {
       return json({ ok: true, skipped: "texto_vazio" });
     }
 
-    await sendAndPersistAutoMessage(supabase, built.ctx, att.conversation_id, texto, {
+    const enviada = await sendAndPersistAutoMessage(supabase, built.ctx, att.conversation_id, texto, {
       auto: true,
       assignment_greeting: true,
       attendance_id: att.id,
     });
+
+    // DEM-0468 — a saudação é uma resposta ao cliente; o relógio de inatividade
+    // precisa enxergá-la.
+    //
+    // Sem este carimbo a bolha saía e nada mexia em last_operator_message_at: em
+    // 1:1 quem carimba é a tela (send-whatsapp-message) e o eco do provedor não
+    // volta para mensagem enviada pela própria plataforma. Dois defeitos medidos
+    // na Athuz em 23/09/2026:
+    //   - cliente esperando (awaiting_agent_since preenchido): a saudação não
+    //     devolvia a bola para ele, o atendimento ficava fora da régua de
+    //     inatividade e não encerrava sozinho nunca — no 02820/26 a saudação saiu
+    //     14:29 e o operador teve que encerrar na mão às 14:58;
+    //   - cliente que não estava esperando: o relógio seguia correndo desde a
+    //     última mensagem DELE, então a janela de 15 min já vinha corrida e o
+    //     atendimento encerrava ~7 min depois da saudação (8 casos em 7 dias).
+    //
+    // Carimbar last_operator_message_at resolve os dois de uma vez:
+    // trg_track_awaiting_agent limpa awaiting_agent_since e
+    // trg_reset_inactivity_warning derruba aviso pendente e encerramento
+    // agendado de fim de expediente.
+    //
+    // msg_agent_count NÃO é incrementado de propósito: é ele que responde "o
+    // agente ainda não escreveu" para o acceptance-timeout, para a devolução à
+    // fila e para as métricas de primeira resposta — e a saudação não é o agente
+    // escrevendo. O gate lá em cima (msg_agent_count > 0 → skip) também depende
+    // disso não ser tocado aqui.
+    //
+    // A guarda do last_customer_message_at é para a corrida: se o cliente
+    // escreveu entre a atribuição e a entrega da saudação, a bola é dele de novo
+    // e limpar o awaiting apagaria um cliente esperando de verdade.
+    if (enviada) {
+      const agoraIso = new Date().toISOString();
+      const { error: carimboErr } = await supabase
+        .from("support_attendances")
+        .update({ last_operator_message_at: agoraIso, updated_at: agoraIso })
+        .eq("id", att.id)
+        .in("status", ["waiting", "in_progress"])
+        .or(`last_customer_message_at.is.null,last_customer_message_at.lt.${agoraIso}`);
+      if (carimboErr) {
+        console.error(`${LOG} falha ao carimbar last_operator_message_at:`, carimboErr.message);
+      }
+    }
 
     await supabase.rpc("mark_assignment_greeting_result", {
       p_attendance_id: att.id,
