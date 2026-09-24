@@ -46,7 +46,7 @@ BASE="$RAIZ/docs/edge-functions-baseline.json"
 SAIDA="${TMPDIR:-${TEMP:-/tmp}}/edge-fn-audit.$$.json"
 trap 'rm -f "$SAIDA"' EXIT
 
-supabase functions list --project-ref "$REF" -o json > "$SAIDA"
+"${SUPABASE_BIN:-supabase}" functions list --project-ref "$REF" -o json > "$SAIDA"
 
 if [ "${1:-}" = "--atualizar" ]; then
   node -e '

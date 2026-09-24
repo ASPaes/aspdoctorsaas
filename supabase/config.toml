@@ -374,3 +374,10 @@ verify_jwt = false
 # publicaria com FALSE e abriria a busca de boleto para qualquer um.
 [functions.fin-titulo-boleto]
 verify_jwt = true
+
+# 2a via de boleto no chat. Chamada pelo motor de atendimento (outra edge
+# function), com a chave de servico -- nao existe usuario, entao verify_jwt =
+# FALSE e a auth mora dentro: compara o Bearer com a SERVICE_ROLE_KEY. Mesmo
+# desenho do dispatch-scheduled-messages, que tambem roda sem gente.
+[functions.fin-segunda-via]
+verify_jwt = false

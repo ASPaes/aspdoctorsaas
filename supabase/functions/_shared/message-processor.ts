@@ -2512,6 +2512,45 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const { data: convStatus } = await supabase.from('whatsapp_conversations').select('status').eq('id', conversationId).single();
   if (convStatus?.status === 'closed') await supabase.from('whatsapp_conversations').update({ status: 'active', updated_at: new Date().toISOString() }).eq('id', conversationId);
 
+  // ─── 2ª via de boleto (autoatendimento do Financeiro) ──────────────────────
+  // Toda a regra mora na function `fin-segunda-via`; aqui só se pergunta se ela
+  // atendeu. Fica fora do `_shared` de propósito: assim a regra de cobrança
+  // evolui sem republicar as 87 functions do repo a cada ajuste de texto.
+  //
+  // POR QUE ANTES DO HORÁRIO COMERCIAL: daqui para baixo, fora do expediente o
+  // processamento PARA e o cliente só recebe "estamos fechados". Quem manda
+  // "me manda o boleto" às 22h quer pagar; responder com horário de
+  // funcionamento é o pior dos mundos. É a mesma exceção que a opção de
+  // autoatendimento da URA já tem.
+  //
+  // A function decide sozinha se é com ela (pedido de 2ª via, empresa com o
+  // módulo ligado, telefone liberado). Falha dela nunca engole a mensagem: sem
+  // `atendido`, o fluxo segue para a URA como sempre.
+  try {
+    const resp2via = await fetch(`${supabaseUrl}/functions/v1/fin-segunda-via`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+      },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        conversation_id: conversationId,
+        contact_id: contactId,
+        texto: content,
+        telefone: phone,
+        instance_id: instanceId,
+      }),
+    });
+    const r2via = await resp2via.json().catch(() => ({}));
+    if (r2via?.atendido === true) {
+      console.log(`[processor] 2a via respondida por autoatendimento em ${conversationId} (${r2via.motivo})`);
+      return;
+    }
+  } catch (err) {
+    console.error('[processor] 2a via indisponivel, seguindo fluxo normal:', err);
+  }
+
   const skipUra = instanceInfo.skip_ura === true;
   const supportConfig = await getSupportConfig(supabase, tenantId);
 
