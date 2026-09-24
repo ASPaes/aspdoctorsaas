@@ -1454,6 +1454,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
+        closureContactPhone={contact?.phone_number ?? null}
         closureHandleSeconds={(attendance as any)?.handle_seconds ?? null}
         closureAiSummary={(attendance as any)?.ai_summary ?? null}
         closureAiTopics={(attendance as any)?.ai_topics ?? null}
@@ -1645,6 +1646,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
           closureDepartmentId={attendanceTicketTarget.department_id ?? (conversation as any).department_id ?? null}
           closureResponsavelId={attendanceTicketTarget.assigned_to ?? (conversation as any).assigned_to ?? null}
           closureContactName={contact?.name ?? null}
+          closureContactPhone={contact?.phone_number ?? null}
           closureHandleSeconds={attendanceTicketTarget.handle_seconds ?? null}
           closureAiSummary={attendanceTicketTarget.ai_summary ?? null}
           closureAiTopics={null}
@@ -1706,6 +1708,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         closureDepartmentId={(conversation as any).department_id ?? null}
         closureResponsavelId={attendance?.assigned_to ?? null}
         closureContactName={contact?.name ?? null}
+        closureContactPhone={contact?.phone_number ?? null}
         closureHandleSeconds={(attendance as any)?.handle_seconds ?? null}
         closureAiSummary={(attendance as any)?.ai_summary ?? null}
         closureAiTopics={(attendance as any)?.ai_topics ?? null}

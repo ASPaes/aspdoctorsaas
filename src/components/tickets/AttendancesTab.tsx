@@ -980,6 +980,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
           closureDepartmentId={ticketModalAtt.department_id ?? null}
           closureResponsavelId={ticketModalAtt.assigned_to ?? null}
           closureContactName={ticketModalAtt.whatsapp_contacts?.name ?? ticketModalAtt.contact_name ?? null}
+          closureContactPhone={ticketModalAtt.whatsapp_contacts?.phone_number ?? null}
           closureHandleSeconds={ticketModalAtt.handle_seconds ?? null}
           closureAiSummary={ticketModalAtt.ai_summary ?? null}
           closureAiTopics={null}

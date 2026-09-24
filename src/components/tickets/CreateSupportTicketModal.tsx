@@ -17,6 +17,7 @@ import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDet
 import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
 import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
+import { formatarTelefone } from "@/components/emails/macros/camposMacro";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function HelpBadge({ text }: { text: string }) {
@@ -64,6 +65,7 @@ interface Props {
   closureDepartmentId?: string | null;
   closureResponsavelId?: string | null;
   closureContactName?: string | null;
+  closureContactPhone?: string | null;
   closureHandleSeconds?: number | null;
   closureAiSummary?: string | null;
   closureAiTopics?: string[] | null;
@@ -116,6 +118,7 @@ export function CreateSupportTicketModal({
   closureDepartmentId = null,
   closureResponsavelId = null,
   closureContactName = null,
+  closureContactPhone = null,
   closureHandleSeconds = null,
   closureAiSummary = null,
   closureAiTopics = null,
@@ -164,6 +167,10 @@ export function CreateSupportTicketModal({
   const [authUserId, setAuthUserId] = useState("");
   const [contatoSolicitante, setContatoSolicitante] = useState("");
   const [contatoSelectedId, setContatoSelectedId] = useState<string | null>(null);
+  // DEM-0459: o campo é texto livre com o NOME. Sem o número, ninguém confere se o
+  // contato que o sistema puxou sozinho é o certo. O telefone anda ao lado do campo,
+  // nunca dentro dele — o que está no input é gravado como nome do contato.
+  const [contatoSelectedFone, setContatoSelectedFone] = useState<string | null>(null);
   const [contatoResults, setContatoResults] = useState<Array<{ id: string; name: string; phone_number: string | null; email: string | null; role: string | null }>>([]);
   const [contatoDropdownOpen, setContatoDropdownOpen] = useState(false);
   const [newContactDialogOpen, setNewContactDialogOpen] = useState(false);
@@ -205,6 +212,7 @@ export function CreateSupportTicketModal({
     setResponsavelId("");
     setContatoSolicitante("");
     setContatoSelectedId(null);
+    setContatoSelectedFone(null);
     setContatoResults([]);
     setContatoDropdownOpen(false);
     setPrevisaoEncerramento(defaultPrevisao());
@@ -229,6 +237,7 @@ export function CreateSupportTicketModal({
       setAgendadoPara("");
       setContatoSolicitante("");
       setContatoSelectedId(null);
+      setContatoSelectedFone(null);
       setContatoResults([]);
       setContatoDropdownOpen(false);
       setPrevisaoEncerramento(defaultPrevisao());
@@ -257,6 +266,7 @@ export function CreateSupportTicketModal({
       setDepartamentoId(closureDepartmentId || "");
       setResponsavelId(closureResponsavelId || "");
       setContatoSolicitante(closureContactName || "");
+      setContatoSelectedFone(closureContactPhone || null);
       const descParts: string[] = [];
       if (closureAiProblem) descParts.push("PROBLEMA: " + closureAiProblem);
       if (closureAiSolution) descParts.push("SOLUÇÃO: " + closureAiSolution);
@@ -626,6 +636,7 @@ export function CreateSupportTicketModal({
     const clienteId = selectedCliente?.id;
     if (!clienteId) {
       setContatoSolicitante("");
+      setContatoSelectedFone(null);
       return;
     }
     (supabase.from("cliente_contatos" as any) as any)
@@ -638,9 +649,11 @@ export function CreateSupportTicketModal({
         if (data?.name) {
           setContatoSolicitante(data.name);
           setContatoSelectedId(data.id ?? null);
+          setContatoSelectedFone(data.phone_number ?? null);
         } else {
           setContatoSolicitante("");
           setContatoSelectedId(null);
+          setContatoSelectedFone(null);
         }
       });
   }, [selectedCliente?.id, fromClosure]);
@@ -1015,12 +1028,13 @@ export function CreateSupportTicketModal({
           email: newContactEmail.trim() || null,
           cargo: newContactRole.trim() || null,
         })
-        .select("id, name:nome")
+        .select("id, name:nome, phone_number:fone")
         .single();
       if (error) throw error;
       toast.success("Contato cadastrado");
       setContatoSolicitante((data as any).name);
       setContatoSelectedId((data as any).id);
+      setContatoSelectedFone((data as any).phone_number ?? null);
       setContatoResults([]);
       setContatoDropdownOpen(false);
       setNewContactDialogOpen(false);
@@ -1299,6 +1313,8 @@ export function CreateSupportTicketModal({
                         setProdutoId("");
                         setClienteSearchTerm("");
                         setContatoSolicitante("");
+                        setContatoSelectedId(null);
+                        setContatoSelectedFone(null);
                       }}
                     >
                       Trocar
@@ -1365,6 +1381,7 @@ export function CreateSupportTicketModal({
                       onChange={(e) => {
                         setContatoSolicitante(e.target.value);
                         setContatoSelectedId(null);
+                        setContatoSelectedFone(null);
                       }}
                       onFocus={() => { if (contatoResults.length > 0) setContatoDropdownOpen(true); }}
                       onBlur={() => setTimeout(() => setContatoDropdownOpen(false), 150)}
@@ -1383,6 +1400,7 @@ export function CreateSupportTicketModal({
                             onClick={() => {
                               setContatoSolicitante(c.name);
                               setContatoSelectedId(c.id);
+                              setContatoSelectedFone(c.phone_number ?? null);
                               setContatoDropdownOpen(false);
                               setContatoResults([]);
                             }}
@@ -1390,7 +1408,7 @@ export function CreateSupportTicketModal({
                             <div className="font-medium">{c.name}</div>
                             {(c.phone_number || c.role) && (
                               <div className="text-[10px] text-muted-foreground">
-                                {[c.role, c.phone_number].filter(Boolean).join(" • ")}
+                                {[c.role, c.phone_number ? formatarTelefone(c.phone_number) : null].filter(Boolean).join(" • ")}
                               </div>
                             )}
                           </button>
@@ -1416,7 +1434,18 @@ export function CreateSupportTicketModal({
                     <UserPlus className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Busca nos contatos do cliente. Use + para cadastrar.</p>
+                {contatoSelectedFone ? (
+                  <p className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                    <Phone className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    {formatarTelefone(contatoSelectedFone)}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    {contatoSolicitante.trim()
+                      ? "Contato sem telefone cadastrado. Busca nos contatos do cliente; use + para cadastrar."
+                      : "Busca nos contatos do cliente. Use + para cadastrar."}
+                  </p>
+                )}
               </div>
             </div>
 
