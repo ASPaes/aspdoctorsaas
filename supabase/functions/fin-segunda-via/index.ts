@@ -101,7 +101,7 @@ function chaveTelefone(bruto: string): string {
  * Fora de uma sessão viva essas palavras não significam nada, e por isso esta
  * checagem só vale quando o estado é `entregue`.
  *
- * Medido em 24/09/2026, no teste do Alexandre: ele pediu "me manda pdf" logo
+ * Medido em 23/09/2026, no teste do Alexandre: ele pediu "me manda pdf" logo
  * depois de receber o boleto e caiu no aviso de fora do expediente, porque
  * "pdf" não estava em lista nenhuma.
  */
@@ -231,7 +231,7 @@ Deno.serve(async (req) => {
     // Dentro de uma conversa que já recebeu boleto, "pdf" e "manda de novo" são
     // pedido.
     //
-    // A âncora NÃO é a sessão, e isso é uma correção de 24/09/2026. A sessão
+    // A âncora NÃO é a sessão, e isso é uma correção de 23/09/2026. A sessão
     // vive 30 minutos; o cliente que recebe o boleto de manhã e escreve "não
     // abriu o pdf" à tarde cairia no aviso de fora do expediente, que foi
     // exatamente o que aconteceu no teste do Alexandre. A âncora é a entrega:
@@ -460,7 +460,7 @@ Deno.serve(async (req) => {
 /**
  * `comAnexo` diz se o PDF vai junto; o link entra SEMPRE.
  *
- * Decisão do Alexandre em 24/09/2026, depois de ver os dois funcionando: manda
+ * Decisão do Alexandre em 23/09/2026, depois de ver os dois funcionando: manda
  * os dois. Ele sabe que a URL do Omie tem ~300 caracteres e ocupa dez linhas no
  * celular — foi ele quem reclamou disso. O peso maior é dar ao cliente as duas
  * saídas, porque quem não abre anexo abre link e vice-versa.
