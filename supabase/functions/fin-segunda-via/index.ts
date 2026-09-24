@@ -220,12 +220,29 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!tenant?.financeiro_enabled) return json({ ok: true, atendido: false, motivo: 'modulo_desligado' });
 
+    // A configuração é lida AQUI, antes do opt-out, porque o opt-out também
+    // precisa saber se pode responder. O portão em si continua mais abaixo.
+    const { data: cfg } = await supabase
+      .from('configuracoes')
+      .select('fin_2via_liberado, fin_2via_telefones_teste')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const liberadosAgora = (cfg?.fin_2via_telefones_teste ?? [])
+      .map((t: string) => chaveTelefone(t))
+      .filter(Boolean);
+
     // ─── Opt-out ────────────────────────────────────────────────────────────
     //
-    // ⚠️ ANTES DO PORTÃO DE TESTE, e isso é o ponto inteiro. O portão existe
-    // para o robô não FALAR com quem não devia; sair é o contrário — é o
-    // cliente mandando parar, e tem que funcionar sempre, inclusive enquanto a
-    // régua está fechada e inclusive para quem nunca recebeu nada daqui.
+    // ⚠️ O REGISTRO vem antes do portão de teste; a RESPOSTA não. Separar os
+    // dois é a correção de 24/09/2026, e a confusão entre eles foi minha: o
+    // portão existe para o robô não FALAR com quem não devia, e eu tratei
+    // "respeitar o pedido de sair" e "responder ao cliente" como a mesma coisa.
+    //
+    // Guardar o pedido tem que acontecer sempre, inclusive com a régua fechada
+    // e inclusive para quem nunca recebeu nada daqui: perder um pedido de saída
+    // é o pior desfecho possível. Já responder automaticamente é falar com
+    // cliente, e isso espera o teste.
     //
     // Mora aqui, e não no motor da régua, porque o pedido chega como mensagem
     // recebida, e esta function é a única do Financeiro que o motor de
@@ -263,6 +280,27 @@ Deno.serve(async (req) => {
           { onConflict: 'tenant_id,chave_telefone' },
         );
 
+        // ⚠️ REGISTRAR é uma coisa; RESPONDER é outra, e só a segunda é "o robô
+        // falando com cliente".
+        //
+        // Correção de 24/09/2026. A versão anterior respondia a qualquer
+        // cliente da Digi Office que escrevesse a frase, porque este bloco fica
+        // antes do portão de teste. Isso é exatamente o que o Alexandre proibiu:
+        // nenhuma automação fala com cliente antes de ele testar no próprio
+        // WhatsApp. Ninguém chegou a ser respondido — as 30 mensagens recebidas
+        // desde o deploy não continham pedido de saída — mas foi sorte, não
+        // desenho.
+        //
+        // O registro continua acontecendo sempre, e tem que continuar: é o
+        // pedido do cliente, e perdê-lo seria pior do que qualquer outra coisa
+        // aqui. O que o portão decide é se a CONFIRMAÇÃO sai automática ou se a
+        // conversa segue para uma pessoa, que responde e vê o que aconteceu.
+        const podeResponder = cfg?.fin_2via_liberado === true || liberadosAgora.includes(chave);
+        if (!podeResponder) {
+          console.log(LOG, 'opt-out registrado sem resposta automática (portão fechado)', conversationId);
+          return json({ ok: true, atendido: false, motivo: 'opt_out_registrado_sem_resposta' });
+        }
+
         await enviar(
           supabase,
           { tenantId, conversationId, contactId, instanceId, telefone, simular },
@@ -284,16 +322,9 @@ Deno.serve(async (req) => {
     //
     // Depois de liberado, isto vira o freio de mão: virar a chave para false
     // para o robô parar na hora, sem deploy.
-    const { data: cfg } = await supabase
-      .from('configuracoes')
-      .select('fin_2via_liberado, fin_2via_telefones_teste')
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
-
     if (!cfg?.fin_2via_liberado) {
       const alvo = chaveTelefone(telefone);
-      const liberados = (cfg?.fin_2via_telefones_teste ?? []).map((t: string) => chaveTelefone(t));
-      if (!alvo || !liberados.includes(alvo)) {
+      if (!alvo || !liberadosAgora.includes(alvo)) {
         return json({ ok: true, atendido: false, motivo: 'modo_teste' });
       }
     }
