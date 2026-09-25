@@ -56,13 +56,36 @@ const DOCTOROMIE_DOCS =
 const DOCS_VALIDADE_MS = 12 * 60 * 60 * 1000;
 
 /**
+ * Teto de espera de cada ida a um serviço externo.
+ *
+ * ⚠️ NASCEU DE UM DEFEITO REAL, em 25/09/2026: a função releu os títulos no
+ * Omie, esperou o conector e buscou os documentos — tudo com sucesso — e
+ * **morreu na hora de responder, 12 segundos depois de começar**. O cliente não
+ * recebeu nada: nem a nota, nem o aviso de fora do expediente.
+ *
+ * A lição não é "ficou lento": é que uma resposta de chat não pode depender de
+ * uma corrente de serviços sem teto. Cada elo agora tem prazo, e estourar o
+ * prazo significa responder com o que já se sabe, nunca não responder.
+ */
+const TETO_RELER_MS = 6000;
+const TETO_SYNC_MS = 4000;
+const TETO_DOCS_MS = 8000;
+
+/** fetch com prazo. Estourou, vira erro tratado, não pendura a resposta. */
+async function buscarComPrazo(url: string, init: RequestInit, prazoMs: number): Promise<Response> {
+  return await fetch(url, { ...init, signal: AbortSignal.timeout(prazoMs) });
+}
+
+/**
  * Quantos títulos releremos no ERP antes de responder.
  *
- * A mensagem lista no máximo 3 vencidos, então reler mais do que isso é pagar
- * 1,2 s por título que o cliente nem vai ver. O que sobra continua valendo pelo
+ * ⚠️ UM, e isso é latência, não economia. Em 25/09/2026 a função fez tudo certo
+ * e morreu na hora de responder, 12 segundos depois de começar: relia 3 títulos
+ * (1,2 s de pausa entre cada), esperava o conector e ainda buscava documento.
+ * O título que importa é o alvo da resposta; o resto continua valendo pelo
  * espelho, e a leitura de hora em hora o alcança depois.
  */
-const MAX_RELEITURA = 3;
+const MAX_RELEITURA = 1;
 
 /** Quantos títulos a mensagem lista antes de resumir. Três cabem na tela do celular. */
 const MAX_TITULOS_NA_MENSAGEM = 3;
@@ -534,7 +557,18 @@ Deno.serve(async (req) => {
     // Nunca deixa a resposta cair: qualquer tropeço aqui é registrado e o
     // atendimento segue com o que o espelho tem. Uma resposta um pouco velha é
     // melhor do que nenhuma.
-    await relerNoErp(supabase, tenantId, clienteId);
+    // ⚠️ DESLIGADA POR PADRÃO desde 25/09/2026, e o motivo é um defeito real.
+    //
+    // Com ela ligada a resposta levou 107 segundos e o cliente não recebeu nada:
+    // o motor desistiu de esperar e mandou o aviso de fora do expediente no
+    // lugar. A releitura funciona — os títulos foram relidos e os documentos
+    // buscados, está tudo gravado —, mas pendurada na frente de uma resposta de
+    // chat ela custa caro demais.
+    //
+    // O conserto certo é responder primeiro e corrigir depois, não apertar
+    // prazos. Enquanto ele não existe, a resposta sai com o espelho, que é o
+    // que ela fazia antes e funcionava.
+    if (body?.reler === true) await relerNoErp(supabase, tenantId, clienteId);
 
     // ---- Títulos em aberto --------------------------------------------------
     // A view só devolve o que a origem confirmou na última leitura: título que o
@@ -834,11 +868,11 @@ async function relerNoErp(supabase: any, tenantId: string, clienteId: string): P
       });
       if (!chave) continue;
 
-      const resp = await fetch(DOCTOROMIE_RELER, {
+      const resp = await buscarComPrazo(DOCTOROMIE_RELER, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
         body: JSON.stringify({ codigos }),
-      });
+      }, TETO_RELER_MS);
       const corpo = await resp.json().catch(() => ({}));
       if (!resp.ok || corpo?.ok === false) {
         console.warn(LOG, 'releitura recusada:', JSON.stringify(corpo).slice(0, 200));
@@ -854,11 +888,11 @@ async function relerNoErp(supabase: any, tenantId: string, clienteId: string): P
 
     const { data: segredo } = await supabase.rpc('obter_segredo_cron_fin_sync');
     if (!segredo) return;
-    await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/fin-sync-titulos`, {
+    await buscarComPrazo(`${Deno.env.get('SUPABASE_URL')}/functions/v1/fin-sync-titulos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${segredo}` },
       body: JSON.stringify({ tenant_id: tenantId }),
-    });
+    }, TETO_SYNC_MS);
   } catch (e) {
     console.warn(LOG, 'releitura falhou, seguindo com o espelho:', (e as Error)?.message);
   }
@@ -874,10 +908,20 @@ async function relerNoErp(supabase: any, tenantId: string, clienteId: string): P
  * Devolve `{}` em qualquer tropeço. Documento que não vem não pode calar a
  * resposta: o cliente ainda recebe a lista de faturas e uma pessoa assume daí.
  */
-async function obterDocumentos(supabase: any, titulo: Titulo): Promise<Record<string, string | null>> {
+async function obterDocumentos(
+  supabase: any,
+  titulo: Titulo,
+  buscarSeFaltar = false,
+): Promise<Record<string, string | null>> {
   const guardados = (titulo as any).documentos ?? null;
   const em = (titulo as any).documentos_em ? new Date((titulo as any).documentos_em).getTime() : 0;
   if (guardados && Date.now() - em < DOCS_VALIDADE_MS) return guardados;
+
+  // ⚠️ SÓ O QUE ESTÁ GUARDADO, desde 25/09/2026. Buscar no Omie aqui custa duas
+  // chamadas e entrou na mesma conta que fez a resposta levar 107 segundos e
+  // não chegar. Quem enche este cache é a tela (`fin-titulo-documentos`), que
+  // pode esperar; o chat não pode.
+  if (!buscarSeFaltar) return guardados ?? {};
 
   if (titulo.origem !== 'omie' || !titulo.origem_conta_id) return guardados ?? {};
 
@@ -887,11 +931,11 @@ async function obterDocumentos(supabase: any, titulo: Titulo): Promise<Record<st
     });
     if (!chave) return guardados ?? {};
 
-    const resp = await fetch(DOCTOROMIE_DOCS, {
+    const resp = await buscarComPrazo(DOCTOROMIE_DOCS, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
       body: JSON.stringify({ codigo_lancamento_omie: Number(titulo.origem_id) }),
-    });
+    }, TETO_DOCS_MS);
     const corpo = await resp.json().catch(() => ({}));
     if (!resp.ok || corpo?.ok === false) {
       console.warn(LOG, 'documentos recusados:', JSON.stringify(corpo).slice(0, 200));
