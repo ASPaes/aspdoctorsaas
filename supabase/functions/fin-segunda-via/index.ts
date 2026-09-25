@@ -787,11 +787,34 @@ function montarMensagem(
 
   if (link && alvo) {
     const qual = alvo.vencido ? 'da fatura mais antiga' : 'dessa fatura';
-    partes.push(
-      comAnexo
-        ? `Boleto ${qual} em anexo. Se preferir abrir pelo navegador:\n${link}`
-        : `Boleto ${qual}:\n${link}`,
-    );
+
+    // O PORTAL NO LUGAR DO LINK GIGANTE, quando existe.
+    //
+    // O link assinado do boleto tem 299 caracteres e ocupa dez linhas num
+    // celular. O do portal do Omie tem 47, e entrega mais: todos os boletos, o
+    // **Pix** (que a API do ObterBoleto nunca devolveu), a nota, o XML e o
+    // demonstrativo, numa página que pede os 5 primeiros dígitos do CNPJ antes
+    // de mostrar qualquer coisa — por isso é seguro mandar por WhatsApp.
+    //
+    // Ele nem sempre existe: só há portal quando a ordem de serviço tem nota
+    // emitida. Sem ele, volta o link de antes, que é feio mas funciona.
+    const portal = (alvo as any).documentos?.portal ?? null;
+
+    if (portal) {
+      partes.push(
+        comAnexo
+          ? `Boleto ${qual} em anexo. Aqui você vê todas as suas faturas, com Pix e nota fiscal:\n${portal}`
+          : `Suas faturas, com boleto, Pix e nota fiscal:\n${portal}`,
+      );
+      partes.push('A página pede os 5 primeiros números do seu CNPJ para abrir.');
+    } else {
+      partes.push(
+        comAnexo
+          ? `Boleto ${qual} em anexo. Se preferir abrir pelo navegador:\n${link}`
+          : `Boleto ${qual}:\n${link}`,
+      );
+    }
+
     if (alvo.codigo_barras) partes.push(`Código de barras:\n${alvo.codigo_barras}`);
   } else {
     partes.push('O boleto ainda não está gerado no sistema. Já vou pedir para o financeiro te enviar.');

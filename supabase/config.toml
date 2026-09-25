@@ -400,3 +400,9 @@ verify_jwt = true
 # publicaria com FALSE e abriria nota fiscal de cliente para qualquer um.
 [functions.fin-titulo-documentos]
 verify_jwt = true
+
+# Enche o cache de documentos em segundo plano. FALSE porque quem chama e o
+# pg_cron, que nao tem JWT; a auth mora dentro, comparando o Bearer com o
+# segredo do vault.
+[functions.fin-documentos-preencher]
+verify_jwt = false
