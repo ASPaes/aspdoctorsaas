@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- 🆕 **Produto novo já entra com os módulos contratados** — Em **Clientes › ficha do cliente › Produtos & Módulos › Adicionar Produto**, depois de escolher o produto aparece a seção **Módulos contratados**. Nela dá para marcar todos os módulos de uma vez, com a quantidade de cada um. Antes era preciso salvar o produto e incluir os módulos um a um pelo "Adicionar módulo". O valor mensal por módulo é opcional e só fica registrado: o MRR do produto continua sendo o Valor Mensal digitado. Nos produtos ligados ao OEM, o custo de cada módulo vem da tabela do parceiro. No **Histórico de módulos**, esses módulos aparecem como **Venda inicial**, separados das vendas feitas depois.
+
 - ⬆️ **Busca de cliente no Novo ticket mostra razão social e CNPJ** — Ao escolher o cliente em **Tickets › Novo ticket**, cada resultado da busca mostra, logo abaixo do nome fantasia, a **razão social** e o **CNPJ** (ou CPF). Antes aparecia só o fantasia, e quando a busca encontrava o cliente pela razão social não dava para saber por que ele estava ali, nem distinguir clientes de nome parecido. A razão social só aparece quando é diferente do fantasia. Depois de escolhido, o cliente continua mostrando os mesmos dados, para conferir antes de salvar.
 
 ### 24/09
