@@ -38,6 +38,18 @@ const LOG = '[fin-segunda-via]';
 const DOCTOROMIE_BOLETO =
   'https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-boleto-obter';
 
+const DOCTOROMIE_RELER =
+  'https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-titulos-reler';
+
+/**
+ * Quantos títulos releremos no ERP antes de responder.
+ *
+ * A mensagem lista no máximo 3 vencidos, então reler mais do que isso é pagar
+ * 1,2 s por título que o cliente nem vai ver. O que sobra continua valendo pelo
+ * espelho, e a leitura de hora em hora o alcança depois.
+ */
+const MAX_RELEITURA = 3;
+
 /** Quantos títulos a mensagem lista antes de resumir. Três cabem na tela do celular. */
 const MAX_TITULOS_NA_MENSAGEM = 3;
 
@@ -468,6 +480,22 @@ Deno.serve(async (req) => {
       return json({ ok: true, atendido: true, motivo: 'pediu_cnpj', ...(simular ? { mensagem: pedeDoc } : {}) });
     }
 
+    // ---- Releitura no ERP, antes de abrir a boca ----------------------------
+    //
+    // O espelho é incremental e a leitura roda de hora em hora. Para um painel
+    // isso serve; para responder um cliente que pediu o boleto, não: a situação
+    // e o boleto podem ser de semanas atrás, e a resposta sai errada sem
+    // ninguém perceber.
+    //
+    // Medido em 25/09/2026: 191 dos 280 títulos vencidos estavam sem boleto no
+    // espelho, e a maior parte porque o boleto foi emitido DEPOIS da última
+    // leitura daquele título.
+    //
+    // Nunca deixa a resposta cair: qualquer tropeço aqui é registrado e o
+    // atendimento segue com o que o espelho tem. Uma resposta um pouco velha é
+    // melhor do que nenhuma.
+    await relerNoErp(supabase, tenantId, clienteId);
+
     // ---- Títulos em aberto --------------------------------------------------
     // A view só devolve o que a origem confirmou na última leitura: título que o
     // ERP apagou não chega aqui.
@@ -642,6 +670,99 @@ function montarMensagem(
   partes.push('Precisa de outra coisa? É só responder aqui.');
 
   return partes.join('\n\n');
+}
+
+/**
+ * Relê no ERP os títulos deste cliente e traz o resultado para `fin_titulos`.
+ *
+ * São dois passos, e os dois são necessários:
+ *   1. `ds-omie-titulos-reler` pergunta ao Omie, título a título, e atualiza o
+ *      espelho do DoctorOMIE.
+ *   2. `fin-sync-titulos` traz o que mudou para cá. Sem ele, o espelho melhora
+ *      e a nossa tabela continua velha — a releitura não teria efeito nenhum
+ *      sobre a resposta que o cliente recebe.
+ *
+ * O passo 2 é barato porque a releitura carimba `synced_at`, então o conector
+ * pega exatamente as linhas mexidas: 1,4 s na medição de 25/09/2026.
+ *
+ * NUNCA LANÇA. Falha aqui não pode calar o atendimento: o pior caso é responder
+ * com o espelho de uma hora atrás, que é o que acontecia antes desta função
+ * existir.
+ */
+async function relerNoErp(supabase: any, tenantId: string, clienteId: string): Promise<void> {
+  try {
+    // Vencido primeiro: é dele que o cliente está falando, e é nele que o
+    // espelho velho causa o estrago (dizer que não há fatura, ou não ter o
+    // boleto que o ERP já emitiu).
+    //
+    // ⚠️ A TABELA, não a view, e só aqui. A view esconde o título cujo
+    // `visto_em` envelheceu — e é exatamente esse que precisa ser relido. Mirar
+    // na view deixaria de fora o caso que motivou esta função: título velho no
+    // espelho, invisível para a resposta, e o cliente ouvindo "não há fatura"
+    // quando há.
+    //
+    // O que a tabela pode trazer de errado (título que sumiu do ERP) já está
+    // barrado por `removido_na_origem_em`, e se ele sumiu mesmo a releitura
+    // confirma isso e carimba.
+    const { data: alvos } = await supabase
+      .from('fin_titulos')
+      .select('origem, origem_conta_id, origem_id, vencimento')
+      .eq('tenant_id', tenantId)
+      .eq('cliente_id', clienteId)
+      .eq('origem', 'omie')
+      .is('removido_na_origem_em', null)
+      .in('situacao', ['atrasado', 'vence_hoje', 'a_vencer'])
+      .lte('vencimento', new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))
+      .order('vencimento', { ascending: true })
+      .limit(MAX_RELEITURA);
+
+    if (!alvos?.length) return;
+
+    // Uma chamada por conta: a chave de API é por conta do Omie, e um tenant
+    // pode ter mais de uma (uma por unidade).
+    const porConta = new Map<string, number[]>();
+    for (const a of alvos) {
+      if (!a.origem_conta_id) continue;
+      const lista = porConta.get(a.origem_conta_id) ?? [];
+      lista.push(Number(a.origem_id));
+      porConta.set(a.origem_conta_id, lista);
+    }
+
+    let mexeu = false;
+    for (const [contaId, codigos] of porConta) {
+      const { data: chave } = await supabase.rpc('obter_chave_omie_por_conta', {
+        p_integration_id: contaId,
+      });
+      if (!chave) continue;
+
+      const resp = await fetch(DOCTOROMIE_RELER, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
+        body: JSON.stringify({ codigos }),
+      });
+      const corpo = await resp.json().catch(() => ({}));
+      if (!resp.ok || corpo?.ok === false) {
+        console.warn(LOG, 'releitura recusada:', JSON.stringify(corpo).slice(0, 200));
+        continue;
+      }
+      console.log(LOG, 'releitura:', JSON.stringify(corpo?.resultados ?? {}).slice(0, 300));
+      if ((corpo?.relidos ?? 0) > 0 || (corpo?.removidos_no_erp ?? 0) > 0) mexeu = true;
+    }
+
+    // Só roda o conector se alguma coisa mudou de verdade. Quando todos os
+    // títulos voltaram "já fresco" ou "redundante", não há o que trazer.
+    if (!mexeu) return;
+
+    const { data: segredo } = await supabase.rpc('obter_segredo_cron_fin_sync');
+    if (!segredo) return;
+    await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/fin-sync-titulos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${segredo}` },
+      body: JSON.stringify({ tenant_id: tenantId }),
+    });
+  } catch (e) {
+    console.warn(LOG, 'releitura falhou, seguindo com o espelho:', (e as Error)?.message);
+  }
 }
 
 /**
