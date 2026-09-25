@@ -71,6 +71,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 const ACAO_LABEL: Record<string, string> = {
   ativar: "Ativar módulo", quantidade: "Alterar quantidade", cancelar: "Cancelar módulo",
+  criar_licenca: "Criar licença",
 };
 
 const dataHora = (s: string | null | undefined) =>

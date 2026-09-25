@@ -56,6 +56,23 @@ type Pedido = {
   decidido_em: string | null;
   motivo_recusa: string | null;
   ultimo_erro: string | null;
+  // Só em `criar_licenca`: o pedido inteiro, como a fn_oem_solicitar_licenca gravou.
+  licenca: PedidoLicenca | null;
+};
+
+type PedidoLicenca = {
+  modo: "avulsa" | "grupo";
+  grupo_codigo: string | null;
+  nome_grupo: string | null;
+  nome_loja: string;
+  cnpj_loja: string;
+  email: string | null;
+  tipo_negocio_nome: string | null;
+  detalhe_nome: string | null;
+  origem_venda_nome: string | null;
+  produto_nome: string | null;
+  modulos: { nome: string; codigo: number; quantidade: number; custo_unit: number | null }[];
+  custo_previsto: number | null;
 };
 
 const fmtBRL = (v: number | null | undefined) =>
@@ -68,6 +85,7 @@ const ACAO_LABEL: Record<string, string> = {
   ativar: "Adicionar módulo",
   quantidade: "Alterar quantidade",
   cancelar: "Cancelar módulo",
+  criar_licenca: "Criar licença",
 };
 
 /**
@@ -130,7 +148,46 @@ function efeito(p: Pedido): string {
       : "e NÃO mexe no MRR (baixa informada: zero)";
     return `Dá baixa de ${saem} ${saem > 1 ? "unidades" : "unidade"} (${resto}) ${mrr}`;
   }
+  if (p.acao === "criar_licenca" && p.licenca) {
+    const l = p.licenca;
+    const onde = l.modo === "grupo"
+      ? `a filial ${l.nome_loja} no grupo ${l.grupo_codigo}${l.nome_grupo ? ` (${l.nome_grupo})` : ""}`
+      : `a licença avulsa ${l.nome_loja}, com grupo novo`;
+    const custo = Number(l.custo_previsto) > 0
+      ? `. Passa a custar ${fmtBRL(l.custo_previsto)}/mês no parceiro`
+      : "";
+    return `Cria no OEM ${onde}${custo}`;
+  }
   return "Aplica a alteração no parceiro";
+}
+
+/**
+ * O pedido de licença nova por inteiro. É dinheiro cobrado pelo parceiro a
+ * partir do dia da criação, então quem aprova vê tudo o que vai: onde nasce,
+ * com que CNPJ, os três códigos que o OEM exige e cada módulo.
+ */
+function DetalheLicenca({ l }: { l: PedidoLicenca }) {
+  return (
+    <div className="space-y-1 rounded-md border bg-muted/30 p-2 text-xs">
+      <div>
+        <span className="text-muted-foreground">Loja no OEM: </span>
+        <span className="font-medium">{l.nome_loja}</span>
+        <span className="text-muted-foreground"> · {mascaraCnpj(l.cnpj_loja)}</span>
+      </div>
+      <div className="text-muted-foreground">
+        {l.modo === "grupo"
+          ? `Filial do grupo ${l.grupo_codigo}${l.nome_grupo ? ` · ${l.nome_grupo}` : ""}`
+          : `Licença avulsa (grupo novo)${l.email ? ` · ${l.email}` : ""}`}
+      </div>
+      <div className="text-muted-foreground">
+        {[l.tipo_negocio_nome, l.detalhe_nome, l.origem_venda_nome].filter(Boolean).join(" · ")}
+        {l.produto_nome ? ` · ${l.produto_nome}` : ""}
+      </div>
+      <div>
+        {l.modulos.map((m) => `${m.nome}${m.quantidade > 1 ? ` × ${m.quantidade}` : ""}`).join(", ")}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -368,9 +425,9 @@ export default function AprovacaoOemTab() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Adição, alteração de quantidade e cancelamento de módulo de cliente com licença no OEM
-          esperam aqui. Enquanto não for aprovado, nada foi enviado ao parceiro e nada entrou na
-          ficha do cliente.
+          Licença nova, adição, alteração de quantidade e cancelamento de módulo no OEM esperam
+          aqui. Enquanto não for aprovado, nada foi enviado ao parceiro e nada entrou na ficha do
+          cliente.
         </p>
       </CardHeader>
 
@@ -457,10 +514,14 @@ export default function AprovacaoOemTab() {
                             CNPJ, que é o que se confere de verdade antes de
                             liberar escrita na licença de terceiro. */}
                         <IdentidadeDoCliente p={p} />
-                        <div className="text-xs text-muted-foreground">
-                          {p.modulo ?? "Módulo"}
-                          {p.produto ? ` · ${p.produto}` : ""}
-                        </div>
+                        {p.acao === "criar_licenca" && p.licenca ? (
+                          <DetalheLicenca l={p.licenca} />
+                        ) : (
+                          <div className="text-xs text-muted-foreground">
+                            {p.modulo ?? "Módulo"}
+                            {p.produto ? ` · ${p.produto}` : ""}
+                          </div>
+                        )}
                         <div className="text-xs">{efeito(p)}</div>
                         {p.motivo && (
                           <div className="text-xs text-muted-foreground">Motivo: {p.motivo}</div>

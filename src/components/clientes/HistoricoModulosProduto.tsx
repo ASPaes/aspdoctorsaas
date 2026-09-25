@@ -51,6 +51,9 @@ const ACOES: Record<string, { texto: string; classe: string }> = {
   // O parceiro reajustou o custo e a carga do espelho trocou o valor aqui.
   // Não é venda: a mensalidade do cliente não muda por causa disto.
   preco:      { texto: "Preço do OEM", classe: "bg-violet-500/15 text-violet-500 hover:bg-violet-500/20" },
+  // Licença nova no OEM: o pedido e, depois da aprovação, a criação.
+  licenca_solicitada: { texto: "Enviado ao OEM", classe: "bg-amber-500/15 text-amber-500 hover:bg-amber-500/20" },
+  licenca_criada:     { texto: "Licença criada", classe: "bg-green-500/15 text-green-500 hover:bg-green-500/20" },
 };
 
 const quando = (iso: string) =>

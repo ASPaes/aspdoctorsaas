@@ -42,7 +42,31 @@ type Linha = {
   quantidade: number | null;
   valor_unitario: number | null;
   tentativas: number;
+  payload: Record<string, unknown> | null;
 };
+
+/**
+ * Corpo da `oem-licenca-criar` (DoctorOEM) a partir do pedido gravado na fila.
+ * Os módulos vêm do payload, que a fn_oem_solicitar_licenca montou a partir da
+ * FICHA — nada do que a tela digitou vai direto ao parceiro.
+ */
+function corpoCriacao(p: Record<string, unknown>) {
+  return {
+    acao: "criar",
+    modo: p.modo,
+    grupo_codigo: p.grupo_codigo,
+    nome_grupo: p.nome_grupo,
+    produto_codigo: p.produto_codigo,
+    nome_loja: p.nome_loja,
+    cnpj_loja: p.cnpj_loja,
+    email: p.email,
+    tipo_negocio: p.tipo_negocio,
+    detalhe_tipo_negocio: p.detalhe_tipo_negocio,
+    origem_venda: p.origem_venda,
+    modulos: ((p.modulos ?? []) as Record<string, unknown>[])
+      .map((m) => ({ codigo: m.codigo, quantidade: m.quantidade })),
+  };
+}
 
 // Espera entre tentativas, em minutos, indexada por número de tentativas já
 // feitas. Depois da última a linha vira 'invalido' e para de consumir chamada.
@@ -92,6 +116,7 @@ Deno.serve(async (req) => {
     let autorizado = ehCron === true;
 
     // 2) Não sendo o cron, tem que ser gente com permissão.
+    let perfilUsuario: { tenant_id: string | null; is_super_admin: boolean | null } | null = null;
     if (!autorizado) {
       const comoUsuario = createClient(
         Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -101,16 +126,44 @@ Deno.serve(async (req) => {
       if (u?.user) {
         const { data: perfil } = await ds
           .from("profiles")
-          .select("role, is_super_admin")
+          .select("role, is_super_admin, tenant_id")
           .eq("user_id", u.user.id)
           .maybeSingle();
         autorizado = perfil?.is_super_admin === true
           || perfil?.role === "admin" || perfil?.role === "head";
+        perfilUsuario = perfil ?? null;
       }
     }
     if (!autorizado) return json({ ok: false, mensagem: "Não autorizado." }, 401);
 
     const corpo = await req.json().catch(() => ({} as Record<string, unknown>));
+
+    // ------------------------------------------------------ opções da licença
+    // Tipos de negócio, detalhes e origens da venda vêm do parceiro, pela conta
+    // que atende o cliente. Só leitura, e só para gente (o cron não pede isto).
+    if (corpo.acao === "opcoes_licenca") {
+      if (!perfilUsuario) return json({ ok: false, mensagem: "Só para usuário logado." }, 401);
+      const cpId = typeof corpo.cliente_produto_id === "string" ? corpo.cliente_produto_id : "";
+      const { data: cpRow } = await ds.from("cliente_produtos").select("tenant_id").eq("id", cpId).maybeSingle();
+      if (!cpRow) return json({ ok: false, mensagem: "Produto do cliente não encontrado." }, 404);
+      if (perfilUsuario.is_super_admin !== true && perfilUsuario.tenant_id !== cpRow.tenant_id) {
+        return json({ ok: false, mensagem: "Não autorizado." }, 401);
+      }
+      const { data: ctx, error: errCtx } = await ds.rpc("fn_oem_licenca_contexto", { p_cliente_produto_id: cpId });
+      if (errCtx) return json({ ok: false, mensagem: errCtx.message }, 400);
+      const contaId = (ctx as Record<string, unknown> | null)?.conta_id as string | null;
+      if (!contaId) return json({ ok: false, mensagem: "A unidade deste cliente não tem conta do OEM conectada." }, 409);
+      const { data: cOp } = await ds.from("oem_integration").select("id, api_url").eq("id", contaId).eq("ativo", true).maybeSingle();
+      const { data: chaveOp } = cOp ? await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: cOp.id }) : { data: null };
+      if (!cOp || !chaveOp) return json({ ok: false, mensagem: "Conta do OEM sem chave ativa." }, 409);
+      const resp = await fetch(`${String(cOp.api_url).replace(/\/+$/, "")}/oem-licenca-criar`, {
+        method: "POST",
+        headers: { "x-api-key": String(chaveOp), "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "listas" }),
+      });
+      const listas = await resp.json().catch(() => null);
+      return json({ ok: resp.ok && (listas as Record<string, unknown> | null)?.ok === true, listas }, resp.ok ? 200 : 502);
+    }
     const limite = Math.min(Math.max(Number(corpo.limite ?? 20) || 20, 1), 50);
     // Uma linha só, pedida pelo clique que acabou de enfileirar: quem cancelou
     // um módulo não pode esperar os 2 minutos do cron para saber o resultado.
@@ -188,13 +241,30 @@ Deno.serve(async (req) => {
 
       const { data: rows, error: errL } = await ds
         .from("oem_sync_fila")
-        .select("id, tenant_id, conta_integration_id, cliente_produto_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario")
+        .select("id, tenant_id, conta_integration_id, cliente_produto_id, empresa_codigo, filial_codigo, oem_modulo_codigo, quantidade, valor_unitario, acao, payload")
         .in("id", filaIds);
       if (errL || !rows || rows.length === 0) return json({ ok: false, mensagem: "Linha não encontrada." }, 404);
       // Ordem pedida, não a ordem que o banco devolveu: num lote a ordem das
       // alterações é parte do que se está conferindo.
       const ls = filaIds.map((id) => rows.find((r) => r.id === id)).filter(Boolean) as typeof rows;
       const l = ls[0];
+
+      // Licença nova não tem filial para ler: a simulação é a da oem-licenca-criar,
+      // que monta o pedido com o preço de tabela e confere o grupo, sem enviar.
+      if (ls.some((x) => x.acao === "criar_licenca")) {
+        if (ls.length > 1) return json({ ok: false, mensagem: "Simule um pedido de licença por vez." }, 409);
+        if (!l.conta_integration_id) return json({ ok: false, mensagem: "A linha não diz por qual conta do OEM ela sai." }, 409);
+        const { data: cS } = await ds.from("oem_integration").select("id, api_url").eq("id", l.conta_integration_id).eq("ativo", true).maybeSingle();
+        const { data: chaveS } = cS ? await ds.rpc("obter_chave_oem_por_conta", { p_integration_id: cS.id }) : { data: null };
+        if (!cS || !chaveS) return json({ ok: false, mensagem: "A conta do OEM desta linha não está ativa." }, 409);
+        const respS = await fetch(`${String(cS.api_url).replace(/\/+$/, "")}/oem-licenca-criar`, {
+          method: "POST",
+          headers: { "x-api-key": String(chaveS), "Content-Type": "application/json" },
+          body: JSON.stringify({ ...corpoCriacao((l.payload ?? {}) as Record<string, unknown>), simular: true }),
+        });
+        const corpoS = await respS.json().catch(() => null);
+        return json({ ok: respS.ok, simulado: true, http: respS.status, resposta: corpoS });
+      }
 
       // Simular um lote que a gravação recusaria não prova nada. As duas
       // guardas são as mesmas do processamento.
@@ -298,7 +368,8 @@ Deno.serve(async (req) => {
     //
     // O que for de outra filial volta para 'pendente' na hora: o clique não tem
     // por que esperar pelo trabalho dos outros, e o cron pega em ≤ 2 min.
-    if (filaId && fila.length === 1) {
+    // Licença nova não tem filial: não há "resto da filial" para levar junto.
+    if (filaId && fila.length === 1 && fila[0].acao !== "criar_licenca") {
       const alvo = fila[0];
       const { data: extras } = await ds.rpc("fn_oem_fila_claim", { p_limite: limite, p_id: null });
       const mesmaFilial: Linha[] = [];
@@ -336,6 +407,85 @@ Deno.serve(async (req) => {
     }
 
     let okCount = 0, erros = 0;
+
+    // ===================================================================
+    // LICENÇA NOVA
+    //
+    // Sai do fluxo dos módulos: não há filial, não há lote, e NÃO HÁ
+    // RETENTATIVA. Uma chamada que o OEM gravou e respondeu com erro, repetida,
+    // criaria uma segunda licença cobrada. Falhou, a linha para em 'invalido'
+    // com o motivo, e o Reprocessar manual é seguro: a oem-licenca-criar
+    // recusa a mesma loja duas vezes no mesmo grupo e devolve o código da que
+    // já existe (409 `ja_existe`), que aqui vira sucesso.
+    // ===================================================================
+    const criacoes = fila.filter((x) => x.acao === "criar_licenca");
+    fila = fila.filter((x) => x.acao !== "criar_licenca");
+
+    async function pararCriacao(x: Linha, motivo: string, resposta: unknown, http: number | null) {
+      erros++;
+      await ds.from("oem_sync_fila").update({
+        status: "invalido",
+        ultimo_erro: motivo,
+        resposta: resposta as Record<string, unknown> | null,
+        http,
+        processado_em: new Date().toISOString(),
+      }).eq("id", x.id);
+    }
+
+    for (const x of criacoes) {
+      if (!x.conta_integration_id) {
+        await pararCriacao(x, "A linha não diz por qual conta do OEM ela sai.", null, null);
+        continue;
+      }
+      const c = await conta(x.conta_integration_id);
+      if (!c) {
+        await pararCriacao(x, "A conta OEM desta linha não está ativa, ou a chave sumiu do Vault.", null, null);
+        continue;
+      }
+
+      let resposta: Record<string, unknown> | null = null;
+      let http: number | null = null;
+      try {
+        const resp = await fetch(`${c.api_url}/oem-licenca-criar`, {
+          method: "POST",
+          headers: { "x-api-key": c.chave, "Content-Type": "application/json" },
+          body: JSON.stringify(corpoCriacao((x.payload ?? {}) as Record<string, unknown>)),
+        });
+        http = resp.status;
+        resposta = await resp.json().catch(() => null);
+      } catch (e) {
+        await pararCriacao(x, `A chamada ao OEM quebrou: ${e instanceof Error ? e.message : String(e)}. `
+          + "Confira no portal se a licença nasceu antes de reprocessar.", null, null);
+        continue;
+      }
+
+      const grupo = resposta?.grupo_codigo != null ? String(resposta.grupo_codigo) : null;
+      const filial = resposta?.filial_codigo != null ? String(resposta.filial_codigo) : null;
+      const criou = http === 200 && resposta?.ok === true;
+      const jaExistia = http === 409 && resposta?.ja_existe === true;
+
+      if ((criou || jaExistia) && grupo && filial) {
+        const { error: errA } = await ds.rpc("fn_oem_licenca_criada", {
+          p_fila_id: x.id, p_grupo: grupo, p_filial: filial, p_resposta: resposta,
+        });
+        if (errA) {
+          await pararCriacao(x, `O OEM aceitou a licença (grupo ${grupo}, filial ${filial}), mas a ficha não foi atualizada: ${errA.message}`, resposta, http);
+          continue;
+        }
+        okCount++;
+        continue;
+      }
+
+      if (criou) {
+        // 201 do parceiro, mas a filial ainda não apareceu na listagem. Ela
+        // EXISTE: reprocessar depois acha a loja e só grava o código.
+        await pararCriacao(x, `O OEM aceitou a licença${grupo ? ` (grupo ${grupo})` : ""}, mas a filial ainda não apareceu na listagem. `
+          + "Reprocesse em alguns minutos: o DoctorSaaS vai achá-la e só gravar o código, sem criar outra.", resposta, http);
+        continue;
+      }
+
+      await pararCriacao(x, String(resposta?.mensagem ?? `HTTP ${http}`), resposta, http);
+    }
 
     // ===================================================================
     // UMA GRAVAÇÃO POR FILIAL

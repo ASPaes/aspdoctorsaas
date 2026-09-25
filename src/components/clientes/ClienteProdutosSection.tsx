@@ -48,6 +48,7 @@ import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import HistoricoModulosProduto from "./HistoricoModulosProduto";
 import ModulosDaVendaSection, { type ModulosDaVenda, modulosParaGravar } from "./ModulosDaVendaSection";
+import EnviarOemDialog, { LicencaOemDoProduto } from "./EnviarOemDialog";
 import ContratoAnexoSection, {
   type ContratoAnexo,
   type AnexoTipo,
@@ -395,6 +396,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     const map: Record<string, PendenciaOem[]> = {};
     for (const p of pendenciasOemQuery.data ?? []) {
       if (p.modulo_linha_id || !p.cliente_produto_id) continue;
+      // Pedido de licença nova não é módulo: ele aparece no bloco do OEM do
+      // produto, não como linha sem nome na tabela.
+      if (p.acao === "criar_licenca") continue;
       (map[p.cliente_produto_id] ||= []).push(p);
     }
     return map;
@@ -987,12 +991,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           </>
                         )}
                       </div>
+                      {/* Produto do OEM sem licença: o pedido de licença nova
+                          (vai pela aprovação). Produto que não é do OEM
+                          continua com o aviso de sempre. */}
                       {oemAtivo === true && !p.oem_codigo_filial && (
-                        <p className="text-xs text-muted-foreground">
-                          Sem licença do OEM vinculada. O código é gravado aqui quando o vínculo é
-                          feito em <strong>Configurações › Integrações › OEM</strong> — não se
-                          preenche à mão.
-                        </p>
+                        <LicencaOemDoProduto clienteProdutoId={p.id} ativo={!!p.ativo} />
                       )}
 
                       {/* Acima da tabela: com a lista do OEM a coluna cresceu
@@ -1827,6 +1830,11 @@ function ProdutoDialog({
   const [confirmSwapOpen, setConfirmSwapOpen] = useState(false);
   // Após criar um novo produto/contrato, oferece o envio ao Omie no fim do fluxo
   const [postSaveContrato, setPostSaveContrato] = useState<{ id: string; numero: string | null; created_at: string | null } | null>(null);
+  // Produto do OEM recém-criado: oferece o pedido de licença no mesmo passo.
+  const [postSaveOemId, setPostSaveOemId] = useState<string | null>(null);
+  const [enviarOemAberto, setEnviarOemAberto] = useState(false);
+  const [oemPedido, setOemPedido] = useState(false);
+  const oemAtivoTenant = useOemIntegracaoAtiva();
 
   // Novos campos
   const [dataVenda, setDataVenda] = useState("");
@@ -2090,6 +2098,7 @@ function ProdutoDialog({
       return;
     }
     setSaving(true);
+    let novoIdCriado: string | null = null;
     try {
       if (isEdit && edit) {
         const payload: any = {
@@ -2181,6 +2190,7 @@ function ProdutoDialog({
           p_dados: dados,
         });
         if (error) throw error;
+        novoIdCriado = (novoCliProdId as string) ?? null;
 
         // Upload dos documentos staged (escolhidos antes de existir o contrato).
         // Ordem obrigatória: RPC cria produto+contrato → busca contrato_id → sobe → RPC adicionar.
@@ -2268,6 +2278,21 @@ function ProdutoDialog({
       // cliente. Antes usava o EnviarContratoOmieButton, que empurra para a fila sem resumo
       // nenhum e só mostra o motivo da recusa no tooltip — o texto ao lado prometia
       // pré-visualização e não havia nenhuma.
+      let temPassoSeguinte = false;
+
+      // Produto do OEM recém-criado: o pedido de licença sai daqui mesmo, no
+      // passo seguinte. Produto que não é do OEM (ou unidade sem conta) não
+      // ganha o bloco.
+      if (!isEdit && !produtoTrocou && novoIdCriado && oemAtivoTenant === true) {
+        const { data: ctxOem } = await (supabase.rpc as any)("fn_oem_licenca_contexto", {
+          p_cliente_produto_id: novoIdCriado,
+        });
+        if (ctxOem?.conta_id && ctxOem?.produto_codigo && !ctxOem?.tem_licenca) {
+          setPostSaveOemId(novoIdCriado);
+          temPassoSeguinte = true;
+        }
+      }
+
       if (!isEdit && !produtoTrocou && omieAtivo && resolvedTenantId) {
         const { data: ctr } = await (supabase.from("contratos" as any) as any)
           .select("id, numero, created_at")
@@ -2277,9 +2302,13 @@ function ProdutoDialog({
           .maybeSingle();
         if (ctr?.id) {
           setPostSaveContrato({ id: ctr.id as string, numero: (ctr as any).numero ?? null, created_at: (ctr as any).created_at ?? null });
-          onSaved();
-          return; // não fecha o diálogo — mostra o passo "Enviar ao Omie"
+          temPassoSeguinte = true;
         }
+      }
+
+      if (temPassoSeguinte) {
+        onSaved();
+        return; // não fecha o diálogo — mostra o passo "Enviar ao Omie / ao OEM"
       }
 
       onSaved();
@@ -2310,8 +2339,11 @@ function ProdutoDialog({
 
   const handleClosePostSave = () => {
     setPostSaveContrato(null);
+    setPostSaveOemId(null);
+    setOemPedido(false);
     onClose();
   };
+  const emPassoSeguinte = !!postSaveContrato || !!postSaveOemId;
 
   // Mesmo portão que o EnviarContratoOmieButton aplica na lista de contratos: só existe envio
   // manual para contrato criado a partir da data de corte DA CONTA que atende este cliente.
@@ -2324,7 +2356,7 @@ function ProdutoDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => {
       if (o) return;
-      if (postSaveContrato) { handleClosePostSave(); return; }
+      if (emPassoSeguinte) { handleClosePostSave(); return; }
       onClose();
     }}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -2332,14 +2364,17 @@ function ProdutoDialog({
             tela nenhuma. Rola por desenho, com cabecalho e rodape fixos. */}
         <DialogHeader>
           <DialogTitle>
-            {postSaveContrato
-              ? "Produto adicionado — enviar ao Omie?"
+            {emPassoSeguinte
+              ? postSaveContrato && postSaveOemId
+                ? "Produto adicionado: enviar ao Omie e ao OEM?"
+                : postSaveContrato ? "Produto adicionado: enviar ao Omie?" : "Produto adicionado: enviar ao OEM?"
               : isEdit ? "Editar Produto" : "Adicionar Produto"}
           </DialogTitle>
         </DialogHeader>
 
-        {postSaveContrato ? (
+        {emPassoSeguinte ? (
           <div className="space-y-4">
+            {postSaveContrato && (<>
             <div className="rounded-md border bg-muted/40 p-4 space-y-2 text-sm">
               <div className="font-medium">Contrato criado com sucesso.</div>
               <div className="text-muted-foreground">
@@ -2375,6 +2410,38 @@ function ProdutoDialog({
                 há envio manual por aqui. Ele aparece no painel de conferência.
               </div>
             )}
+            </>)}
+
+            {postSaveOemId && (
+              <div className="rounded-md border p-4 space-y-3">
+                <div className="text-sm font-medium">OEM</div>
+                {oemPedido ? (
+                  <div className="text-sm text-muted-foreground">
+                    Pedido de licença enviado. Ele espera aprovação em <strong>Clientes › Aprovação OEM</strong> e
+                    só depois chega ao parceiro.
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-sm text-muted-foreground">
+                      Este produto ainda não tem licença no OEM. O pedido passa pela aprovação antes de ir ao
+                      parceiro. Se preferir, envie depois pelo botão <strong>Enviar ao OEM</strong> no produto.
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" className="gap-1.5" onClick={() => setEnviarOemAberto(true)}>
+                        Enviar ao OEM
+                      </Button>
+                    </div>
+                  </>
+                )}
+                <EnviarOemDialog
+                  clienteProdutoId={postSaveOemId}
+                  open={enviarOemAberto}
+                  onClose={() => setEnviarOemAberto(false)}
+                  onEnviado={() => { setOemPedido(true); onSaved(); }}
+                />
+              </div>
+            )}
+
             <DialogFooter>
               <Button type="button" onClick={handleClosePostSave}>Concluir</Button>
             </DialogFooter>
