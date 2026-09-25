@@ -19,7 +19,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 24/09
 
-- 🔧 **O aviso continuava na barra do telefone depois de a mensagem ser lida** — Ao abrir a conversa pelo celular, a mensagem era marcada como lida no sistema, mas o aviso ficava parado na barra de notificações do aparelho. Como o telefone usa os avisos abertos para desenhar o número no ícone do aplicativo, ele seguia mostrando pendência mesmo com tudo lido. Agora abrir a conversa tira os avisos dela da barra, como no WhatsApp. Se você ler pelo computador, o aviso no celular ainda sai só quando você abrir o chat no aparelho.
+- 🔧 **O aviso continuava na barra do telefone depois de a mensagem ser lida** — Ao abrir a conversa pelo celular, a mensagem era marcada como lida no sistema, mas o aviso ficava parado na barra de notificações do aparelho. Como o telefone usa os avisos abertos para desenhar o número no ícone do aplicativo, ele seguia mostrando pendência mesmo com tudo lido. Agora abrir a conversa tira os avisos dela da barra, como no WhatsApp — e isso vale entre os seus aparelhos: ler no computador limpa também o aviso do celular que ficou no bolso, sem precisar abrir o chat nele. Vale para os aparelhos da própria pessoa; ninguém mexe no aviso de outro.
 
 - 🔧 **No celular, vídeo e nome de arquivo grande apareciam cortados** — No chat pelo telefone, o vídeo enviado saía pela lateral da tela, com parte dele fora do alcance. Nome de arquivo comprido também parava cedo demais, em algo como "La Traviata SavassiCardapioSomenteVisu...", sem dizer qual arquivo era. Agora o vídeo se ajusta à largura do aparelho e o nome do arquivo usa duas linhas; o tipo e o tamanho continuam logo abaixo. No computador nada muda.
 
