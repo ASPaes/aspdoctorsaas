@@ -16,8 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, LayoutList } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, LayoutList, MoreHorizontal } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
@@ -178,6 +181,9 @@ export default function OnboardingPage() {
    *  ticket pai, mas o que for feito ali é registrado como partindo deste sub-ticket. */
   const [detailSubTicket, setDetailSubTicket] = useState<{ id: string; code: string | null } | null>(null);
   const [busca, setBusca] = useState("");
+  const noCelular = useIsMobile() || isChatHost();
+  // No telefone a barra guarda so a busca; o resto sai daqui.
+  const [maisFiltros, setMaisFiltros] = useState(false);
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
   const [filtroDemanda, setFiltroDemanda] = useState<string>("todos");
   const [filtroSemaforo, setFiltroSemaforo] = useState<string>("todos");
@@ -883,10 +889,17 @@ export default function OnboardingPage() {
   const totalFaseAtual = selectedPipelineId ? totalDoPipeline(selectedPipelineId, loading) : null;
 
   return (
-    <div className="flex flex-col h-full w-full min-h-0">
-      <div className="flex items-center justify-between gap-3 p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold">Implantação</h1>
+    <div className="flex flex-col h-full w-full min-h-0 min-w-0">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 border-b border-border",
+          noCelular ? "flex-wrap gap-y-2 px-3 py-2" : "p-4"
+        )}
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-wrap">
+          {/* O nome do modulo ja esta na barra do app no telefone; repeti-lo aqui
+              custava ~110px de uma linha que nao cabia. */}
+          {!noCelular && <h1 className="text-lg font-semibold">Implantação</h1>}
           {phases.length > 1 && (
             <div className="inline-flex rounded-md border border-border p-0.5">
               {phases.map((p) => (
@@ -902,29 +915,44 @@ export default function OnboardingPage() {
           )}
           {/* Com dois pipelines o total mora no badge de cada um. Com um só a barra de
               pipelines nem é renderizada, e sem isto a fase ficaria sem total nenhum. */}
-          {pipelines.length <= 1 && totalFaseAtual !== null && (
+          {/* No telefone o total de cada coluna ja aparece no cabecalho dela, e esta
+              linha custava uma terceira fila no cabecalho do aparelho. */}
+          {!noCelular && pipelines.length <= 1 && totalFaseAtual !== null && (
             <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
               <span className="text-muted-foreground/40 mr-2">·</span>
               {totalFaseAtual} {totalFaseAtual === 1 ? "ticket" : "tickets"} em andamento
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="outline">
-            <Link to="/onboarding-implantacao/config">
-              <Settings2 className="h-4 w-4 mr-1" />
-              Configurar
+        {/* Com o texto, estes dois terminavam em 624px numa tela de 390 e faziam a
+            pagina inteira rolar de lado. No telefone viram icone com rotulo de leitor
+            de tela; no computador nada muda. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button asChild size="sm" variant="outline" className={cn(noCelular && "h-8 w-8 p-0")}>
+            <Link to="/onboarding-implantacao/config" aria-label="Configurar">
+              <Settings2 className={cn("h-4 w-4", !noCelular && "mr-1")} />
+              {!noCelular && "Configurar"}
             </Link>
           </Button>
           {podeCriarJornada && (isAcompanhamento ? (
-            <Button size="sm" onClick={() => setNewAcompOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Novo acompanhamento
+            <Button
+              size="sm"
+              className={cn(noCelular && "h-8 w-8 p-0")}
+              aria-label="Novo acompanhamento"
+              onClick={() => setNewAcompOpen(true)}
+            >
+              <Plus className={cn("h-4 w-4", !noCelular && "mr-1")} />
+              {!noCelular && "Novo acompanhamento"}
             </Button>
           ) : (
-            <Button size="sm" onClick={() => setNewOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
-              Nova jornada
+            <Button
+              size="sm"
+              className={cn(noCelular && "h-8 w-8 p-0")}
+              aria-label="Nova jornada"
+              onClick={() => setNewOpen(true)}
+            >
+              <Plus className={cn("h-4 w-4", !noCelular && "mr-1")} />
+              {!noCelular && "Nova jornada"}
             </Button>
           ))}
         </div>
@@ -963,8 +991,13 @@ export default function OnboardingPage() {
       )}
 
 
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-muted/20">
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 border-b border-border bg-muted/20",
+          noCelular ? "px-3 py-2" : "px-4 py-3"
+        )}
+      >
+        <div className={cn("relative", noCelular ? "min-w-0 flex-1" : "flex-1 min-w-[200px] max-w-xs")}>
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             value={busca}
@@ -973,6 +1006,21 @@ export default function OnboardingPage() {
             className="h-8 text-xs pl-7"
           />
         </div>
+        {noCelular && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 shrink-0"
+            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
+            aria-expanded={maisFiltros}
+            onClick={() => setMaisFiltros((v) => !v)}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        )}
+        {/* `contents` deixa os filhos seguirem sendo itens da mesma barra: escondido
+            ou nao, o desenho no computador fica identico ao que era. */}
+        <div className={cn("contents", noCelular && !maisFiltros && "hidden")}>
         <Select value={filtroResponsavel} onValueChange={setFiltroResponsavel}>
           <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Responsável" /></SelectTrigger>
           <SelectContent>
@@ -1089,6 +1137,7 @@ export default function OnboardingPage() {
             {agrupadoPorTicket ? "Ver por etapa" : "Agrupar por ticket"}
           </Button>
         )}
+        </div>
       </div>
 
 
