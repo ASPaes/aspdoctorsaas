@@ -17,9 +17,14 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
 // `hoje + 3` — ou seja, `vencimento = hoje - dias_offset`. Escrito assim numa
 // linha só para não virar um `if` de tipo/quantidade.
 //
-// O QUE AINDA NÃO ESTÁ AQUI, e por que a lista importa:
-//   • Releitura no Omie antes de cobrar (item 4 do plano). Sem ela, cobrar é
-//     arriscar cobrar quem pagou ontem. É pré-requisito do envio, não deste.
+// RELEITURA NO ERP (`reler: true`): antes de decidir cobrar, pergunta ao Omie
+// se o título ainda está em aberto. Não é precaução teórica — no primeiro teste
+// real, em 25/09/2026, três títulos que constavam "A vencer" com vencimento em
+// 25 e 30/09 já não existiam no Omie. Ela roda sobre quem SAIRIA nesta rodada,
+// nunca sobre a fila inteira: 341 consultas em rajada derrubam a API deles por
+// 30 minutos.
+//
+// O QUE AINDA NÃO ESTÁ AQUI:
 //   • Link do boleto. Gerar link custa chamada no Omie por título, e a API
 //     deles bloqueia por 30 min em rajada. Numa simulação de 600 títulos isso
 //     derrubaria a integração inteira sem necessidade.
@@ -73,6 +78,19 @@ const MINUTOS_DA_JANELA = (19 * 60) - (7 * 60 + 30);
  * nova.
  */
 const LINHA_OPTOUT = 'Se não quiser mais receber estes lembretes, responda SAIR.';
+
+const DOCTOROMIE_RELER =
+  'https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-titulos-reler';
+
+/**
+ * Quantos títulos a releitura pré-envio confere por rodada.
+ *
+ * Este número é o do Omie, não o nosso: 5 consultas com 1,2 s entre elas foi o
+ * ritmo que sobreviveu depois de um bloqueio real de 30 minutos por rajada.
+ * Como o envio é uma mensagem por vez, com 45 a 90 s de intervalo, reler 5 por
+ * rodada acompanha o envio folgado.
+ */
+const MAX_RELEITURA_RODADA = 5;
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {
@@ -205,6 +223,10 @@ Deno.serve(async (req) => {
   const hoje: string = typeof body?.data_referencia === 'string'
     ? body.data_referencia.slice(0, 10)
     : new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Releitura no ERP antes de decidir cobrar. Opcional na simulação para ela
+  // continuar barata; quando o envio existir, passa a ser sempre.
+  const reler: boolean = body?.reler === true;
+
   const tetoDiario: number = Number.isFinite(body?.teto_diario)
     ? Math.max(1, Number(body.teto_diario))
     : TETO_DIARIO_INICIAL;
@@ -288,6 +310,7 @@ Deno.serve(async (req) => {
       // Contado à parte porque já processado deixou de virar candidato: quem
       // já foi cobrado não é uma decisão de hoje, é histórico.
       let resumoJaProcessado = 0;
+      const releitura: any[] = [];
 
       for (const toque of toques ?? []) {
         // Impedimento do TOQUE inteiro, decidido antes de olhar título nenhum.
@@ -330,7 +353,7 @@ Deno.serve(async (req) => {
         const titulos = await buscarTodos((de, ate) =>
           service
             .from('vw_fin_titulos_abertos')
-            .select('id, cliente_id, vencimento, valor, situacao, numero_documento, parcela, boleto_gerado')
+            .select('id, cliente_id, vencimento, valor, situacao, numero_documento, parcela, boleto_gerado, origem, origem_conta_id, origem_id')
             .eq('tenant_id', tenant.id)
             .eq('vencimento', vencimentoAlvo)
             .in('situacao', SITUACOES_COBRAVEIS)
@@ -522,9 +545,107 @@ Deno.serve(async (req) => {
             // de não cobrar duas vezes é por título, mesmo que a mensagem seja
             // uma só.
             titulo_ids: lista.map((t) => t.id),
+            // Guardados para a releitura pre-envio: ela pergunta ao ERP pelo
+            // codigo do Omie, nao pelo nosso uuid.
+            origem_conta_id: lista[0].origem_conta_id ?? null,
+            origem_ids: lista.map((t) => Number(t.origem_id)).filter(Number.isFinite),
             conversation_id: conversa?.conversation_id ?? null,
             mensagem,
           });
+        }
+      }
+
+      // ── Releitura no ERP, imediatamente antes do envio ──────────────────
+      //
+      // Item 4 do plano, e ele deixou de ser precaução em 25/09/2026: no
+      // primeiro teste real da releitura, 3 títulos que constavam "A vencer"
+      // com vencimento em 25 e 30/09 já não existiam no Omie. A conferência do
+      // sync só olha 5 por rodada e só os vencidos, então título que some do
+      // ERP enquanto ainda está a vencer não era pego por ninguém.
+      //
+      // POR QUE AQUI E NÃO NA MONTAGEM DA FILA: reler os 341 candidatos de um
+      // lote custaria 341 consultas em rajada e derrubaria a API do Omie por 30
+      // minutos. O envio é uma por vez; a conferência acompanha o envio, não a
+      // fila.
+      //
+      // Em simulação ela é opcional (`reler: true`) justamente para a simulação
+      // continuar barata — ela existe para ser rodada muitas vezes.
+      if (reler) {
+        const fila = candidatos
+          .filter((c) => c.decisao === 'enviaria' || c.decisao === 'bloqueado_portao')
+          .filter((c) => c.origem_conta_id && c.origem_ids?.length);
+
+        const porConta = new Map<string, number[]>();
+        let orcamento = MAX_RELEITURA_RODADA;
+        for (const c of fila) {
+          if (orcamento <= 0) break;
+          const cabe = c.origem_ids.slice(0, orcamento);
+          porConta.set(c.origem_conta_id, [...(porConta.get(c.origem_conta_id) ?? []), ...cabe]);
+          orcamento -= cabe.length;
+        }
+
+        let mexeu = false;
+        for (const [contaId, codigos] of porConta) {
+          try {
+            const { data: chave } = await service.rpc('obter_chave_omie_por_conta', {
+              p_integration_id: contaId,
+            });
+            if (!chave) continue;
+            const r = await fetch(DOCTOROMIE_RELER, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
+              body: JSON.stringify({ codigos }),
+            });
+            const corpo = await r.json().catch(() => ({}));
+            releitura.push({ conta: contaId, pedidos: codigos.length, ...(corpo?.resultados ?? {}) });
+            if ((corpo?.relidos ?? 0) > 0 || (corpo?.removidos_no_erp ?? 0) > 0) mexeu = true;
+          } catch (e) {
+            // Releitura que falha não pode derrubar a rodada: o que ela protege
+            // é a decisão de cobrar, e sem ela a decisão volta a ser a de antes.
+            console.warn(LOG, 'releitura falhou:', (e as Error)?.message);
+          }
+        }
+
+        if (mexeu) {
+          const { data: segredo } = await service.rpc('obter_segredo_cron_fin_sync');
+          if (segredo) {
+            await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/fin-sync-titulos`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${segredo}` },
+              body: JSON.stringify({ tenant_id: tenant.id }),
+            });
+          }
+
+          // Reconfere: o título ainda está em aberto depois da releitura? O que
+          // sumiu do ERP ou foi pago deixa de aparecer na view, e o candidato
+          // cai — que é o ponto inteiro desta etapa.
+          const conferidos = new Set<string>();
+          for (const c of candidatos) {
+            for (const id of c.titulo_ids ?? []) conferidos.add(id);
+          }
+          const aindaAbertos = await buscarPorIds(
+            (bloco) =>
+              service
+                .from('vw_fin_titulos_abertos')
+                .select('id')
+                .eq('tenant_id', tenant.id)
+                .in('id', bloco),
+            [...conferidos],
+          );
+          const vivos = new Set(aindaAbertos.map((t: any) => t.id));
+
+          for (const c of candidatos) {
+            if (c.decisao !== 'enviaria' && c.decisao !== 'bloqueado_portao') continue;
+            const restantes = (c.titulo_ids ?? []).filter((id: string) => vivos.has(id));
+            if (restantes.length === 0) {
+              c.decisao = 'suprimido';
+              c.motivo = 'o ERP confirmou que este título não está mais em aberto';
+              c.faturas = 0;
+            } else if (restantes.length < (c.titulo_ids ?? []).length) {
+              c.motivo = `${(c.titulo_ids.length - restantes.length)} fatura(s) deixaram de estar em aberto na releitura`;
+              c.titulo_ids = restantes;
+            }
+          }
         }
       }
 
@@ -575,6 +696,7 @@ Deno.serve(async (req) => {
         regua_liberada: cfg?.fin_regua_liberada === true,
         toques_ativos: (toques ?? []).length,
         opt_outs_ativos: bloqueados.size,
+        releitura: reler ? releitura : null,
         canal: canal
           ? {
               nome: canal.instance_name,
