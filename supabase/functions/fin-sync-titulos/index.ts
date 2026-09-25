@@ -92,6 +92,8 @@ interface TituloOrigem {
   excluido_em?: string | null;
   /** Código da OS na origem. É a chave para chegar ao PDF da nota e da OS. */
   os_id?: string | null;
+  /** Codigo do contrato na origem. O elo que separa dois contratos da mesma empresa. */
+  contrato_id?: string | null;
   numero_nf?: string | null;
 }
 
@@ -235,6 +237,7 @@ Deno.serve(async (req) => {
               // Vinham no bruto do Omie e se perdiam na listagem. Não são o
               // link do documento: são o que permite ir buscá-lo.
               origem_os_id: t.os_id ?? null,
+              origem_contrato_id: t.contrato_id ?? null,
               numero_nf: t.numero_nf ?? null,
               atualizado_em: new Date().toISOString(),
             }));
