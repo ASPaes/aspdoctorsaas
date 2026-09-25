@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { fecharAvisosDoSistema } from "@/lib/notificacaoDoSistema";
 import { ConversationsSidebar } from "@/components/whatsapp/conversations/ConversationsSidebar";
 import { ChatAreaFull } from "@/components/whatsapp/chat/ChatAreaFull";
 import type { ConversationWithContact } from "@/components/whatsapp/hooks/useWhatsAppConversations";
@@ -145,6 +146,11 @@ function WhatsAppContent() {
         queryClient.invalidateQueries({ queryKey: ["notifications-list"] });
         queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
       }
+      // Marcar como lida no banco não tira o aviso da barra do telefone, e o
+      // launcher do Android conta os avisos ABERTOS para desenhar o número no
+      // ícone: ficava parecendo mensagem pendente com tudo já lido. No WhatsApp
+      // o aviso some ao abrir a conversa; aqui é o mesmo gesto.
+      void fecharAvisosDoSistema(`chat-${selected.id}`);
     })();
   }, [selected?.id, queryClient]);
 

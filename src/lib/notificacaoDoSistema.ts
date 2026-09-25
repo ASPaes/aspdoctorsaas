@@ -78,3 +78,27 @@ export function marcarIconeDoApp(naoLidas: number) {
     // Sem suporte: nada a fazer, e não vale poluir o console do operador.
   }
 }
+
+/**
+ * Fecha os avisos que já estão na barra do telefone.
+ *
+ * Sem isto o aviso ficava lá depois de a pessoa ler a conversa — e o launcher
+ * do Android conta as notificações abertas para desenhar o número no ícone.
+ * Dava a impressão de mensagem pendente que nunca acabava, mesmo com tudo lido.
+ * No WhatsApp o aviso some quando você abre a conversa; aqui é o mesmo gesto.
+ *
+ * Sem `tag` fecha todos os avisos do app, que é o caso de "marcar tudo como
+ * lido". Quem cria os avisos usa `chat-<id da conversa>` como tag, então fechar
+ * por conversa é fechar por tag.
+ */
+export async function fecharAvisosDoSistema(tag?: string) {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  try {
+    const registro = await navigator.serviceWorker.getRegistration();
+    if (!registro) return;
+    const abertos = await registro.getNotifications(tag ? { tag } : undefined);
+    abertos.forEach((n) => n.close());
+  } catch {
+    // Navegador sem suporte ou sem permissão: não há aviso aberto para fechar.
+  }
+}
