@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 24/09
 
+- 🔧 **O aviso continuava na barra do telefone depois de a mensagem ser lida** — Ao abrir a conversa pelo celular, a mensagem era marcada como lida no sistema, mas o aviso ficava parado na barra de notificações do aparelho. Como o telefone usa os avisos abertos para desenhar o número no ícone do aplicativo, ele seguia mostrando pendência mesmo com tudo lido. Agora abrir a conversa tira os avisos dela da barra, como no WhatsApp. Se você ler pelo computador, o aviso no celular ainda sai só quando você abrir o chat no aparelho.
+
 - 🔧 **No celular, vídeo e nome de arquivo grande apareciam cortados** — No chat pelo telefone, o vídeo enviado saía pela lateral da tela, com parte dele fora do alcance. Nome de arquivo comprido também parava cedo demais, em algo como "La Traviata SavassiCardapioSomenteVisu...", sem dizer qual arquivo era. Agora o vídeo se ajusta à largura do aparelho e o nome do arquivo usa duas linhas; o tipo e o tamanho continuam logo abaixo. No computador nada muda.
 
 - 🔧 **Na lista de conversas, o selo "Aguardando você" espremia o nome do contato** — No telefone, o aviso vermelho ocupava tanto espaço à direita que o nome do cliente virava reticências logo no começo, e os selos ficavam colados na borda da tela, parecendo cortados. Em tela estreita o aviso passa a mostrar só **Aguardando**, e a lista ganhou uma folga lateral. O significado é o mesmo e o nome do contato ganha espaço.
