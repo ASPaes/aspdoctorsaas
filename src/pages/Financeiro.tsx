@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { LayoutDashboard, Receipt } from 'lucide-react';
+import { CalendarClock, LayoutDashboard, Receipt } from 'lucide-react';
 import PainelCobrancaTab from '@/components/financeiro/PainelCobrancaTab';
 import TitulosTab from '@/components/financeiro/TitulosTab';
+import ReguaTab from '@/components/financeiro/ReguaTab';
 
 /**
- * Financeiro — Fase 1: só leitura.
+ * Financeiro.
  *
  * Mostra o que a empresa tem a receber, lido do sistema de cobrança dela
- * (Omie hoje) e guardado em fin_titulos. A régua de cobrança entra aqui como
- * uma terceira aba quando for a vez dela.
+ * (Omie hoje) e guardado em fin_titulos, e a régua de cobrança.
+ *
+ * ⚠️ A régua ainda NÃO envia: o motor só simula. A própria aba diz isso no
+ * topo, porque quem abre esta página precisa saber se tem robô falando com
+ * cliente sem ter que perguntar a ninguém.
  */
 export default function Financeiro() {
   const [aba, setAba] = useState('painel');
@@ -39,6 +43,10 @@ export default function Financeiro() {
             <Receipt className="h-4 w-4" />
             Títulos
           </TabsTrigger>
+          <TabsTrigger value="regua" className="gap-1.5">
+            <CalendarClock className="h-4 w-4" />
+            Régua de cobrança
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="painel" className="mt-4">
@@ -46,6 +54,9 @@ export default function Financeiro() {
         </TabsContent>
         <TabsContent value="titulos" className="mt-4">
           <TitulosTab />
+        </TabsContent>
+        <TabsContent value="regua" className="mt-4">
+          <ReguaTab />
         </TabsContent>
       </Tabs>
     </div>
