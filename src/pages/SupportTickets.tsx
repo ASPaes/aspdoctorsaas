@@ -1200,9 +1200,11 @@ export default function SupportTickets() {
     );
   };
 
+  // No telefone quem da o respiro lateral e o layout (ChatMobileLayout); manter o
+  // padding daqui somaria os dois e comeria a largura util da tela.
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
+    <div className={cn("space-y-4", noCelular ? "" : "p-4 md:p-6")}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -1313,6 +1315,18 @@ export default function SupportTickets() {
                 <SelectItem value="closed">Encerrados</SelectItem>
               </SelectContent>
             </Select>
+        {noCelular && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 p-0 shrink-0"
+            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
+            aria-expanded={maisFiltros}
+            onClick={() => setMaisFiltros((v) => !v)}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        )}
           </>
         )}
         {/* No telefone a barra guarda o essencial — periodo, situacao e busca — e
@@ -1339,7 +1353,9 @@ export default function SupportTickets() {
           </SelectContent>
         </Select>
         </div>
-        <div className="relative flex-1 min-w-[160px]">
+        {/* No telefone a busca fica sozinha na linha: espremida ao lado dos seletores,
+            o texto do placeholder cortava no meio ("Buscar por assunto, cliente, destina..."). */}
+        <div className={cn("relative", noCelular ? "w-full" : "flex-1 min-w-[160px]")}>
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar..."
@@ -1717,18 +1733,6 @@ export default function SupportTickets() {
           {exporting ? "Exportando..." : "Exportar"}
         </Button>
         </div>
-        {noCelular && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 w-9 p-0 shrink-0"
-            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
-            aria-expanded={maisFiltros}
-            onClick={() => setMaisFiltros((v) => !v)}
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        )}
         <div className="flex-1" />
         {/* View switcher */}
         {/* Cinco visoes nao cabem em 390px: no telefone a faixa rola de lado, em

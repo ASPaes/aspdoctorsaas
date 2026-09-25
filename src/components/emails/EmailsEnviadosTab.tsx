@@ -19,11 +19,14 @@ import { useMoverParaPasta } from "./usePastasEmail";
 import {
   Archive, ArchiveRestore, Building2, CheckCircle2, ChevronLeft, ChevronRight, Eye, FolderInput, Lock, Mail, RotateCcw,
   Search, Send, Trash2, XCircle,
+  MoreHorizontal,
 } from "lucide-react";
 import { subDays } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
 import { FiltroMulti } from "./FiltroMulti";
 import {
   POR_PAGINA, ROTULO_ORIGEM, nomeDoCliente, useEmailsEnviados, useLixeiraEnviados, useOpcoesFiltro,
@@ -57,6 +60,9 @@ export default function EmailsEnviadosTab() {
   const podeExcluir = profile?.role === "admin" || profile?.is_super_admin === true;
 
   const [buscaDigitada, setBuscaDigitada] = useState("");
+  // No telefone a barra mostra so a busca; o resto entra pelos tres pontos.
+  const [maisFiltros, setMaisFiltros] = useState(false);
+  const noCelular = useIsMobile() || isChatHost();
   const [filtros, setFiltros] = useState<FiltrosEnviados>({
     busca: "",
     setores: [],
@@ -167,7 +173,9 @@ export default function EmailsEnviadosTab() {
     <div className="space-y-3">
       {/* busca e filtros */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[260px] flex-1">
+        {/* No telefone a busca fica sozinha na linha: o texto de apoio e longo e
+            era cortado no meio quando ela dividia espaco com os seletores. */}
+        <div className={cn("relative", noCelular ? "min-w-0 flex-1" : "min-w-[260px] flex-1")}>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={buscaDigitada}
@@ -176,6 +184,10 @@ export default function EmailsEnviadosTab() {
             className="h-9 pl-9"
           />
         </div>
+        {/* Setor, origem, conta, situacao, periodo, pastas, arquivadas e lixeira:
+            oito controles nao cabem num telefone. Ficam atras dos tres pontos, e
+            `contents` mantem o layout da barra igual quando aparecem. */}
+        <div className={cn("contents", noCelular && !maisFiltros && "hidden")}>
         <FiltroMulti
           rotulo="Setor"
           icone={<Building2 className="h-3.5 w-3.5 text-muted-foreground" />}
@@ -235,6 +247,19 @@ export default function EmailsEnviadosTab() {
           >
             <Trash2 className="mr-2 h-4 w-4" />
             Lixeira
+          </Button>
+        )}
+        </div>
+        {noCelular && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 shrink-0 p-0"
+            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
+            aria-expanded={maisFiltros}
+            onClick={() => setMaisFiltros((v) => !v)}
+          >
+            <MoreHorizontal className="h-4 w-4" />
           </Button>
         )}
       </div>

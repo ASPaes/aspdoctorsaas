@@ -102,7 +102,13 @@ export default function ChatMobileLayout() {
           <main
             className={cn(
               "flex-1 min-h-0 min-w-0",
-              gerenciaProprioScroll ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+              gerenciaProprioScroll
+                ? "overflow-hidden"
+                // O respiro lateral vem daqui, como vem do AppLayout no computador:
+                // as telas do sistema nao trazem margem propria e encostavam nas
+                // bordas do telefone. Tickets ja tem a sua, e por isso a dispensa
+                // no celular (ver SupportTickets).
+                : "overflow-y-auto overscroll-contain px-3 py-3"
             )}
           >
             <ErrorBoundary>
