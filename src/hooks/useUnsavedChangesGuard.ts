@@ -1,13 +1,18 @@
 import { useEffect, useCallback, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+/** Caminho especial: em vez de navegar, chama `onFechar` (ficha aberta em modal). */
+export const FECHAR_MODAL = "__fechar__";
+
 /**
  * Guards against accidental navigation/reload when the form has unsaved changes.
  * - Registers beforeunload to catch browser refresh/close.
  * - Wraps navigate to intercept in-app navigation.
  * Returns state and handlers for the confirmation dialog.
  */
-export function useUnsavedChangesGuard(isDirty: boolean) {
+export function useUnsavedChangesGuard(isDirty: boolean, onFechar?: () => void) {
+  const onFecharRef = useRef(onFechar);
+  onFecharRef.current = onFechar;
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const navigate = useNavigate();
   const isDirtyRef = useRef(isDirty);
@@ -49,7 +54,8 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
       if (isDirtyRef.current) {
         setPendingPath(to);
       } else {
-        navigate(to);
+        if (to === FECHAR_MODAL) onFecharRef.current?.();
+        else navigate(to);
       }
     },
     [navigate]
@@ -61,6 +67,8 @@ export function useUnsavedChangesGuard(isDirty: boolean) {
     if (path === "__back__") {
       // Go back (allow the popstate)
       window.history.go(-2);
+    } else if (path === FECHAR_MODAL) {
+      onFecharRef.current?.();
     } else if (path) {
       navigate(path);
     }

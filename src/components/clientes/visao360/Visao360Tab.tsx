@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
@@ -40,6 +41,8 @@ import { EnviarSegundaViaDialog } from "./EnviarSegundaViaDialog";
 
 // Os dois pesam: o detalhe do ticket tem 2.600 linhas. Só descem quando alguém clica.
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
+// A ficha inteira (1.100 linhas) só desce quando alguém abre.
+const ClienteForm = lazyWithReload(() => import("@/pages/ClienteForm"));
 const CreateSupportTicketModal = lazyWithReload(() =>
   import("@/components/tickets/CreateSupportTicketModal").then((m) => ({ default: m.CreateSupportTicketModal })),
 );
@@ -211,6 +214,7 @@ export default function Visao360Tab() {
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
   const [novoTicket, setNovoTicket] = useState(false);
+  const [fichaAberta, setFichaAberta] = useState(false);
   const [segundaVia, setSegundaVia] = useState<{ aberto: boolean; titulo: string | null }>({ aberto: false, titulo: null });
 
   const cliente = useCliente360(clienteId);
@@ -523,7 +527,7 @@ export default function Visao360Tab() {
                   <Receipt className="h-4 w-4" />Enviar 2ª via
                 </button>
               )}
-              <button type="button" onClick={() => navigate(`/clientes/${c.id}`)} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[12.5px] font-bold text-slate-100 transition duration-300 hover:-translate-y-px hover:bg-white/10", EASE)}>
+              <button type="button" onClick={() => setFichaAberta(true)} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[12.5px] font-bold text-slate-100 transition duration-300 hover:-translate-y-px hover:bg-white/10", EASE)}>
                 <FileText className="h-4 w-4" />Abrir ficha
               </button>
             </div>
@@ -678,6 +682,23 @@ export default function Visao360Tab() {
           preSelecionado={segundaVia.titulo}
         />
         )}
+        {/* A ficha de sempre, dentro de um modal. Fechar é só pelo Voltar, X ou
+            Cancelar da própria ficha: eles passam pela pergunta de alteração não
+            salva; Esc e clique fora não passariam, por isso estão desligados. */}
+        <Dialog open={fichaAberta && !!c} onOpenChange={() => { /* fecha só pela ficha */ }}>
+          <DialogContent
+            className="w-[96vw] max-w-[1400px] h-[94vh] overflow-y-auto p-4 sm:p-6 [&>button.absolute]:hidden"
+            onEscapeKeyDown={(e) => e.preventDefault()}
+            onInteractOutside={(e) => e.preventDefault()}
+          >
+            <DialogTitle className="sr-only">Ficha do cliente</DialogTitle>
+            {fichaAberta && c && (
+              <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+                <ClienteForm clienteIdModal={c.id} onFechar={() => setFichaAberta(false)} />
+              </Suspense>
+            )}
+          </DialogContent>
+        </Dialog>
         {novoTicket && c && (
           <CreateSupportTicketModal
             open={novoTicket}

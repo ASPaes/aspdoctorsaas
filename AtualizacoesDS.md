@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **Ficha do cliente abre sem sair da Visão 360°** — Em **Clientes › Visão 360°**, o botão **Abrir ficha** passa a abrir a ficha do cliente numa janela por cima da tela, exatamente como ela é hoje. Voltar, o X e Cancelar fecham a janela e deixam você no mesmo cliente; com alteração não salva, o sistema pergunta antes de fechar. Depois de salvar, os números da Visão 360° se atualizam na hora.
+
 - 🆕 **Corrigir o valor mensal de um módulo digitado errado** — Em **Clientes › ficha do cliente › Produtos & Módulos**, quem tem permissão vê um lápis ao lado do **Vlr Mensal** de cada módulo ativo. Basta informar o valor certo e o motivo: a mensalidade do produto é recalculada e, onde há integração com o Omie, o contrato segue com o valor corrigido. Por ser correção e não venda, não lança upsell nem downsell. A alteração fica no **Histórico de módulos** com o selo **Valor mensal**, mostrando de quanto para quanto, quem fez e o motivo. Por padrão só administradores podem corrigir; para liberar outra pessoa, use **Configurações › Acessos da equipe**, coluna **Integração**, opção **Corrigir valor do módulo**. Módulo com upsell, downsell ou reajuste ligado a ele ainda não pode ser corrigido por aqui.
 
 - ⬆️ **MRR antes e depois, e o vendedor, em cada movimentação do contrato** — Em **Clientes › Visão 360° › Linha do tempo**, cada movimentação de contrato (upsell, cross-sell, downsell, reajuste, cancelamento) passa a mostrar o MRR do cliente antes e depois dela, por exemplo "MRR R$ 230,00 → R$ 260,00" num upsell de R$ 30,00. Upsell, cross-sell, downsell e venda avulsa também mostram o **vendedor** da movimentação, ou "Sem vendedor" quando ele não foi informado.

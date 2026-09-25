@@ -11,7 +11,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { getNavIds } from "@/hooks/useClientesFilters";
 import { useFormDraftPersistence } from "@/hooks/useFormDraftPersistence";
-import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import { FECHAR_MODAL, useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import { buscarClientesComMesmoDocumento, type ClienteMesmoDocumento } from "@/lib/clienteDuplicado";
 import { UnsavedChangesDialog } from "@/components/UnsavedChangesDialog";
 import { Form } from "@/components/ui/form";
@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History, AlertTriangle, Pencil } from "lucide-react";
+import { ArrowLeft, Loader2, Building2, FileText, XCircle, ChevronLeft, ChevronRight, Eye, EyeOff, ShieldAlert, History, AlertTriangle, Pencil, X } from "lucide-react";
 import EditarCancelamentoDialog from "@/components/clientes/EditarCancelamentoDialog";
 import { MovimentosMrrModal } from "@/components/clientes/MovimentosMrrModal";
 import DadosClienteTab from "@/components/clientes/DadosClienteTab";
@@ -314,8 +314,14 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
   );
 }
 
-export default function ClienteForm() {
-  const { id } = useParams();
+/**
+ * Ficha do cliente. Rota `/clientes/:id` e, com `clienteIdModal`, dentro do modal
+ * da Visão 360° (mesma tela; muda só para onde "Voltar" e "Cancelar" levam).
+ */
+export default function ClienteForm({ clienteIdModal, onFechar }: { clienteIdModal?: string; onFechar?: () => void } = {}) {
+  const params = useParams();
+  const emModal = !!clienteIdModal;
+  const id = clienteIdModal ?? params.id;
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -330,7 +336,8 @@ export default function ClienteForm() {
 
   // Navigation between records
   const navInfo = useMemo(() => {
-    if (!id) return null;
+    // No modal não há anterior/próximo: levaria para fora da Visão 360°.
+    if (!id || emModal) return null;
     const ids = getNavIds();
     if (!ids.length) return null;
     const idx = ids.indexOf(id);
@@ -415,7 +422,9 @@ export default function ClienteForm() {
 
   // Unsaved changes guard
   const isDirty = form.formState.isDirty;
-  const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(isDirty);
+  const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(isDirty, onFechar);
+  // No modal, sair é fechar o modal (com a mesma pergunta de alteração não salva).
+  const sair = () => guardedNavigate(emModal ? FECHAR_MODAL : "/clientes");
 
   // Fetch MC% ponderada for auto-filling custo_operacao on new clients
   const mcPonderadaQuery = useQuery({
@@ -621,6 +630,8 @@ export default function ClienteForm() {
       clienteLoadedRef.current = false;
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["cliente", id] });
+      // Aberta pela Visão 360°: os números e etiquetas de lá se atualizam na hora.
+      if (emModal) queryClient.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? "").startsWith("visao360_") });
       clearDraft();
       toast({ title: isEditing ? "Cliente atualizado!" : "Cliente criado!", description: "Dados salvos com sucesso." });
       if (!isEditing && newId) navigate(`/clientes/${newId}`);
@@ -788,7 +799,7 @@ export default function ClienteForm() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => guardedNavigate("/clientes")}>
+          <Button variant="ghost" size="icon" onClick={sair}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1">
@@ -800,6 +811,11 @@ export default function ClienteForm() {
           </div>
 
           {/* Prev/Next navigation */}
+          {emModal && (
+            <Button variant="ghost" size="icon" onClick={sair} aria-label="Fechar ficha" title="Fechar">
+              <X className="h-5 w-5" />
+            </Button>
+          )}
           {isEditing && navInfo && (
             <div className="flex items-center gap-1">
               <Button
@@ -1095,7 +1111,7 @@ export default function ClienteForm() {
 
           {/* Botões de ação */}
           <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => guardedNavigate("/clientes")}>
+            <Button type="button" variant="outline" onClick={sair}>
               Cancelar
             </Button>
             <ProtectedElement resource="clientes" action={isEditing ? "update" : "insert"} mode="notify">
