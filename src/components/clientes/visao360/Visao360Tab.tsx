@@ -34,6 +34,7 @@ import { LinhaDoTempo, MapaDeContato, OQueUsa, ProximosEventos, QuemFala, type P
 import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360Listas";
 import { FinanceiroSubAba } from "./Visao360Financeiro";
 import { SaudeDoCliente } from "./Visao360Saude";
+import { TheoResumo } from "./Visao360Theo";
 
 // Os dois pesam: o detalhe do ticket tem 2.600 linhas. Só descem quando alguém clica.
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
@@ -577,6 +578,7 @@ export default function Visao360Tab() {
                   <LinhaDoTempo eventos={eventos} onAbrirAtendimento={setAtendimentoAberto} onAbrirTicket={setTicketAberto} />
                 </div>
                 <div className="grid min-w-0 content-start gap-3.5">
+                  <TheoResumo clienteId={clienteId} nomeAgente={nomeAgente} />
                   <QuemFala contatos={contatos.data ?? []} />
                   <ProximosEventos eventos={proximos} />
                   <OQueUsa produtos={produtos} />

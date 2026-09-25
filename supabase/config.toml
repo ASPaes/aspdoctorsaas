@@ -406,3 +406,10 @@ verify_jwt = true
 # segredo do vault.
 [functions.fin-documentos-preencher]
 verify_jwt = false
+
+# Resumo do Théo na Visão 360° do cliente (Clientes › Visão 360°).
+# verify_jwt = TRUE: só a tela chama, com a sessão do usuário, e só quando a
+# pessoa clica. A function ainda lê os dados do cliente com o token do usuário
+# (RLS) e gasta a IA da empresa, com o teto de gasto do mês.
+[functions.cliente-resumo-360]
+verify_jwt = true
