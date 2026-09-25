@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
+import { useTicketDialogSize, TicketDialogResizeHandles } from "@/components/tickets/useTicketDialogSize";
 import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner";
 import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { formatarTelefone } from "@/components/emails/macros/camposMacro";
@@ -135,6 +136,7 @@ export function CreateSupportTicketModal({
 
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
+  const dialogSize = useTicketDialogSize(open);
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
@@ -1081,11 +1083,13 @@ export function CreateSupportTicketModal({
     <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) { requestClose(); } else { onOpenChange(true); } }}>
       <DialogContent
-        className="max-w-[900px] p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col shadow-none"
+        className={`p-0 gap-0 overflow-hidden flex flex-col shadow-none ${dialogSize.effectiveSize ? "max-w-none max-h-none" : "max-w-[900px] max-h-[90vh]"}`}
+        style={dialogSize.effectiveSize ? { width: dialogSize.effectiveSize.w, height: dialogSize.effectiveSize.h } : undefined}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        <TicketDialogResizeHandles onStart={dialogSize.startResize} onReset={dialogSize.resetSize} />
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">

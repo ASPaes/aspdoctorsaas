@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 24/09
 
+- ⬆️ **Tamanho da janela do ticket vale também para o ticket novo** — O tamanho que você ajusta na janela de um ticket agora também vale ao abrir **Novo ticket**, que antes sempre abria no tamanho padrão e não deixava redimensionar. As duas janelas seguem o mesmo ajuste: mudou numa, a outra abre igual. Além da borda direita, da de baixo e do canto inferior direito, agora dá para arrastar também a **borda esquerda** e o **canto inferior esquerdo**. Duplo clique em qualquer borda volta ao tamanho padrão.
+
 - 🔧 **No celular, mensagem que responde outra saía pela lateral da tela** — Quando alguém responde citando uma mensagem anterior, o trecho citado esticava o balão e parte da conversa ficava fora da tela, cortada na borda direita — pior ainda quando a mensagem citada tinha menções. Agora o trecho citado respeita a largura do aparelho e o balão volta para dentro da tela. Junto disso, a barra de rolagem que aparecia por cima dos selos no topo da conversa (Ativa, setor, número) deixou de aparecer, e a faixa ganhou um pouco mais de espaço. No computador nada muda.
 
 - 🆕 **Resumo da IA vai para o chat com um clique** — Nos **Detalhes** da conversa, o resumo gerado pela IA ganhou o botão **Enviar para o chat**: em conversa individual, logo abaixo do resumo na seção **Resumos**; em grupo, no rodapé do resumo aberto na janela **Resumo do grupo com IA**, ao lado de "Copiar resumo". O texto vai para o campo de mensagem já formatado para o WhatsApp, com títulos em negrito e itens em lista, sem precisar copiar e colar. Nada é enviado sozinho: o atendente revisa e envia. No grupo, as correções feitas no resumo vão junto, mesmo antes de salvar.
