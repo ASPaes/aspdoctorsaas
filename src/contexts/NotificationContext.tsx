@@ -705,27 +705,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [unreadCount, refreshUnreadCount]);
 
   // Title flashing while hidden
+  // O título "de volta" é lido na hora em que o pisca começa, não quando o efeito
+  // monta: desde a DEM-0474 ele muda a cada tela, e guardar o da montagem
+  // devolvia à aba o nome de uma tela por onde a pessoa já tinha passado.
   useEffect(() => {
-    const originalTitle = document.title;
+    const aviso = `(${unreadCount}) Nova mensagem - DoctorSaaS`;
+    let tituloDaTela = document.title;
     let interval: number | undefined;
     let toggled = false;
 
     const stop = () => {
-      if (interval) {
-        window.clearInterval(interval);
-        interval = undefined;
-      }
-      document.title = originalTitle;
+      if (!interval) return;
+      window.clearInterval(interval);
+      interval = undefined;
+      document.title = tituloDaTela;
     };
 
     const maybeStart = () => {
       stop();
       if (document.hidden && unreadCount > 0) {
+        tituloDaTela = document.title;
+        toggled = false;
         interval = window.setInterval(() => {
           toggled = !toggled;
-          document.title = toggled
-            ? `(${unreadCount}) Nova mensagem - DoctorSaaS`
-            : originalTitle;
+          document.title = toggled ? aviso : tituloDaTela;
         }, 1500);
       }
     };

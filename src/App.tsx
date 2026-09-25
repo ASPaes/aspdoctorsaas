@@ -1,10 +1,10 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { lazyWithReload } from "@/lib/staleChunkReload";
 import AppToasters from "@/components/AppToasters";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AuthGuard from "@/components/AuthGuard";
 import AppLayout from "@/components/AppLayout";
 import { TenantFilterProvider } from "@/contexts/TenantFilterContext";
@@ -17,6 +17,7 @@ import LandingRedirect from "@/components/auth/LandingRedirect";
 import { registerMediaBlobRevoker } from "@/lib/mediaBlobRegistry";
 import { isChatHost } from "@/lib/chatHost";
 import ChatHostRoutes from "@/routes/ChatHostRoutes";
+import { tituloDaAba } from "@/lib/tituloDaAba";
 
 // Eager-loaded: pages visited most frequently (no spinner on navigate)
 import Dashboard from "@/pages/Dashboard";
@@ -82,6 +83,16 @@ const queryClient = new QueryClient({
 // aberto no turno até o reload.
 registerMediaBlobRevoker(queryClient);
 
+// DEM-0474: cada aba mostra o nome da tela (ver lib/tituloDaAba.ts). Só no app:
+// chat.doctorsaas.com.br tem uma tela só e fica com o título do index.html.
+function TituloDaAba() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    document.title = tituloDaAba(pathname);
+  }, [pathname]);
+  return null;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
@@ -93,6 +104,8 @@ const App = () => (
               é aqui que os dois endereços se separam, e nada do ramo do chat
               atravessa para o app. */}
           {isChatHost() ? <ChatHostRoutes /> : (
+          <>
+          <TituloDaAba />
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
@@ -151,6 +164,7 @@ const App = () => (
 
             <Route path="*" element={<Suspense fallback={<PageLoader />}><NotFound /></Suspense>} />
           </Routes>
+          </>
           )}
       </BrowserRouter>
     </TooltipProvider>
