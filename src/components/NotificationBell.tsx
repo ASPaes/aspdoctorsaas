@@ -12,6 +12,8 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+import { fecharAvisosDoSistema, marcarIconeDoApp } from "@/lib/notificacaoDoSistema";
 
 export function NotificationBell() {
   const {
@@ -220,6 +222,28 @@ export function NotificationBell() {
                 Limpar todas
               </Button>
             )}
+            {/* "Limpar todas" mexe na caixa do sistema; este mexe na BARRA do
+                aparelho, que é outra coisa e não sai junto. Aviso velho fica lá
+                até alguém abrir o app ou deslizar, e no Android é ele que desenha
+                o número no ícone do app instalado. Dizer QUANTOS fechou é de
+                propósito: é o único jeito de saber, de fora do aparelho, o que o
+                app enxerga na barra dele. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs gap-1"
+              onClick={async () => {
+                const fechados = await fecharAvisosDoSistema();
+                marcarIconeDoApp(0);
+                toast.success(
+                  fechados > 0
+                    ? `${fechados} aviso${fechados > 1 ? "s" : ""} retirado${fechados > 1 ? "s" : ""} da barra do aparelho`
+                    : "O app não enxerga nenhum aviso na barra deste aparelho"
+                );
+              }}
+            >
+              Limpar avisos do aparelho
+            </Button>
           </div>
         </div>
 

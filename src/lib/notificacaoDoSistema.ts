@@ -114,14 +114,26 @@ export async function pedirLimpezaNosOutrosAparelhos(tag: string) {
   }
 }
 
-export async function fecharAvisosDoSistema(tag?: string) {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+export async function fecharAvisosDoSistema(tag?: string): Promise<number> {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return 0;
   try {
-    const registro = await navigator.serviceWorker.getRegistration();
-    if (!registro) return;
-    const abertos = await registro.getNotifications(tag ? { tag } : undefined);
-    abertos.forEach((n) => n.close());
+    // `getRegistrations()`, no plural, DE PROPOSITO. O singular devolve so o
+    // registro que corresponde a pagina atual, e um aviso continua pertencendo ao
+    // registro que o criou: se sobrou registro de outro escopo — o caminho do
+    // script mudou ao longo do tempo (`/sw.js`, depois `/sw.js?v=N`) —, os avisos
+    // dele ficavam fora do alcance e a barra nao esvaziava nunca.
+    const registros = await navigator.serviceWorker.getRegistrations();
+    let fechados = 0;
+    for (const registro of registros) {
+      const abertos = await registro.getNotifications(tag ? { tag } : undefined);
+      for (const aviso of abertos) {
+        aviso.close();
+        fechados++;
+      }
+    }
+    return fechados;
   } catch {
-    // Navegador sem suporte ou sem permissão: não há aviso aberto para fechar.
+    // Navegador sem suporte ou sem permissao: nao ha aviso aberto para fechar.
+    return 0;
   }
 }
