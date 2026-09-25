@@ -5,7 +5,7 @@ import { endOfDay, formatDistanceStrict, parseISO, startOfDay, subDays, differen
 import { ptBR } from "date-fns/locale";
 import {
   Search, MessageCircle, Ticket, FileText, MapPin, TrendingUp, Star, Clock, AlertTriangle,
-  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt,
+  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -26,7 +26,7 @@ import {
   type ClienteBusca,
 } from "./useVisao360";
 import {
-  brl, calcularSaude, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
+  brl, calcularSaude, dadosDaVenda, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
   type Periodo,
 } from "./visao360Calc";
 import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
@@ -352,6 +352,7 @@ export default function Visao360Tab() {
   const nome = c ? nomeDoCliente(c) : "";
   const desde = c?.data_ativacao || c?.data_cadastro;
   const produtosAtivos = produtos.filter((p) => p.ativo).length;
+  const venda = dadosDaVenda(produtos, contrato.data?.contratoVenda ?? { vendedores: [], origens: [] });
   const varMrr = mrr12 > 0 ? ((mrrAtual - mrr12) / mrr12) * 100 : null;
   const difCsat = kCs.media != null && kCs.mediaAnterior != null ? kCs.media - kCs.mediaAnterior : null;
 
@@ -418,6 +419,9 @@ export default function Visao360Tab() {
                       Cliente há {formatDistanceStrict(parseISO(desde), new Date(), { locale: ptBR })}
                     </span>
                   )}
+                  <ChipDado Icon={Tag} rotulo="Segmento" valores={c.segmento ? [c.segmento] : []} />
+                  <ChipDado Icon={UserRound} rotulo="Vendedor" valores={venda.vendedores} />
+                  <ChipDado Icon={Megaphone} rotulo="Origem" valores={venda.origens} />
                   {produtosAtivos > 0 && (
                     <span className="rounded-full bg-sky-500/20 px-2.5 py-0.5 text-[11.5px] font-bold text-sky-300">
                       {produtosAtivos} produto{produtosAtivos > 1 ? "s" : ""} ativo{produtosAtivos > 1 ? "s" : ""}
@@ -680,5 +684,26 @@ function Numero({ rotulo, Icon, valor, sub, grafico, carregando }: {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Etiqueta de dado do cadastro no topo escuro. Vazio aparece apagado, "sem
+ * segmento", de propósito: é o jeito de a pessoa perceber que o cadastro está
+ * incompleto sem precisar abrir a ficha.
+ */
+function ChipDado({ Icon, rotulo, valores }: { Icon: typeof Tag; rotulo: string; valores: string[] }) {
+  const vazio = valores.length === 0;
+  return (
+    <span
+      title={vazio ? `${rotulo} não informado no cadastro` : `${rotulo}: ${valores.join(", ")}`}
+      className={cn(
+        "inline-flex max-w-[260px] items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-bold",
+        vazio ? "border border-dashed border-white/15 text-slate-500" : "bg-violet-500/20 text-violet-200",
+      )}
+    >
+      <Icon className="h-3 w-3 flex-none" />
+      <span className="truncate">{vazio ? `Sem ${rotulo.toLowerCase()}` : valores.join(", ")}</span>
+    </span>
   );
 }

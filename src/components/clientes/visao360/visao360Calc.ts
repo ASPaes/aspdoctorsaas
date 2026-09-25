@@ -51,6 +51,8 @@ export interface Produto360 {
   data_ativacao: string | null;
   data_venda: string | null;
   data_proximo_reajuste: string | null;
+  vendedor?: string | null;
+  origem_venda?: string | null;
 }
 
 export interface Movimento360 {
@@ -687,4 +689,24 @@ export function textoSemAnexo(
     t.codigo_barras ? `\nLinha digitável:\n${t.codigo_barras}` : null,
     t.pix_copia_cola ? `\nPix copia e cola:\n${t.pix_copia_cola}` : null,
   ].filter(Boolean).join("\n");
+}
+
+/**
+ * Vendedor e origem da venda do cliente. Fonte: os produtos ATIVOS (é o que a
+ * ficha edita em Produtos & Módulos); o contrato só entra quando nenhum produto
+ * tem o dado. `clientes.funcionario_id` / `origem_venda_id` são legados e não
+ * são lidos. Nomes repetidos entre produtos aparecem uma vez só.
+ */
+export function dadosDaVenda(
+  produtos: Produto360[],
+  contrato: { vendedores: string[]; origens: string[] },
+): { vendedores: string[]; origens: string[] } {
+  const unicos = (xs: (string | null | undefined)[]) => [...new Set(xs.filter((x): x is string => !!x && !!x.trim()))];
+  const ativos = produtos.filter((p) => p.ativo);
+  const vendedores = unicos(ativos.map((p) => p.vendedor));
+  const origens = unicos(ativos.map((p) => p.origem_venda));
+  return {
+    vendedores: vendedores.length ? vendedores : unicos(contrato.vendedores),
+    origens: origens.length ? origens : unicos(contrato.origens),
+  };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
-  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo,
+  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -220,5 +220,23 @@ describe("textos da 2ª via", () => {
     expect(t).toContain("https://x/y");
     expect(t).toContain("Linha digitável:\n3419 1");
     expect(t).toContain("Pix copia e cola:\n000201");
+  });
+});
+
+describe("vendedor e origem da venda", () => {
+  const vazioCt = { vendedores: [], origens: [] };
+  it("vem dos produtos ativos, sem repetir", () => {
+    const r = dadosDaVenda([
+      prod({ id: "1", vendedor: "Rafael", origem_venda: "Indicação" }),
+      prod({ id: "2", vendedor: "Rafael", origem_venda: "Site" }),
+      prod({ id: "3", ativo: false, vendedor: "Antigo", origem_venda: "Feira" }),
+    ], { vendedores: ["Contrato"], origens: ["Contrato"] });
+    expect(r).toEqual({ vendedores: ["Rafael"], origens: ["Indicação", "Site"] });
+  });
+  it("sem dado nos produtos, usa o contrato", () => {
+    expect(dadosDaVenda([prod({})], { vendedores: ["Bruna", "Bruna"], origens: [] })).toEqual({ vendedores: ["Bruna"], origens: [] });
+  });
+  it("sem nada em lugar nenhum, lista vazia", () => {
+    expect(dadosDaVenda([], vazioCt)).toEqual({ vendedores: [], origens: [] });
   });
 });

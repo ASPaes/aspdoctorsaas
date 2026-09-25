@@ -30,6 +30,7 @@ export interface Cliente360 {
   uf: string | null;
   unidade: string | null;
   tenant_id: string | null;
+  segmento: string | null;
 }
 
 export function useCliente360(clienteId: string | null) {
@@ -41,7 +42,8 @@ export function useCliente360(clienteId: string | null) {
       const { data, error } = await (supabase.from("clientes") as any)
         .select(`id, tenant_id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado,
           data_cadastro, data_ativacao, data_cancelamento, telefone_whatsapp, cert_a1_vencimento,
-          cidades:cidade_id(nome), estados:estado_id(sigla), unidades_base:unidade_base_id(nome)`)
+          cidades:cidade_id(nome), estados:estado_id(sigla), unidades_base:unidade_base_id(nome),
+          segmentos:segmento_id(nome)`)
         .eq("id", clienteId)
         .maybeSingle();
       if (error) throw error;
@@ -51,6 +53,7 @@ export function useCliente360(clienteId: string | null) {
         cidade: data.cidades?.nome ?? null,
         uf: data.estados?.sigla ?? null,
         unidade: data.unidades_base?.nome ?? null,
+        segmento: data.segmentos?.nome ?? null,
       };
     },
   });
@@ -145,7 +148,7 @@ export function useContrato360(clienteId: string | null, tid: string | null) {
     staleTime: STALE,
     queryFn: async () => {
       let qp = (supabase.from("cliente_produtos") as any)
-        .select("id, vlr_mensal, ativo, data_cancelamento, data_ativacao, data_venda, data_proximo_reajuste, produtos:produto_id(nome)")
+        .select("id, vlr_mensal, ativo, data_cancelamento, data_ativacao, data_venda, data_proximo_reajuste, produtos:produto_id(nome), funcionarios:funcionario_id(nome), origens_venda:origem_venda_id(nome)")
         .eq("cliente_id", clienteId);
       // Mesmo recorte de fn_mrr_cliente_em: ativo, sem estorno.
       let qm = (supabase.from("movimentos_mrr") as any)
@@ -155,8 +158,13 @@ export function useContrato360(clienteId: string | null, tid: string | null) {
         .is("estornado_por", null)
         .is("estorno_de", null)
         .order("data_movimento", { ascending: false });
-      if (tid) { qp = qp.eq("tenant_id", tid); qm = qm.eq("tenant_id", tid); }
-      const [p, m] = await Promise.all([qp, qm]);
+      // Reserva do vendedor/origem quando nenhum produto ativo tem o dado.
+      let qc = (supabase.from("contratos") as any)
+        .select("funcionarios:funcionario_id(nome), origens_venda:origem_venda_id(nome)")
+        .eq("cliente_id", clienteId)
+        .eq("status", "ativo");
+      if (tid) { qp = qp.eq("tenant_id", tid); qm = qm.eq("tenant_id", tid); qc = qc.eq("tenant_id", tid); }
+      const [p, m, ct] = await Promise.all([qp, qm, qc]);
       if (p.error) throw p.error;
       if (m.error) throw m.error;
       const produtos: Produto360[] = (p.data ?? []).map((r: any) => ({
@@ -168,12 +176,19 @@ export function useContrato360(clienteId: string | null, tid: string | null) {
         data_ativacao: r.data_ativacao,
         data_venda: r.data_venda,
         data_proximo_reajuste: r.data_proximo_reajuste,
+        vendedor: r.funcionarios?.nome ?? null,
+        origem_venda: r.origens_venda?.nome ?? null,
       }));
       const movimentos: Movimento360[] = (m.data ?? []).map((r: any) => ({
         ...r,
         valor_delta: Number(r.valor_delta) || 0,
       }));
-      return { produtos, movimentos };
+      // Contrato é só reserva: se a consulta falhar, segue sem ele.
+      const contratoVenda = {
+        vendedores: (ct.data ?? []).map((r: any) => r.funcionarios?.nome).filter(Boolean) as string[],
+        origens: (ct.data ?? []).map((r: any) => r.origens_venda?.nome).filter(Boolean) as string[],
+      };
+      return { produtos, movimentos, contratoVenda };
     },
   });
 }

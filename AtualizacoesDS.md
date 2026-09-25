@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **Segmento, vendedor e origem da venda no topo da Visão 360°** — Em **Clientes › Visão 360°**, ao lado de "Ativo" e "Cliente há", aparecem o **segmento** do cliente, o **vendedor** e a **origem da venda**. Vendedor e origem vêm dos produtos do cliente (e do contrato, quando o produto não tem). Quando o dado não está no cadastro, a etiqueta aparece apagada, como "Sem segmento" ou "Sem vendedor", para mostrar o que falta preencher na ficha.
+
 - 🆕 **Enviar a 2ª via do boleto pela Visão 360°** — Em **Clientes › Visão 360°**, o botão **Enviar 2ª via** no topo (e o botão **Enviar** em cada título da aba **Financeiro**) manda o boleto em PDF para o cliente pelo WhatsApp. Você escolhe os boletos, já com os vencidos marcados, e a conversa, já com a do atendimento aberto escolhida. A mensagem sai em seu nome, com a sua assinatura, como qualquer anexo mandado pelo chat. Se o PDF não puder ser anexado, vai o link do boleto com a linha digitável e o Pix copia e cola. Título sem boleto gerado no Omie não aparece na lista.
 
 - 🆕 **Resumo do Théo na Visão 360°** — Em **Clientes › Visão 360°**, na aba **Linha do tempo**, o botão **Gerar resumo** pede ao Théo que leia o histórico do cliente (atendimentos, avaliações, tickets, títulos em aberto e receita) e conte em poucas frases como está a relação, com até três próximos passos para quem vai atender. O Théo só roda quando alguém clica, porque cada resumo usa o crédito de IA da empresa, e respeita o teto de gasto do mês. O cartão mostra o último resumo do dia e quem pediu; o botão **Histórico** guarda todos os resumos já feitos para o cliente. O resumo só fala do que a pessoa já enxerga no sistema.
