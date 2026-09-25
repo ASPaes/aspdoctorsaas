@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **MRR antes e depois, e o vendedor, em cada movimentação do contrato** — Em **Clientes › Visão 360° › Linha do tempo**, cada movimentação de contrato (upsell, cross-sell, downsell, reajuste, cancelamento) passa a mostrar o MRR do cliente antes e depois dela, por exemplo "MRR R$ 230,00 → R$ 260,00" num upsell de R$ 30,00. Upsell, cross-sell, downsell e venda avulsa também mostram o **vendedor** da movimentação, ou "Sem vendedor" quando ele não foi informado.
+
 - ⬆️ **2ª via da Visão 360° sai pelo número da régua e abre a conversa na hora** — Em **Clientes › Visão 360° › Enviar 2ª via**, o boleto passa a sair sempre pelo número padrão da régua de cobrança, mostrado no alto da janela. Em "Mandar para" aparecem o WhatsApp da ficha e os contatos do cliente, além de um campo para digitar outro número. Se ainda não houver conversa com esse telefone no número da régua, ela é aberta ali mesmo, sem precisar ir ao Chat. Depois do envio, o aviso traz o botão **Abrir conversa**.
 
 - 🔧 **Venda cancelada aparecia com MRR negativo na lista de novos clientes** — No **Dashboard › Vendas**, um cliente vendido no período e que já tinha cancelado aparecia na coluna **Vlr MRR** com valor negativo (ex.: −R$ 359), dando a impressão de um financeiro negativo. O card **New MRR** também descontava essa venda em vez de somá-la. Agora a lista mostra o MRR que foi vendido, em vermelho e riscado, com "cancelado em DD/MM/AAAA" embaixo, e o card soma esse valor normalmente — a perda continua aparecendo nos cancelamentos do período. A planilha exportada ganhou a coluna **Cancelado em**.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
-  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda, chaveTelefoneBR,
+  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda, chaveTelefoneBR, mrrAntesDepois,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -249,5 +249,30 @@ describe("chave de telefone", () => {
   it("número incompleto não vira chave", () => {
     expect(chaveTelefoneBR("99812441")).toBeNull();
     expect(chaveTelefoneBR("")).toBeNull();
+  });
+});
+
+describe("movimentação de contrato", () => {
+  const produtos = [prod({ vlr_mensal: 230 })];
+  it("upsell mostra antes e depois que fecham a conta (230 + 30 = 260)", () => {
+    const up = mov({ id: "u", tipo: "upsell", valor_delta: 30, data_movimento: "2026-09-08" });
+    expect(mrrAntesDepois(up, produtos, [up])).toEqual({ antes: 230, depois: 260 });
+  });
+  it("downsell desce", () => {
+    const up = mov({ id: "u", tipo: "upsell", valor_delta: 48, data_movimento: "2026-09-08" });
+    const down = mov({ id: "d", tipo: "downsell", valor_delta: -48, data_movimento: "2026-09-21" });
+    expect(mrrAntesDepois(down, produtos, [up, down])).toEqual({ antes: 278, depois: 230 });
+  });
+  it("evento de venda traz o vendedor; reajuste não", () => {
+    const ev = montarLinhaDoTempo([], [], [
+      mov({ id: "a", tipo: "upsell", valor_delta: 30, data_movimento: "2026-09-08", vendedor: "Kaio" }),
+      mov({ id: "b", tipo: "cross_sell", valor_delta: 10, data_movimento: "2026-09-09" }),
+      mov({ id: "c", tipo: "reajuste", valor_delta: 5, data_movimento: "2026-09-10" }),
+    ], () => null, SET, [], produtos);
+    const tags = (id: string) => ev.find((e) => e.id === `m-${id}`)!.tags.map((t) => t.texto);
+    expect(tags("a")).toContain("Vendedor: Kaio");
+    expect(tags("b")).toContain("Sem vendedor");
+    expect(tags("c").join()).not.toContain("endedor");
+    expect(ev.find((e) => e.id === "m-a")!.mrr).toEqual({ antes: 230, depois: 260 });
   });
 });

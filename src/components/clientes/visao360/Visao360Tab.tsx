@@ -254,8 +254,8 @@ export default function Visao360Tab() {
     });
   }, [listaAts]);
   const eventos = useMemo(
-    () => montarLinhaDoTempo(listaAts, listaTks, movimentos, nomeAgente, per, titulos),
-    [listaAts, listaTks, movimentos, nomeAgente, per, titulos],
+    () => montarLinhaDoTempo(listaAts, listaTks, movimentos, nomeAgente, per, titulos, produtos),
+    [listaAts, listaTks, movimentos, nomeAgente, per, titulos, produtos],
   );
 
   // Nota de saúde: só depois que tudo que entra nela chegou, para o anel não

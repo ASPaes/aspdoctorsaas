@@ -62,6 +62,7 @@ export interface Movimento360 {
   data_movimento: string;
   encerrado_em: string | null;
   descricao: string | null;
+  vendedor?: string | null;
 }
 
 export interface Periodo {
@@ -214,6 +215,8 @@ export interface Evento360 {
   citacao?: string | null;
   attendanceId?: string;
   ticketId?: string;
+  /** Eventos de contrato: MRR do cliente antes e depois da movimentação. */
+  mrr?: { antes: number; depois: number };
 }
 
 const RESOLUCAO: Record<string, { texto: string; tom: Evento360["tags"][number]["tom"] }> = {
@@ -421,6 +424,7 @@ export function montarLinhaDoTempo(
   nomeAgente: (uid: string | null) => string | null,
   p: Periodo,
   titulos: Titulo360[] = [],
+  produtos: Produto360[] = [],
 ): Evento360[] {
   const ev: Evento360[] = [];
 
@@ -516,17 +520,25 @@ export function montarLinhaDoTempo(
     }
   }
 
+  // Vendedor só faz sentido em movimento de venda; reajuste, cancelamento e
+  // reativação não têm, e "sem vendedor" ali seria ruído.
+  const DE_VENDA = ["upsell", "cross_sell", "downsell", "venda_avulsa"];
   for (const m of movs) {
     // data_movimento é date puro: meio-dia de SP para não cair no dia anterior.
     const quando = `${m.data_movimento}T15:00:00Z`;
     if (!dentro(quando, p)) continue;
     const info = MOV[m.tipo] ?? { titulo: m.tipo, tom: "neutro" as const };
     const v = Number(m.valor_delta) || 0;
+    const tags: Evento360["tags"] = [{ texto: info.titulo, tom: info.tom }];
+    if (DE_VENDA.includes(m.tipo)) {
+      tags.push(m.vendedor ? { texto: `Vendedor: ${m.vendedor}`, tom: "roxo" } : { texto: "Sem vendedor", tom: "neutro" });
+    }
     ev.push({
       id: `m-${m.id}`, tipo: "contrato", quando,
       titulo: info.titulo,
       detalhe: [m.descricao, v ? `${v > 0 ? "+" : "−"} ${brl(Math.abs(v))}/mês` : null].filter(Boolean).join(" · ") || null,
-      tags: [{ texto: info.titulo, tom: info.tom }],
+      tags,
+      mrr: mrrAntesDepois(m, produtos, movs),
     });
   }
 
@@ -721,4 +733,22 @@ export function chaveTelefoneBR(fone: string | null | undefined): string | null 
   if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
   if (d.length !== 10 && d.length !== 11) return null;
   return d.slice(0, 2) + d.slice(-8);
+}
+
+/**
+ * MRR do cliente antes e depois de uma movimentação, pela mesma conta de
+ * `mrrEm`. Nos tipos que entram no saldo (upsell, cross, downsell, reajuste) o
+ * "antes" é o "depois" menos o próprio valor: a linha fecha a conta que a pessoa
+ * faz de cabeça (230 + 30 = 260) mesmo quando houve outra movimentação no mesmo
+ * dia. Nos demais (cancelamento, reativação, venda avulsa) compara o dia anterior
+ * com o dia, porque o valor deles não está no saldo.
+ */
+export function mrrAntesDepois(m: Movimento360, produtos: Produto360[], movs: Movimento360[]) {
+  const depois = mrrEm(produtos, movs, m.data_movimento);
+  if (TIPOS_SALDO.includes(m.tipo)) {
+    return { antes: Math.round((depois - (Number(m.valor_delta) || 0)) * 100) / 100, depois };
+  }
+  const ontem = new Date(`${m.data_movimento}T12:00:00Z`);
+  ontem.setUTCDate(ontem.getUTCDate() - 1);
+  return { antes: mrrEm(produtos, movs, ontem.toISOString().slice(0, 10)), depois };
 }

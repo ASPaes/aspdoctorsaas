@@ -102,6 +102,14 @@ export function LinhaDoTempo({
                       {e.titulo}
                     </button>
                     {e.detalhe && <p className="mt-0.5 line-clamp-2 text-[12.5px] text-muted-foreground">{e.detalhe}</p>}
+                    {e.mrr && e.mrr.antes !== e.mrr.depois && (
+                      <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12.5px]">
+                        <span className="text-muted-foreground">MRR</span>
+                        <span className="tabular-nums text-muted-foreground">{brl(e.mrr.antes)}</span>
+                        <span className={e.mrr.depois > e.mrr.antes ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>→</span>
+                        <b className="tabular-nums">{brl(e.mrr.depois)}</b>
+                      </p>
+                    )}
                     {e.citacao && (
                       <p className="mt-1.5 border-l-2 pl-2.5 text-[12.5px] italic text-muted-foreground">"{e.citacao}"</p>
                     )}

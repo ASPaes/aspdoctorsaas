@@ -152,7 +152,7 @@ export function useContrato360(clienteId: string | null, tid: string | null) {
         .eq("cliente_id", clienteId);
       // Mesmo recorte de fn_mrr_cliente_em: ativo, sem estorno.
       let qm = (supabase.from("movimentos_mrr") as any)
-        .select("id, tipo, valor_delta, data_movimento, encerrado_em, descricao")
+        .select("id, tipo, valor_delta, data_movimento, encerrado_em, descricao, funcionarios!movimentos_mrr_funcionario_id_fkey(nome)")
         .eq("cliente_id", clienteId)
         .eq("status", "ativo")
         .is("estornado_por", null)
@@ -182,6 +182,7 @@ export function useContrato360(clienteId: string | null, tid: string | null) {
       const movimentos: Movimento360[] = (m.data ?? []).map((r: any) => ({
         ...r,
         valor_delta: Number(r.valor_delta) || 0,
+        vendedor: r.funcionarios?.nome ?? null,
       }));
       // Contrato é só reserva: se a consulta falhar, segue sem ele.
       const contratoVenda = {
