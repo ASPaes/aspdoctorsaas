@@ -672,6 +672,24 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     if (unreadCount === 0) void fecharAvisosDoSistema();
   }, [unreadCount]);
 
+  // O app instalado quase nunca recarrega: o atendente volta a ele pelo
+  // alternador de tarefas, e ai nenhum efeito de montagem roda. Sem isto, a
+  // limpeza acima so acontecia na primeira abertura — e a pilha de avisos que
+  // chegou enquanto o app estava em segundo plano continuava na barra depois de
+  // tudo ser lido em outro lugar.
+  useEffect(() => {
+    const aoVoltar = () => {
+      if (document.visibilityState !== "visible") return;
+      refreshUnreadCount();
+      if (unreadCount === 0) {
+        void fecharAvisosDoSistema();
+        marcarIconeDoApp(0);
+      }
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => document.removeEventListener("visibilitychange", aoVoltar);
+  }, [unreadCount, refreshUnreadCount]);
+
   // Title flashing while hidden
   useEffect(() => {
     const originalTitle = document.title;
