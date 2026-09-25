@@ -12,7 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
-import { mostrarNotificacaoDoSistema, marcarIconeDoApp, fecharAvisosDoSistema } from "@/lib/notificacaoDoSistema";
+import { mostrarNotificacaoDoSistema, marcarIconeDoApp, fecharAvisosDoSistema, pedirLimpezaNosOutrosAparelhos } from "@/lib/notificacaoDoSistema";
 import { inscreverAparelho } from "@/lib/webPush";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
@@ -172,6 +172,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const tenantId = profile?.tenant_id;
 
   const [unreadCount, setUnreadCount] = useState(0);
+  // Guarda o valor anterior para distinguir "zerou agora" de "ja estava zerado".
+  const naoLidasAnterior = useRef(0);
   const [browserPermission, setBrowserPermission] = useState<
     NotificationPermission | "unsupported"
   >(() =>
@@ -669,7 +671,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // lugar antes de a limpeza existir. E o launcher do Android conta os avisos
     // ABERTOS para desenhar o numero no icone, entao a pilha velha segurava o
     // numero sozinha. Com o contador zerado nao ha o que preservar.
-    if (unreadCount === 0) void fecharAvisosDoSistema();
+    if (unreadCount === 0) {
+      void fecharAvisosDoSistema();
+      // Zerou AGORA (nao apenas "esta zerado"): e o momento em que os outros
+      // aparelhos ainda estao com a barra cheia. O "*" limpa tudo la, sem
+      // depender de a pessoa abrir o app em cada um.
+      //
+      // So na transicao de propria: pedir limpeza a cada carga do app gastaria o
+      // "budget" que o Chrome da para push que nao mostra nada, e quando ele
+      // acaba o navegador passa a exibir "este site foi atualizado em segundo
+      // plano" sozinho.
+      if (naoLidasAnterior.current > 0) void pedirLimpezaNosOutrosAparelhos("*");
+    }
+    naoLidasAnterior.current = unreadCount;
   }, [unreadCount]);
 
   // O app instalado quase nunca recarrega: o atendente volta a ele pelo
