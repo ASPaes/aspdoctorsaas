@@ -157,6 +157,33 @@ function WhatsAppContent() {
     })();
   }, [selected?.id, queryClient]);
 
+  // No celular a conversa ocupa a tela inteira e faz as vezes de "outra tela" —
+  // mas ela é só um estado de React, sem entrada no histórico. Resultado: o gesto
+  // de voltar do Android não tinha para onde voltar e FECHAVA o aplicativo, em
+  // vez de devolver a lista de conversas. Em todo aplicativo de mensagem esse
+  // gesto volta para a lista.
+  //
+  // Abrir a conversa empurra uma entrada; o gesto consome essa entrada e o
+  // `popstate` fecha a conversa. Fechar pelo X faz o mesmo caminho ao contrário
+  // (`onFecharConversa`), senão sobraria entrada no histórico e o próximo gesto
+  // de voltar não faria nada visível.
+  const emTelaDeConversa = isMobile || isChatHost();
+  useEffect(() => {
+    if (!emTelaDeConversa || !selected?.id) return;
+    window.history.pushState({ dsConversa: selected.id }, "");
+    const aoVoltar = () => setSelected(null);
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  }, [emTelaDeConversa, selected?.id]);
+
+  const onFecharConversa = useCallback(() => {
+    if (emTelaDeConversa && window.history.state?.dsConversa) {
+      window.history.back();
+      return;
+    }
+    setSelected(null);
+  }, [emTelaDeConversa]);
+
   // Capture URL params once on mount and clear them immediately
   const pendingParamsRef = useRef<{ phone: string; clienteId: string | null; clienteName: string | null } | null>(null);
   const didCaptureRef = useRef(false);
@@ -296,7 +323,7 @@ function WhatsAppContent() {
         <div className="flex flex-col h-[calc(100vh-3.5rem)]">
           <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
           <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
-              <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={() => setSelected(null)} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
+              <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={onFecharConversa} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
             <AgentPresenceOverlay />
           </div>
         </div>
