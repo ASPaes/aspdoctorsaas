@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
-  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO,
+  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -208,5 +208,17 @@ describe("nota de saúde", () => {
   });
   it("pesos gravados incompletos são completados com o padrão", () => {
     expect(normalizarPesos({ satisfacao: 40 } as any)).toEqual({ ...PESOS_SAUDE_PADRAO, satisfacao: 40 });
+  });
+});
+
+describe("textos da 2ª via", () => {
+  it("legenda do PDF", () => {
+    expect(legendaBoleto({ valor: 1486, vencimento: "2026-09-10" }).replace(/\s/g, " ")).toBe("Segue o boleto de R$ 1.486,00 com vencimento em 10/09/2026.");
+  });
+  it("sem anexo leva link, linha digitável e Pix", () => {
+    const t = textoSemAnexo({ valor: 10, vencimento: "2026-10-10", codigo_barras: "3419 1", pix_copia_cola: "000201" }, "https://x/y");
+    expect(t).toContain("https://x/y");
+    expect(t).toContain("Linha digitável:\n3419 1");
+    expect(t).toContain("Pix copia e cola:\n000201");
   });
 });

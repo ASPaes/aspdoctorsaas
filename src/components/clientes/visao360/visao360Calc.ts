@@ -666,3 +666,25 @@ export function calcularSaude(e: EntradaSaude, pesos: PesosSaude) {
     })),
   };
 }
+
+/* ------------------------------------------------ 2ª via pelo chat */
+
+const dataBRCurta = (iso: string) => iso.slice(0, 10).split("-").reverse().join("/");
+
+/** Legenda que acompanha o PDF. Curta: quem lê é o cliente, no celular. */
+export function legendaBoleto(t: { valor: number; vencimento: string }) {
+  return `Segue o boleto de ${brl(t.valor)} com vencimento em ${dataBRCurta(t.vencimento)}.`;
+}
+
+/** Texto de quando o PDF não pôde ser anexado: o link (vale 24 h) e o que dá para copiar. */
+export function textoSemAnexo(
+  t: { valor: number; vencimento: string; codigo_barras: string | null; pix_copia_cola: string | null },
+  link: string,
+) {
+  return [
+    `Segue o boleto de ${brl(t.valor)} com vencimento em ${dataBRCurta(t.vencimento)}:`,
+    link,
+    t.codigo_barras ? `\nLinha digitável:\n${t.codigo_barras}` : null,
+    t.pix_copia_cola ? `\nPix copia e cola:\n${t.pix_copia_cola}` : null,
+  ].filter(Boolean).join("\n");
+}

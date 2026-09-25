@@ -413,3 +413,10 @@ verify_jwt = false
 # (RLS) e gasta a IA da empresa, com o teto de gasto do mês.
 [functions.cliente-resumo-360]
 verify_jwt = true
+
+# Prepara o PDF do boleto para o botão "Enviar 2ª via" da Visão 360° do cliente.
+# verify_jwt = TRUE: só a tela chama, com a sessão de quem clicou. A function lê
+# o título com o token do usuário (RLS) e não envia nada: quem manda é a tela,
+# pela send-whatsapp-message, como um anexo do operador.
+[functions.fin-boleto-para-chat]
+verify_jwt = true

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, formatDistanceToNowStrict, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Copy, QrCode } from "lucide-react";
+import { Copy, QrCode, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -33,7 +33,7 @@ async function copiar(texto: string, oque: string) {
 
 type Filtro = "abertos" | "vencidos" | "pagos" | "todos";
 
-export function FinanceiroSubAba({ titulos, atualizadoEm }: { titulos: Titulo360[]; atualizadoEm: string | null }) {
+export function FinanceiroSubAba({ titulos, atualizadoEm, onEnviar }: { titulos: Titulo360[]; atualizadoEm: string | null; onEnviar?: (tituloId: string) => void }) {
   const k = useMemo(() => kpisFinanceiro(titulos, new Date()), [titulos]);
   const [filtro, setFiltro] = useState<Filtro>(k.abertoQtd ? "abertos" : "todos");
   const [limite, setLimite] = useState(50);
@@ -146,6 +146,11 @@ export function FinanceiroSubAba({ titulos, atualizadoEm }: { titulos: Titulo360
                       <TableCell className="whitespace-nowrap font-mono text-xs">{t.numero_nf ? `nº ${t.numero_nf}` : "—"}</TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-0.5">
+                          {t.aberto && t.boleto_gerado && onEnviar && (
+                            <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => onEnviar(t.id)} title="Mandar este boleto pelo chat">
+                              <Send className="h-3.5 w-3.5" />Enviar
+                            </Button>
+                          )}
                           {t.aberto && <BotaoBoleto tituloId={t.id} boletoGerado={t.boleto_gerado} compacto />}
                           {t.aberto && t.codigo_barras && (
                             <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => copiar(t.codigo_barras as string, "Código de barras")} title="Copiar a linha digitável">

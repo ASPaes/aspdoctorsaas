@@ -35,6 +35,7 @@ import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360List
 import { FinanceiroSubAba } from "./Visao360Financeiro";
 import { SaudeDoCliente } from "./Visao360Saude";
 import { TheoResumo } from "./Visao360Theo";
+import { EnviarSegundaViaDialog } from "./EnviarSegundaViaDialog";
 
 // Os dois pesam: o detalhe do ticket tem 2.600 linhas. Só descem quando alguém clica.
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
@@ -199,6 +200,7 @@ export default function Visao360Tab() {
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
   const [novoTicket, setNovoTicket] = useState(false);
+  const [segundaVia, setSegundaVia] = useState<{ aberto: boolean; titulo: string | null }>({ aberto: false, titulo: null });
 
   const cliente = useCliente360(clienteId);
   const ats = useAtendimentos360(clienteId, tid);
@@ -477,6 +479,11 @@ export default function Visao360Tab() {
                   <Ticket className="h-4 w-4" />Novo ticket
                 </button>
               )}
+              {podeChat && finHab && kFin.abertoQtd > 0 && (
+                <button type="button" onClick={() => setSegundaVia({ aberto: true, titulo: null })} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[12.5px] font-bold text-slate-100 transition duration-300 hover:-translate-y-px hover:bg-white/10", EASE)}>
+                  <Receipt className="h-4 w-4" />Enviar 2ª via
+                </button>
+              )}
               <button type="button" onClick={() => navigate(`/clientes/${c.id}`)} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-[12.5px] font-bold text-slate-100 transition duration-300 hover:-translate-y-px hover:bg-white/10", EASE)}>
                 <FileText className="h-4 w-4" />Abrir ficha
               </button>
@@ -596,7 +603,7 @@ export default function Visao360Tab() {
             </TabsContent>
             {finHab && (
               <TabsContent value="financeiro" className="mt-4">
-                <FinanceiroSubAba titulos={titulos} atualizadoEm={fin.data?.atualizadoEm ?? null} />
+                <FinanceiroSubAba titulos={titulos} atualizadoEm={fin.data?.atualizadoEm ?? null} onEnviar={podeChat ? (id) => setSegundaVia({ aberto: true, titulo: id }) : undefined} />
               </TabsContent>
             )}
           </>
@@ -621,6 +628,13 @@ export default function Visao360Tab() {
             }}
           />
         )}
+        <EnviarSegundaViaDialog
+          open={segundaVia.aberto}
+          onOpenChange={(o) => setSegundaVia((s) => ({ ...s, aberto: o }))}
+          titulos={titulos}
+          conversas={conversas}
+          preSelecionado={segundaVia.titulo}
+        />
         {novoTicket && c && (
           <CreateSupportTicketModal
             open={novoTicket}
