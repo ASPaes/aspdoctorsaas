@@ -188,3 +188,17 @@
     color: hsl(var(--primary-text));
   }
 }
+
+@layer utilities {
+  /* A faixa de selos do cabeçalho do chat e a régua de sugestões rolam de lado e
+     pedem `scrollbar-none` — que NÃO existia: nem utilitário do Tailwind, nem
+     plugin, nem regra aqui. A classe não fazia nada, e no Android a barra de
+     rolagem aparecia por cima do conteúdo, encostada nos selos. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

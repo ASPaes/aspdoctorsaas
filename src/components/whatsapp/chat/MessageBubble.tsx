@@ -468,7 +468,12 @@ export function MessageBubble({
         onReplyClick?.(msg.quoted_message_id!);
       }}
       className={cn(
-        "block w-full text-left text-xs px-2 py-1.5 rounded mb-1 border-l-2 hover:opacity-100 transition-opacity cursor-pointer",
+        // max-w pela TELA: o `truncate` de dentro so corta se algo limitar a
+        // largura, e o balao se dimensiona pelo conteudo — entao a citacao
+        // crescia com o texto e arrastava o balao junto. Medido em 390px: a
+        // citacao foi a 460px e a bolha terminou em 506, fora da tela.
+        // No computador 62vw e bem maior que o balao, entao la nada muda.
+        "block w-full max-w-[62vw] text-left text-xs px-2 py-1.5 rounded mb-1 border-l-2 hover:opacity-100 transition-opacity cursor-pointer",
         isFromMe
           ? "bg-primary-foreground/10 border-primary-foreground/40 opacity-90"
           : "bg-background/60 border-primary/40 opacity-90"
