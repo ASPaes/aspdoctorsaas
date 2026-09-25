@@ -34,6 +34,9 @@ type Evento = {
   // parceiro mudou o custo daquele módulo.
   vlr_custo: number | null;
   vlr_custo_anterior: number | null;
+  // O par do evento 'valor': a receita por unidade antes e depois.
+  vlr_mensal: number | null;
+  vlr_mensal_anterior: number | null;
 };
 
 const brl = (v: number) =>
@@ -51,6 +54,8 @@ const ACOES: Record<string, { texto: string; classe: string }> = {
   // O parceiro reajustou o custo e a carga do espelho trocou o valor aqui.
   // Não é venda: a mensalidade do cliente não muda por causa disto.
   preco:      { texto: "Preço do OEM", classe: "bg-violet-500/15 text-violet-500 hover:bg-violet-500/20" },
+  // Valor mensal mudou. Pela correção, sempre com motivo e sem movimento de MRR.
+  valor:      { texto: "Valor mensal", classe: "bg-orange-500/15 text-orange-500 hover:bg-orange-500/20" },
   // Licença nova no OEM: o pedido e, depois da aprovação, a criação.
   licenca_solicitada: { texto: "Enviado ao OEM", classe: "bg-amber-500/15 text-amber-500 hover:bg-amber-500/20" },
   licenca_criada:     { texto: "Licença criada", classe: "bg-green-500/15 text-green-500 hover:bg-green-500/20" },
@@ -71,7 +76,7 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
     enabled: aberto,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produto_modulo_eventos" as any) as any)
-        .select("id, modulo_nome, acao, quantidade, origem, fonte, usuario_nome, usuario_id, motivo, created_at, vlr_custo, vlr_custo_anterior")
+        .select("id, modulo_nome, acao, quantidade, origem, fonte, usuario_nome, usuario_id, motivo, created_at, vlr_custo, vlr_custo_anterior, vlr_mensal, vlr_mensal_anterior")
         .eq("cliente_produto_id", clienteProdutoId)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -138,6 +143,11 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                             {brl(Number(e.vlr_custo_anterior || 0))} → {brl(Number(e.vlr_custo || 0))} por licença
                           </span>
                         )}
+                        {e.acao === "valor" && (
+                          <span className="block text-xs font-normal text-muted-foreground tabular-nums">
+                            {brl(Number(e.vlr_mensal_anterior || 0))} → {brl(Number(e.vlr_mensal || 0))} por unidade
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center tabular-nums">
                         {e.quantidade ?? "—"}
@@ -163,8 +173,8 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                             : rotuloDaFonte(e.fonte)
                               ?? (e.origem === "oem" ? "Sincronização OEM" : "—")}
                       </TableCell>
-                      {/* Motivo é opcional e só existe em cancelamento: a
-                          coluna fica vazia no resto em vez de repetir traço. */}
+                      {/* Motivo existe em cancelamento e em correção de valor:
+                          a coluna fica vazia no resto em vez de repetir traço. */}
                       <TableCell className="text-muted-foreground whitespace-pre-wrap break-words">
                         {e.motivo || ""}
                       </TableCell>

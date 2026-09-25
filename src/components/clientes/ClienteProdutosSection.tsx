@@ -47,6 +47,8 @@ import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import HistoricoModulosProduto from "./HistoricoModulosProduto";
+import CorrigirValorModuloDialog, { type ModuloParaCorrigir } from "./CorrigirValorModuloDialog";
+import { usePortao, useEhAdmin } from "@/hooks/usePortao";
 import ModulosDaVendaSection, { type ModulosDaVenda, modulosParaGravar } from "./ModulosDaVendaSection";
 import EnviarOemDialog, { LicencaOemDoProduto } from "./EnviarOemDialog";
 import ContratoAnexoSection, {
@@ -274,6 +276,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   // ainda tirava o módulo pela lixeira e pelo Inativar, que ficam ali do lado.
   const { can } = usePermissions();
   const podeEscreverModulo = can("clientes.modulos", "view");
+  // Corrigir valor mexe no MRR sem movimento: permissão própria, nasce só para
+  // admin. Empresa sem RBAC fica em "só admin" (a RPC repete a mesma regra).
+  const ehAdmin = useEhAdmin();
+  const podeCorrigirValor = usePortao("clientes.modulos_valor", ehAdmin);
+  const [corrigirValor, setCorrigirValor] = useState<ModuloParaCorrigir | null>(null);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [produtoDialog, setProdutoDialog] = useState<{ open: boolean; edit?: ClienteProduto | null }>({ open: false });
@@ -1074,6 +1081,26 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                                   </TableCell>
                                   <TableCell className="text-center">{Number(m.quantidade) || 1}</TableCell>
                                   <TableCell className="text-right">
+                                    {podeCorrigirValor && m.ativo && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            type="button" variant="ghost" size="icon"
+                                            className="h-6 w-6 mr-1 align-middle text-muted-foreground hover:text-foreground"
+                                            onClick={() => setCorrigirValor({
+                                              id: m.id,
+                                              cliente_produto_id: m.cliente_produto_id,
+                                              nome: m.produto_modulos?.nome ?? "Módulo",
+                                              vlr_mensal: m.vlr_mensal,
+                                              quantidade: m.quantidade,
+                                            })}
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Corrigir valor mensal</TooltipContent>
+                                      </Tooltip>
+                                    )}
                                     R$ {fmtBRL(m.vlr_mensal)}
                                     {(Number(m.quantidade) || 1) > 1 && (
                                       <span className="block text-xs text-muted-foreground">
@@ -1337,6 +1364,13 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
         onProductCreated={(cliProdId) => setExpanded(s => ({ ...s, [cliProdId]: true }))}
       />
 
+
+      <CorrigirValorModuloDialog
+        modulo={corrigirValor}
+        irmaos={corrigirValor ? (modulosByProduto[corrigirValor.cliente_produto_id] ?? []) : []}
+        onClose={() => setCorrigirValor(null)}
+        onSaved={invalidateAll}
+      />
 
       <ModuloDialog
         open={moduloDialog.open}

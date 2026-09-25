@@ -73,6 +73,7 @@ const LABEL_CAMPO: Record<string, string> = {
 const LABEL_RECURSO: Record<string, string> = {
   "clientes.modulos": "Integração · Módulos",
   "clientes.oem_aprovacao": "Integração · Aprovação OEM",
+  "clientes.modulos_valor": "Integração · Corrigir valor do módulo",
 };
 
 const LABEL_EVENTO: Record<string, string> = {

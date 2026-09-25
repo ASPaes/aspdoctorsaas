@@ -153,6 +153,14 @@ const ACESSOS_INTEGRACAO: AcessoIntegracao[] = [
       "Adicionar e cancelar módulos no card Produtos & Módulos da ficha do cliente. Sem isso a pessoa continua vendo a lista, as quantidades e os valores.",
   },
   {
+    // Corrigir valor muda o MRR sem lançar movimento: nasce só para admin e é
+    // liberado por pessoa aqui, como os módulos.
+    key: "clientes.modulos_valor",
+    titulo: "Corrigir valor do módulo",
+    descricao:
+      "Corrige o valor mensal de um módulo digitado errado, com motivo obrigatório. Muda o MRR sem lançar upsell/downsell e fica no Histórico de módulos.",
+  },
+  {
     key: RESOURCE_OEM_APROVACAO,
     titulo: "Aprovação OEM",
     descricao:
