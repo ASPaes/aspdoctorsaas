@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 25/09
+
+- 🔧 **Aviso de pausa não saía no horário de almoço** — Quando o setor tem intervalo de almoço configurado no horário de atendimento, a mensagem automática da pausa (ex.: "Almoço") não era enviada ao cliente que escrevia nesse intervalo, fosse texto, áudio, imagem ou resposta a um modelo de mensagem. Agora o cliente recebe o aviso da pausa em qualquer horário, uma vez por pausa, como já acontecia no resto do dia.
+
 ### 24/09
 
 - 🔧 **Ao encerrar atendimento de grupo, o ticket abria sem o cliente** — Em grupos de WhatsApp que exigem ticket no encerramento, o formulário às vezes abria com o campo **Cliente** em branco, mesmo com o grupo já vinculado a um cliente, e o atendente precisava pesquisar e escolher de novo. Agora o cliente do grupo já vem selecionado sempre; se o vínculo ainda estiver carregando quando o formulário abre, ele entra sozinho assim que chega, junto com o produto.

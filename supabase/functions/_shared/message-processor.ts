@@ -2554,6 +2554,23 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
   const skipUra = instanceInfo.skip_ura === true;
   const supportConfig = await getSupportConfig(supabase, tenantId);
 
+  // Robô de terceiros (auto-resposta logo depois de uma cobrança, menu de URA alheia).
+  // Calculado aqui porque o aviso de pausa, logo abaixo, também precisa respeitá-lo.
+  const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
+  const isBillingAutoReply = !!lastBilling
+    && Math.max(0, (new Date(timestamp).getTime() - lastBilling.getTime()) / 1000) <= 30
+    && isLikelyBusinessAutoReplyPTBR(content);
+  const isThirdPartyBot = isBillingAutoReply || isLikelyThirdPartyURA(content);
+
+  // DEM-0341 / DEM-0475: aviso de pausa ANTES do bloco de horário. Ele ficava depois,
+  // e a pausa de almoço do agente cai justamente no intervalo de almoço do setor
+  // (DelVale: setores 07:30–11:48 e 13:30–18:00). Fora do horário o bloco abaixo
+  // retorna cedo, então o aviso nunca saía — para áudio, texto ou resposta a template.
+  // Os dois avisos continuam sem sair juntos: o aviso de pausa exige atendimento
+  // in_progress, e com atendimento in_progress checkBusinessHours não manda o de
+  // fora do horário (nem as respostas curtas, que exigem nenhum atendimento aberto).
+  if (!isThirdPartyBot) await sendPauseNoticeIfAgentPaused(supabase, ctx, conversationId);
+
   if (supportConfig.business_hours_enabled) {
     // Para tenants com URA: se a conversa ainda não tem setor definido,
     // checa se ALGUM setor está aberto. Se sim, pula business hours e deixa URA resolver.
@@ -2637,13 +2654,7 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     } // fecha else (sem URA)
   }
 
-  const lastBilling = await getLastBillingMessageAt(supabase, conversationId, tenantId);
-  if (lastBilling) { const secs = Math.max(0, (new Date(timestamp).getTime() - lastBilling.getTime()) / 1000); if (secs <= 30 && isLikelyBusinessAutoReplyPTBR(content)) return; }
-  if (isLikelyThirdPartyURA(content)) return;
-
-  // DEM-0341: depois do bloco de horário (fora do expediente o fluxo já retornou, então
-  // os dois avisos nunca saem juntos) e depois dos filtros de robô de terceiros.
-  await sendPauseNoticeIfAgentPaused(supabase, ctx, conversationId);
+  if (isThirdPartyBot) return;
 
   const billing = await checkBillingSkipUra(supabase, conversationId, tenantId, supportConfig, phone);
   if (billing.skip) {
