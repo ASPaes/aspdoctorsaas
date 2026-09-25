@@ -78,7 +78,7 @@ export function ajustarManifestPeloHost() {
   if (!isChatHost()) return;
 
   const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-  if (link) link.href = "/chat.webmanifest";
+  if (link) link.href = "/mobile.webmanifest";
 
   const cor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   if (cor) cor.content = "#111B21";

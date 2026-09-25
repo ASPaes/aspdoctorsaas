@@ -19,7 +19,14 @@ describe("isChatHost", () => {
     vi.restoreAllMocks();
   });
 
-  it("liga no subdominio do chat", () => {
+  it("liga no subdominio da versao de telefone", () => {
+    comUrl("https://mobile.doctorsaas.com.br/");
+    expect(isChatHost()).toBe(true);
+  });
+
+  // O endereco antigo continua valendo: app instalado guarda o endereco da
+  // instalacao, e quem instalou pelo chat. abriria um endereco morto.
+  it("continua ligando no endereco antigo do chat", () => {
     comUrl("https://chat.doctorsaas.com.br/");
     expect(isChatHost()).toBe(true);
   });

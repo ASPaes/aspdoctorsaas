@@ -9,6 +9,9 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { PresenceHeartbeatProvider } from "@/contexts/PresenceHeartbeatProvider";
 import ChatMobileLayout from "@/components/chat-mobile/ChatMobileLayout";
 import ChatHostGuard from "@/components/chat-mobile/ChatHostGuard";
+import MobileHome from "@/components/chat-mobile/MobileHome";
+import RequirePermission from "@/components/auth/RequirePermission";
+import OnboardingGuard from "@/components/OnboardingGuard";
 import Login from "@/pages/Login";
 import WhatsApp from "@/pages/WhatsApp";
 
@@ -19,6 +22,9 @@ const Onboarding = lazyWithReload(() => import("@/pages/Onboarding"));
 const AccessPending = lazyWithReload(() => import("@/pages/AccessPending"));
 const AccessBlocked = lazyWithReload(() => import("@/pages/AccessBlocked"));
 const WhatsAppContatos = lazyWithReload(() => import("@/pages/WhatsAppContatos"));
+const SupportTickets = lazyWithReload(() => import("@/pages/SupportTickets"));
+const Emails = lazyWithReload(() => import("@/pages/Emails"));
+const OnboardingPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingPage"));
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-background">
@@ -62,7 +68,39 @@ export default function ChatHostRoutes() {
           </AuthGuard>
         }
       >
-        <Route index element={<ChatHostGuard><WhatsApp /></ChatHostGuard>} />
+        {/* A home e a porta de entrada: antes o endereco abria direto no chat,
+            porque so existia o chat. Cada modulo tem rota propria para o gesto de
+            voltar do Android ter para onde voltar. */}
+        <Route index element={<MobileHome />} />
+        <Route path="/whatsapp" element={<ChatHostGuard><WhatsApp /></ChatHostGuard>} />
+        <Route
+          path="/tickets"
+          element={
+            <RequirePermission resource="tickets">
+              <Suspense fallback={<PageLoader />}><SupportTickets /></Suspense>
+            </RequirePermission>
+          }
+        />
+        {/* OnboardingGuard é rota de LAYOUT (renderiza Outlet): ele checa a flag
+            `tenants.onboarding_enabled`, que é diferente da permissão do usuário. */}
+        <Route element={<OnboardingGuard />}>
+          <Route
+            path="/implantacao"
+            element={
+              <RequirePermission resource="nav.onboarding">
+                <Suspense fallback={<PageLoader />}><OnboardingPage /></Suspense>
+              </RequirePermission>
+            }
+          />
+        </Route>
+        <Route
+          path="/emails"
+          element={
+            <RequirePermission resource="nav.emails">
+              <Suspense fallback={<PageLoader />}><Emails /></Suspense>
+            </RequirePermission>
+          }
+        />
         <Route
           path="/whatsapp/contatos"
           element={

@@ -42,7 +42,7 @@ export default function ChatMobileLayout() {
         >
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base font-semibold truncate">Chat</span>
+              <span className="text-base font-semibold truncate">DS Mobile</span>
               <AgentPresenceButton />
             </div>
             <div className="flex items-center gap-1">
