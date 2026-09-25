@@ -26,7 +26,7 @@ import { isChatHost } from "@/lib/chatHost";
 // cópia válida por um ano — e nem o navegador nem o cache do servidor voltam a
 // buscar. Uma URL diferente é o que o navegador trata como outro script e o
 // cache não conhece. **Suba este número sempre que mexer no sw.js.**
-const VERSAO_SW = 3;
+const VERSAO_SW = 4;
 const CAMINHO_SW = `/sw.js?v=${VERSAO_SW}`;
 
 export function registrarServiceWorker() {

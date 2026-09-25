@@ -91,6 +91,29 @@ export function marcarIconeDoApp(naoLidas: number) {
  * lido". Quem cria os avisos usa `chat-<id da conversa>` como tag, então fechar
  * por conversa é fechar por tag.
  */
+/**
+ * Pede aos OUTROS aparelhos da mesma pessoa que fechem o aviso.
+ *
+ * Fechar notificacao e sempre local: o computador nao alcanca a barra do
+ * celular. Quem ficava com o aviso preso era justamente quem le no computador e
+ * deixa o telefone no bolso. O pedido vai pelo mesmo canal de push, com o login
+ * do usuario — o servidor descobre o dono pelo token, entao ninguem limpa o
+ * aparelho de outro.
+ *
+ * Silencioso por natureza: falhar aqui nao pode atrapalhar a leitura; no pior
+ * caso o aviso fica no aparelho ate ele abrir o chat.
+ */
+export async function pedirLimpezaNosOutrosAparelhos(tag: string) {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
+    await supabase.functions.invoke("send-web-push", { body: { limpar_tag: tag } });
+  } catch (err) {
+    console.warn("[aviso] nao foi possivel pedir a limpeza nos outros aparelhos", err);
+  }
+}
+
 export async function fecharAvisosDoSistema(tag?: string) {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   try {

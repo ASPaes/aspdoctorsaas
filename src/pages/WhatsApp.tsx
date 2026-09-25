@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { fecharAvisosDoSistema } from "@/lib/notificacaoDoSistema";
+import { fecharAvisosDoSistema, pedirLimpezaNosOutrosAparelhos } from "@/lib/notificacaoDoSistema";
 import { ConversationsSidebar } from "@/components/whatsapp/conversations/ConversationsSidebar";
 import { ChatAreaFull } from "@/components/whatsapp/chat/ChatAreaFull";
 import type { ConversationWithContact } from "@/components/whatsapp/hooks/useWhatsAppConversations";
@@ -151,6 +151,9 @@ function WhatsAppContent() {
       // ícone: ficava parecendo mensagem pendente com tudo já lido. No WhatsApp
       // o aviso some ao abrir a conversa; aqui é o mesmo gesto.
       void fecharAvisosDoSistema(`chat-${selected.id}`);
+      // E nos outros aparelhos: ler no computador tem que limpar o celular que
+      // ficou no bolso, e só o próprio aparelho consegue fechar o que mostrou.
+      void pedirLimpezaNosOutrosAparelhos(`chat-${selected.id}`);
     })();
   }, [selected?.id, queryClient]);
 

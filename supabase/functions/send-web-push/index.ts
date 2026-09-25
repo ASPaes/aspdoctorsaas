@@ -55,7 +55,61 @@ serve(async (req) => {
     // livres deixaria qualquer um mandar aviso falso para o aparelho de um
     // atendente. Com só o id, o pior que alguém consegue é reenviar um aviso
     // que já existe — e ainda precisaria adivinhar o UUID.
-    const { recipient_id } = await req.json();
+    const { recipient_id, limpar_tag } = await req.json();
+
+    // ─── Modo limpeza ────────────────────────────────────────────────────────
+    // Quem lê no computador não apaga o aviso do celular, porque quem fecha a
+    // notificação é o próprio aparelho. Aqui o app pede aos OUTROS aparelhos da
+    // mesma pessoa que fechem aquele aviso.
+    //
+    // Este modo exige o JWT DO USUÁRIO, e não a chave anon: o dono é lido do
+    // token, então ninguém mexe no aparelho de outro. É a mesma razão de o outro
+    // modo aceitar só `recipient_id` — lá quem chama é o gatilho, com a chave
+    // anon, que é pública.
+    if (limpar_tag) {
+      const autorizacao = req.headers.get("Authorization") ?? "";
+      const token = autorizacao.replace(/^Bearer\s+/i, "");
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      );
+      const { data: donoToken } = await supabaseAdmin.auth.getUser(token);
+      const dono = donoToken?.user?.id;
+      if (!dono) {
+        return new Response(JSON.stringify({ error: "limpeza exige login" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: aparelhos } = await supabaseAdmin
+        .from("push_subscriptions")
+        .select("id, endpoint, p256dh, auth")
+        .eq("user_id", dono);
+
+      const carga = JSON.stringify({ acao: "limpar", tag: String(limpar_tag) });
+      let limpos = 0;
+      for (const a of (aparelhos ?? []) as Assinatura[]) {
+        try {
+          // TTL curto: limpeza que chega meia hora depois não serve para nada e
+          // ainda acordaria o aparelho à toa.
+          await webpush.sendNotification(
+            { endpoint: a.endpoint, keys: { p256dh: a.p256dh, auth: a.auth } },
+            carga,
+            { TTL: 120, urgency: "normal" },
+          );
+          limpos++;
+        } catch (err) {
+          const status = (err as any)?.statusCode;
+          if (status === 404 || status === 410) {
+            await supabaseAdmin.from("push_subscriptions").delete().eq("id", a.id);
+          }
+        }
+      }
+      return new Response(JSON.stringify({ limpos }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,

@@ -18,7 +18,7 @@
  *    Mensagem de chat não pode vir de cache.
  */
 
-const VERSAO = "ds-v3";
+const VERSAO = "ds-v4";
 const CASCA = `casca-${VERSAO}`;
 const ARQUIVOS = `arquivos-${VERSAO}`;
 
@@ -134,6 +134,29 @@ self.addEventListener("push", (evento) => {
     dados = evento.data ? evento.data.json() : {};
   } catch (_) {
     dados = {};
+  }
+
+  // Pedido de limpeza: a pessoa leu a conversa em OUTRO aparelho (o computador,
+  // tipicamente) e este aqui ainda mostra o aviso na barra. Quem fecha uma
+  // notificação é sempre o aparelho que a criou, então a única forma de apagar
+  // à distância é este push.
+  //
+  // ⚠️ `userVisibleOnly: true` é a promessa feita na inscrição: todo push deve
+  // virar algo visível. Fechar sem mostrar nada gasta o "budget" que o Chrome dá
+  // a cada origem, e quando ele acaba o próprio navegador mostra "este site foi
+  // atualizado em segundo plano" — pior que o problema que viemos resolver. Por
+  // isso a limpeza só fica silenciosa quando REALMENTE fechou alguma coisa; se
+  // não havia nada para fechar, o push não vira ruído nenhum porque o aparelho
+  // já estava limpo, e aí aceitamos o custo de não mostrar nada (é o caso raro:
+  // limpeza chega antes do aviso, ou o aviso já tinha sido dispensado à mão).
+  if (dados.acao === "limpar") {
+    evento.waitUntil(
+      self.registration
+        .getNotifications(dados.tag ? { tag: dados.tag } : undefined)
+        .then((abertos) => abertos.forEach((n) => n.close()))
+        .catch(() => {})
+    );
+    return;
   }
 
   const titulo = dados.titulo || "Nova mensagem";
