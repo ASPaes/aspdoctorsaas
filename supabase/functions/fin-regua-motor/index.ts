@@ -1,12 +1,15 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.85.0';
+import { getAdapter, getInstanceSecrets } from '../_shared/providers/index.ts';
 
 // fin-regua-motor — quem seria cobrado hoje, por quê, e quem não seria.
 //
-// v1 (23/09/2026): esta versão NÃO MANDA MENSAGEM. Não existe caminho de envio
-// no arquivo, e `simular: false` é recusado. É de propósito: a régua fala com o
-// cliente sem ele pedir, então a primeira entrega tem que ser a que só mostra.
-// Quem olhar este código procurando o envio não vai achar porque ele não existe
-// ainda, não porque está escondido atrás de uma flag.
+// v2 (25/09/2026): agora ELE ENVIA, e por isso a leitura deste arquivo importa.
+// Simular é o PADRÃO — mandar exige pedir explicitamente, e mesmo assim só
+// alcança quem o portão deixa passar. Somam-se quiet hours e teto diário de
+// aquecimento do número.
+//
+// A régua fala com o cliente sem ele ter pedido. Tudo aqui é desenhado para que
+// o silêncio seja o padrão e falar seja a exceção pedida.
 //
 // O QUE ELE FAZ: para cada toque ativo do tenant, calcula qual vencimento cai
 // naquele toque hoje, pega os títulos daquele vencimento, tira os que já foram
@@ -91,6 +94,117 @@ const DOCTOROMIE_RELER =
  * rodada acompanha o envio folgado.
  */
 const MAX_RELEITURA_RODADA = 5;
+
+/** Quantas mensagens saem por rodada do cron. Ver `INTERVALO_*`. */
+const MAX_ENVIOS_RODADA = 3;
+
+/** Sorteia o intervalo entre dois envios. Cadência fixa é sinal de robô. */
+const intervaloSorteado = () =>
+  (INTERVALO_MIN_SEG + Math.random() * (INTERVALO_MAX_SEG - INTERVALO_MIN_SEG)) * 1000;
+
+/**
+ * Manda a cobrança e grava no histórico do chat.
+ *
+ * ⚠️ A LINHA EM `fin_cobranca_envios` É GRAVADA ANTES DO ENVIO, e essa ordem é o
+ * coração da proteção contra cobrar duas vezes. A chave única
+ * (tenant, título, dias_offset) faz duas rodadas simultâneas colidirem NO BANCO
+ * em vez de no WhatsApp do cliente: a segunda perde o insert e desiste.
+ *
+ * O preço dessa escolha é honesto e está escrito na linha: se o processo morrer
+ * entre gravar e confirmar, sobra um registro dizendo "comecei e não sei se
+ * terminou". Esse estado NÃO é retentado sozinho — alguém confere. É melhor uma
+ * cobrança que talvez não saiu do que uma que saiu duas vezes.
+ */
+async function enviarCobranca(
+  service: any,
+  tenantId: string,
+  c: any,
+): Promise<{ ok: boolean; motivo?: string }> {
+  const chaves = {
+    tenant_id: tenantId,
+    dias_offset: c.dias_offset,
+    vencimento: c.vencimento,
+    valor: c.valor,
+    telefone: c.telefone,
+    conversation_id: c.conversation_id,
+  };
+
+  // Uma linha por TÍTULO, mesmo quando a mensagem é uma só: a trava de não
+  // cobrar duas vezes é por título.
+  const linhas = (c.titulo_ids ?? []).map((id: string) => ({
+    ...chaves,
+    titulo_id: id,
+    status: 'erro',
+    motivo: 'envio iniciado, sem confirmação — não reenviar sem conferir',
+  }));
+  if (!linhas.length) return { ok: false, motivo: 'candidato sem título' };
+
+  const { error: insErr } = await service.from('fin_cobranca_envios').insert(linhas);
+  if (insErr) {
+    // Violação da chave única é o caso ESPERADO quando duas rodadas se cruzam.
+    // Não é erro: é a proteção funcionando.
+    console.log(LOG, 'já havia registro para este toque, pulando:', c.cliente, insErr.message);
+    return { ok: false, motivo: 'ja_registrado' };
+  }
+
+  try {
+    const { data: instancia } = await service
+      .from('whatsapp_instances')
+      .select('*')
+      .eq('id', c.instance_id)
+      .maybeSingle();
+    if (!instancia) throw new Error('instância da conversa não encontrada');
+
+    const secrets = await getInstanceSecrets(service, c.instance_id);
+    const adapter = getAdapter(instancia.provider_type || 'self_hosted');
+    const envio = await adapter.send(secrets, instancia, {
+      to: c.telefone,
+      messageType: 'text',
+      content: c.mensagem,
+    });
+
+    await service.from('whatsapp_messages').insert({
+      tenant_id: tenantId,
+      conversation_id: c.conversation_id,
+      message_id: envio.messageId,
+      remote_jid: c.telefone,
+      content: c.mensagem,
+      message_type: 'text',
+      status: 'pending',
+      is_from_me: true,
+      timestamp: new Date().toISOString(),
+      instance_id: c.instance_id,
+      sender_name: 'Cobrança automática',
+      // A mesma marca da 2ª via: se o cliente responder qualquer coisa, o motor
+      // leva a conversa direto ao Financeiro, sem passar pela URA.
+      metadata: { source: 'billing_automation', kind: 'cobranca', origem: 'fin_regua' },
+    });
+
+    await service
+      .from('whatsapp_conversations')
+      .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', c.conversation_id);
+
+    await service
+      .from('fin_cobranca_envios')
+      .update({ status: 'enviado', motivo: null, message_id: envio.messageId })
+      .eq('tenant_id', tenantId)
+      .eq('dias_offset', c.dias_offset)
+      .in('titulo_id', c.titulo_ids);
+
+    return { ok: true };
+  } catch (e) {
+    const msg = (e as Error)?.message ?? String(e);
+    console.error(LOG, 'envio falhou para', c.cliente, msg);
+    await service
+      .from('fin_cobranca_envios')
+      .update({ status: 'erro', motivo: msg.slice(0, 200) })
+      .eq('tenant_id', tenantId)
+      .eq('dias_offset', c.dias_offset)
+      .in('titulo_id', c.titulo_ids);
+    return { ok: false, motivo: msg };
+  }
+}
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), {
@@ -207,15 +321,9 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
 
-  // A recusa é explícita e não silenciosa: quem chamar com simular:false tem
-  // que ver que o envio não existe, em vez de receber um "ok" e achar que
-  // mandou.
-  if (body?.simular === false) {
-    return json({
-      ok: false,
-      error: 'Esta versão só simula. O envio ainda não foi implementado.',
-    }, 400);
-  }
+  // ⚠️ SIMULAR É O PADRÃO. Enviar exige dizer `simular: false` — e mesmo assim
+  // só alcança quem o portão deixa. Quem chama sem pensar, simula.
+  const simular: boolean = body?.simular !== false;
 
   const tenantFiltro: string | null = typeof body?.tenant_id === 'string' ? body.tenant_id : null;
   // `data_referencia` existe para responder "e se eu rodasse na terça?" sem
@@ -427,7 +535,7 @@ Deno.serve(async (req) => {
           (bloco) =>
             service
               .from('whatsapp_contacts')
-              .select('id, cliente_id, phone_number, whatsapp_conversations(id, is_group, status)')
+              .select('id, cliente_id, phone_number, whatsapp_conversations(id, is_group, status, instance_id)')
               .in('cliente_id', bloco),
           clienteIds as string[],
         );
@@ -436,7 +544,12 @@ Deno.serve(async (req) => {
         for (const ct of contatos) {
           const convs = (ct.whatsapp_conversations ?? []).filter((c: any) => !c.is_group);
           if (convs.length && !conversaPor.has(ct.cliente_id)) {
-            conversaPor.set(ct.cliente_id, { conversation_id: convs[0].id, phone_number: ct.phone_number });
+            conversaPor.set(ct.cliente_id, {
+              conversation_id: convs[0].id,
+              contact_id: ct.id,
+              instance_id: convs[0].instance_id,
+              phone_number: ct.phone_number,
+            });
           }
         }
 
@@ -550,6 +663,15 @@ Deno.serve(async (req) => {
             origem_conta_id: lista[0].origem_conta_id ?? null,
             origem_ids: lista.map((t) => Number(t.origem_id)).filter(Number.isFinite),
             conversation_id: conversa?.conversation_id ?? null,
+            // ⚠️ A instância é a DA CONVERSA, não a configurada no tenant.
+            // Medido em 25/09/2026 na Digi Office: das conversas dos clientes
+            // com título em aberto, 595 estão no número oficial, 323 no 9922 e
+            // apenas 11 no 9944. Cobrar por um número com quem o cliente nunca
+            // falou é exatamente o que parece spam, e é onde mora o risco de
+            // banimento. Continuar a conversa que já existe é melhor para ele e
+            // mais seguro para o número.
+            instance_id: conversa?.instance_id ?? null,
+            contact_id: conversa?.contact_id ?? null,
             mensagem,
           });
         }
@@ -649,6 +771,50 @@ Deno.serve(async (req) => {
         }
       }
 
+      // ── ENVIO ────────────────────────────────────────────────────────────
+      //
+      // Aqui o robô fala com cliente sem ele ter pedido. Três travas, em ordem,
+      // e nenhuma delas é opcional:
+      //
+      //   1. `simular` é o padrão. Enviar exige pedir explicitamente.
+      //   2. Quiet hours. Fora de seg–sex 07:30–19:00 não sai nada, nem
+      //      urgente. Cobrança à noite ou no domingo é o tipo de coisa que
+      //      queima anos de relação.
+      //   3. Teto diário, para aquecimento do número.
+      //
+      // O portão (`fin_regua_liberada` + lista de teste) já filtrou os
+      // candidatos bem antes: quem não passa por ele nem chega aqui, porque
+      // virou `bloqueado_portao` na decisão.
+      const enviados: any[] = [];
+      if (!simular) {
+        if (quiet === true) {
+          console.log(LOG, 'quiet hours: nada sai agora');
+        } else {
+          // Quantas já saíram hoje, para o teto diário valer de verdade entre
+          // rodadas — e não só dentro de uma.
+          const { count: hojeJaForam } = await service
+            .from('fin_cobranca_envios')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', tenant.id)
+            .eq('status', 'enviado')
+            .gte('criado_em', new Date().toISOString().slice(0, 10));
+
+          const sobra = Math.max(0, tetoDiario - (hojeJaForam ?? 0));
+          const fila = candidatos
+            .filter((c) => c.decisao === 'enviaria')
+            .filter((c) => c.conversation_id && c.instance_id && c.telefone)
+            .slice(0, Math.min(MAX_ENVIOS_RODADA, sobra));
+
+          for (let i = 0; i < fila.length; i++) {
+            if (i > 0) await new Promise((r) => setTimeout(r, intervaloSorteado()));
+            const c = fila[i];
+            const r = await enviarCobranca(service, tenant.id, c);
+            enviados.push({ cliente: c.cliente, ok: r.ok, motivo: r.motivo ?? null });
+            if (r.ok) c.decisao = 'enviado';
+          }
+        }
+      }
+
       const porDecisao: Record<string, number> = {};
       let valorEnviaria = 0;
       let mensagensEnviaria = 0;
@@ -696,6 +862,7 @@ Deno.serve(async (req) => {
         regua_liberada: cfg?.fin_regua_liberada === true,
         toques_ativos: (toques ?? []).length,
         opt_outs_ativos: bloqueados.size,
+        enviados: simular ? null : enviados,
         releitura: reler ? releitura : null,
         canal: canal
           ? {
@@ -730,7 +897,7 @@ Deno.serve(async (req) => {
 
     return json({
       ok: true,
-      simulacao: true,
+      simulacao: simular,
       data_referencia: hoje,
       quiet_hours_agora: quiet === true,
       tenants: saida,
