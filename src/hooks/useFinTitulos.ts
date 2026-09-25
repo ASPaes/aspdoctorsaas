@@ -48,6 +48,8 @@ export interface FinTitulo {
   link_boleto: string | null;
   pix_copia_cola: string | null;
   link_nfse: string | null;
+  origem_os_id: string | null;
+  numero_nf: string | null;
   visto_em: string;
   clientes?: { razao_social: string | null; nome_fantasia: string | null; cnpj: string | null } | null;
 }
@@ -141,7 +143,7 @@ export function useFinTitulos(filtros: FiltrosTitulos) {
     queryFn: async () => {
       const rows = await fetchAllRows<FinTitulo>(() => {
         let q = (supabase.from('fin_titulos' as any) as any).select(
-          'id, origem, origem_id, cliente_id, cnpj_cpf_digits, numero_documento, parcela, emissao, vencimento, valor, situacao, situacao_origem, boleto_gerado, codigo_barras, link_boleto, pix_copia_cola, link_nfse, visto_em, clientes(razao_social, nome_fantasia, cnpj)',
+          'id, origem, origem_id, cliente_id, cnpj_cpf_digits, numero_documento, parcela, emissao, vencimento, valor, situacao, situacao_origem, boleto_gerado, codigo_barras, link_boleto, pix_copia_cola, link_nfse, origem_os_id, numero_nf, visto_em, clientes(razao_social, nome_fantasia, cnpj)',
         );
         if (tid) q = q.eq('tenant_id', tid);
         if (filtros.situacoes.length > 0) q = q.in('situacao', filtros.situacoes);

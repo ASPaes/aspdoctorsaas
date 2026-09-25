@@ -394,3 +394,9 @@ verify_jwt = false
 # aceita `recipient_id` e busca o texto no banco.
 [functions.send-web-push]
 verify_jwt = true
+
+# verify_jwt = TRUE, mesma razao da fin-titulo-boleto: quem pede e um usuario
+# logado e a function confere o titulo com o TOKEN DELE. Sem esta entrada o CI
+# publicaria com FALSE e abriria nota fiscal de cliente para qualquer um.
+[functions.fin-titulo-documentos]
+verify_jwt = true

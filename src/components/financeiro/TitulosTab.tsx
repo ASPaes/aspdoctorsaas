@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, FileText, X } from 'lucide-react';
 import { useFinTitulos, FIN_SITUACAO_LABEL, type FinSituacao } from '@/hooks/useFinTitulos';
 import BotaoBoleto from './BotaoBoleto';
+import BotaoDocumentos from './BotaoDocumentos';
 
 const fmtBRL = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -129,7 +130,7 @@ export default function TitulosTab() {
                   <TableHead>Documento</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead>Situação</TableHead>
-                  <TableHead>Cobrança</TableHead>
+                  <TableHead>Documentos</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -167,10 +168,15 @@ export default function TitulosTab() {
                           ) : (
                             <span>sem boleto</span>
                           )}
-                          {t.link_nfse && (
-                            <span className="flex items-center gap-1">
+                          {/* Nota e OS vêm juntas: quem tem ordem de serviço tem
+                              pelo menos a OS, e a nota aparece quando existe.
+                              Saber qual das duas existe custa duas chamadas ao
+                              Omie, então a pergunta só é feita no clique. */}
+                          <BotaoDocumentos tituloId={t.id} temOs={!!t.origem_os_id} compacto />
+                          {t.numero_nf && (
+                            <span className="flex items-center gap-1" title="Número da nota fiscal">
                               <FileText className="h-3.5 w-3.5" />
-                              nota
+                              {t.numero_nf}
                             </span>
                           )}
                         </div>

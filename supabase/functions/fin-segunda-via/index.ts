@@ -41,6 +41,20 @@ const DOCTOROMIE_BOLETO =
 const DOCTOROMIE_RELER =
   'https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-titulos-reler';
 
+const DOCTOROMIE_DOCS =
+  'https://vqrytdntynxuqozehals.supabase.co/functions/v1/ds-omie-documentos-obter';
+
+/**
+ * Idade a partir da qual os endereços de documento são buscados de novo.
+ *
+ * ⚠️ Medido: duas chamadas seguidas para a mesma OS devolvem endereços
+ * DIFERENTES — o Omie gera o arquivo a cada pedido ("Documentos gerados com
+ * sucesso"). A validade exata não é documentada; o link de boleto do mesmo ERP
+ * morre em 24 h. 12 h fica do lado seguro: reaproveitar por engano entrega link
+ * quebrado na mão do cliente, e buscar à toa custa duas chamadas.
+ */
+const DOCS_VALIDADE_MS = 12 * 60 * 60 * 1000;
+
 /**
  * Quantos títulos releremos no ERP antes de responder.
  *
@@ -128,6 +142,28 @@ function pedeReenvio(texto: string): boolean {
 }
 
 /**
+ * O cliente está pedindo a NOTA, e não o boleto?
+ *
+ * Os dois pedidos entram pela mesma porta (`pedeSegundaVia` aceita "nota
+ * fiscal" desde o início), mas a resposta é outra: quem pede nota quer o
+ * documento fiscal, não a forma de pagar. Mandar boleto para quem pediu nota é
+ * responder outra pergunta.
+ *
+ * "boleto" vence o empate de propósito: quem escreve "manda o boleto e a nota"
+ * está falando de pagamento em primeiro lugar, e o boleto é o que tem prazo.
+ */
+function pedeNotaFiscal(texto: string): boolean {
+  const t = String(texto ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim();
+  if (!t || t.length > 300) return false;
+  if (/(boleto|codigo de barras|linha digitavel|pix)/.test(t)) return false;
+  return /(nota fiscal|nota-fiscal|\bnfse\b|\bnfs-e\b|\bnf-e\b|\bnfe\b|\bnota\b|ordem de servico|\bo\.?s\.?\b|orcamento|xml)/.test(t);
+}
+
+/**
  * O cliente está pedindo para NÃO receber mais cobrança automática?
  *
  * Aqui a régua é o oposto da do pedido de boleto: estreita, quase literal. Um
@@ -191,6 +227,10 @@ interface Titulo {
   link_boleto: string | null;
   link_boleto_expira_em: string | null;
   codigo_barras: string | null;
+  origem_os_id: string | null;
+  numero_nf: string | null;
+  documentos: Record<string, string | null> | null;
+  documentos_em: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -502,7 +542,7 @@ Deno.serve(async (req) => {
     const { data: titulosRaw } = await supabase
       .from('vw_fin_titulos_abertos')
       .select(
-        'id, origem, origem_conta_id, origem_id, vencimento, valor, situacao, dias_atraso, vencido, boleto_gerado, link_boleto, link_boleto_expira_em, codigo_barras',
+        'id, origem, origem_conta_id, origem_id, vencimento, valor, situacao, dias_atraso, vencido, boleto_gerado, link_boleto, link_boleto_expira_em, codigo_barras, origem_os_id, numero_nf, documentos, documentos_em',
       )
       .eq('tenant_id', tenantId)
       .eq('cliente_id', clienteId)
@@ -526,6 +566,65 @@ Deno.serve(async (req) => {
         motivo: 'sem_titulos',
         cliente_id: clienteId,
         ...(simular ? { mensagem: semTitulos } : {}),
+      });
+    }
+
+    // ---- Quem pediu a NOTA recebe a nota, não o boleto ---------------------
+    //
+    // Os dois pedidos entram pela mesma porta, mas são perguntas diferentes:
+    // quem quer a nota quer o documento fiscal, não a forma de pagar. E a regra
+    // do Alexandre para quando não há nota: manda a ordem de serviço, que é o
+    // documento que existe em todos os casos.
+    if (pedeNotaFiscal(texto)) {
+      const alvoDoc =
+        titulos.find((t) => t.origem_os_id && t.vencido) ??
+        titulos.find((t) => t.origem_os_id) ??
+        null;
+
+      const docs = alvoDoc ? await obterDocumentos(supabase, alvoDoc) : {};
+      const partes: string[] = [];
+
+      if (docs?.pdf_nfse) {
+        partes.push(
+          `Segue a nota fiscal${docs.numero_nf ? ` nº ${docs.numero_nf}` : ''}${
+            alvoDoc ? `, referente à fatura de ${fmtBRL(alvoDoc.valor)} com vencimento em ${fmtData(alvoDoc.vencimento)}` : ''
+          }:\n${docs.pdf_nfse}`,
+        );
+        if (docs.url_oficial) partes.push(`Consulta oficial da nota:\n${docs.url_oficial}`);
+      } else if (docs?.pdf_os) {
+        // Dizer POR QUE está vindo a OS evita o cliente achar que recebeu o
+        // documento errado.
+        partes.push(
+          `Ainda não há nota fiscal emitida para essa cobrança. Segue a ordem de serviço${
+            docs.numero_os ? ` nº ${String(Number(docs.numero_os))}` : ''
+          }, com a descrição do que foi contratado:\n${docs.pdf_os}`,
+        );
+      } else {
+        partes.push(
+          'Não consegui localizar a nota fiscal dessa cobrança por aqui. Já vou pedir para o financeiro te enviar.',
+        );
+      }
+      partes.push('Se precisar do boleto também, é só me pedir.');
+
+      const textoNota = partes.join('\n\n');
+      await enviar(
+        supabase,
+        { tenantId, conversationId, contactId, instanceId, telefone, simular },
+        textoNota,
+        true,
+      );
+      await salvarSessao(supabase, tenantId, conversationId, {
+        estado: 'entregue',
+        tentativas: 0,
+        cliente_id: clienteId,
+        minutos: 60,
+      });
+      return json({
+        ok: true,
+        atendido: true,
+        motivo: docs?.pdf_nfse ? 'nota_entregue' : docs?.pdf_os ? 'os_entregue' : 'sem_documento',
+        cliente_id: clienteId,
+        ...(simular ? { mensagem: textoNota } : {}),
       });
     }
 
@@ -762,6 +861,58 @@ async function relerNoErp(supabase: any, tenantId: string, clienteId: string): P
     });
   } catch (e) {
     console.warn(LOG, 'releitura falhou, seguindo com o espelho:', (e as Error)?.message);
+  }
+}
+
+/**
+ * Documentos do título: nota fiscal, ordem de serviço, XML e consulta oficial.
+ *
+ * Reaproveita o que está guardado enquanto é novo o bastante, porque cada busca
+ * custa DUAS chamadas ao Omie (a nota exige listar para descobrir o id interno
+ * dela antes de pedir o PDF).
+ *
+ * Devolve `{}` em qualquer tropeço. Documento que não vem não pode calar a
+ * resposta: o cliente ainda recebe a lista de faturas e uma pessoa assume daí.
+ */
+async function obterDocumentos(supabase: any, titulo: Titulo): Promise<Record<string, string | null>> {
+  const guardados = (titulo as any).documentos ?? null;
+  const em = (titulo as any).documentos_em ? new Date((titulo as any).documentos_em).getTime() : 0;
+  if (guardados && Date.now() - em < DOCS_VALIDADE_MS) return guardados;
+
+  if (titulo.origem !== 'omie' || !titulo.origem_conta_id) return guardados ?? {};
+
+  try {
+    const { data: chave } = await supabase.rpc('obter_chave_omie_por_conta', {
+      p_integration_id: titulo.origem_conta_id,
+    });
+    if (!chave) return guardados ?? {};
+
+    const resp = await fetch(DOCTOROMIE_DOCS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${chave}` },
+      body: JSON.stringify({ codigo_lancamento_omie: Number(titulo.origem_id) }),
+    });
+    const corpo = await resp.json().catch(() => ({}));
+    if (!resp.ok || corpo?.ok === false) {
+      console.warn(LOG, 'documentos recusados:', JSON.stringify(corpo).slice(0, 200));
+      return guardados ?? {};
+    }
+
+    const documentos = corpo?.documentos ?? {};
+    await supabase
+      .from('fin_titulos')
+      .update({
+        documentos,
+        documentos_em: new Date().toISOString(),
+        link_nfse: documentos?.pdf_nfse ?? null,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq('id', titulo.id);
+
+    return documentos;
+  } catch (e) {
+    console.warn(LOG, 'documentos falharam:', (e as Error)?.message);
+    return guardados ?? {};
   }
 }
 
