@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 25/09
+
+- ⬆️ **Busca de cliente no Novo ticket mostra razão social e CNPJ** — Ao escolher o cliente em **Tickets › Novo ticket**, cada resultado da busca mostra, logo abaixo do nome fantasia, a **razão social** e o **CNPJ** (ou CPF). Antes aparecia só o fantasia, e quando a busca encontrava o cliente pela razão social não dava para saber por que ele estava ali, nem distinguir clientes de nome parecido. A razão social só aparece quando é diferente do fantasia. Depois de escolhido, o cliente continua mostrando os mesmos dados, para conferir antes de salvar.
+
 ### 24/09
 
 - ⬆️ **Tamanho da janela do ticket vale também para o ticket novo** — O tamanho que você ajusta na janela de um ticket agora também vale ao abrir **Novo ticket**, que antes sempre abria no tamanho padrão e não deixava redimensionar. As duas janelas seguem o mesmo ajuste: mudou numa, a outra abre igual. Além da borda direita, da de baixo e do canto inferior direito, agora dá para arrastar também a **borda esquerda** e o **canto inferior esquerdo**. Duplo clique em qualquer borda volta ao tamanho padrão.
