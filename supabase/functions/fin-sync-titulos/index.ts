@@ -82,6 +82,14 @@ interface TituloOrigem {
   numero_boleto: string | null;
   codigo_barras: string | null;
   visto_em: string;
+  /**
+   * Preenchido quando a origem já sabe que este título não existe mais no ERP.
+   *
+   * Ele CHEGA em vez de sumir, e é essa a diferença: enquanto a listagem
+   * escondia a linha excluída, o título ficava parado aqui para sempre com o
+   * estado do dia em que sumiu. Eram 218 assim em 25/09/2026.
+   */
+  excluido_em?: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -212,6 +220,15 @@ Deno.serve(async (req) => {
               numero_boleto: t.numero_boleto,
               codigo_barras: t.codigo_barras,
               visto_em: t.visto_em,
+              // Carimbo, não exclusão: a linha fica para responder o que sumiu
+              // do ERP e quando. Quem impede de cobrar é a view, que barra o
+              // carimbado.
+              //
+              // Repare que ele é gravado nos DOIS sentidos: quando vem nulo,
+              // limpa um carimbo anterior. Título excluído por engano no ERP e
+              // depois restaurado precisa voltar a ser cobrável sozinho, sem
+              // alguém lembrar de limpar na mão.
+              removido_na_origem_em: t.excluido_em ?? null,
               atualizado_em: new Date().toISOString(),
             }));
 
