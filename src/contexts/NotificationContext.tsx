@@ -12,7 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast as sonnerToast } from "sonner";
-import { mostrarNotificacaoDoSistema, marcarIconeDoApp } from "@/lib/notificacaoDoSistema";
+import { mostrarNotificacaoDoSistema, marcarIconeDoApp, fecharAvisosDoSistema } from "@/lib/notificacaoDoSistema";
 import { inscreverAparelho } from "@/lib/webPush";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
@@ -661,6 +661,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     // Instalado na tela inicial, o icone do app leva a contagem como no WhatsApp.
     marcarIconeDoApp(unreadCount);
     updateFaviconBadge(unreadCount > 0);
+
+    // Nada pendente = a barra do telefone nao pode continuar mostrando aviso.
+    //
+    // Fechar por conversa (ao abrir cada uma) nao alcanca o que ficou de tras:
+    // aviso de conversa que a pessoa nunca abriu NESTE aparelho, ou lido em outro
+    // lugar antes de a limpeza existir. E o launcher do Android conta os avisos
+    // ABERTOS para desenhar o numero no icone, entao a pilha velha segurava o
+    // numero sozinha. Com o contador zerado nao ha o que preservar.
+    if (unreadCount === 0) void fecharAvisosDoSistema();
   }, [unreadCount]);
 
   // Title flashing while hidden

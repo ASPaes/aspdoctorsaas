@@ -18,7 +18,7 @@
  *    Mensagem de chat não pode vir de cache.
  */
 
-const VERSAO = "ds-v4";
+const VERSAO = "ds-v5";
 const CASCA = `casca-${VERSAO}`;
 const ARQUIVOS = `arquivos-${VERSAO}`;
 
@@ -150,9 +150,13 @@ self.addEventListener("push", (evento) => {
   // já estava limpo, e aí aceitamos o custo de não mostrar nada (é o caso raro:
   // limpeza chega antes do aviso, ou o aviso já tinha sido dispensado à mão).
   if (dados.acao === "limpar") {
+    // "*" limpa a barra inteira — usado quando o contador zera e a pilha antiga
+    // ficou para trás (avisos de conversas que esta pessoa nunca abriu NESTE
+    // aparelho). Com tag, limpa só aquela conversa.
+    const filtro = dados.tag && dados.tag !== "*" ? { tag: dados.tag } : undefined;
     evento.waitUntil(
       self.registration
-        .getNotifications(dados.tag ? { tag: dados.tag } : undefined)
+        .getNotifications(filtro)
         .then((abertos) => abertos.forEach((n) => n.close()))
         .catch(() => {})
     );
