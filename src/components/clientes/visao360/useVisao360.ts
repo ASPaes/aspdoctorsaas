@@ -319,3 +319,46 @@ export function useSaudePesos(tenantId: string | null) {
     },
   });
 }
+
+export interface Modulo360 {
+  id: string;
+  cliente_produto_id: string;
+  nome: string;
+  quantidade: number;
+  vlr_mensal: number;
+  data_ativacao: string | null;
+  oem: boolean;
+}
+
+/**
+ * Módulos ATIVOS dos produtos ativos do cliente. Cancelados ficam de fora de
+ * propósito: o card responde "o que ele tem hoje"; o histórico mora na ficha.
+ */
+export function useModulos360(produtoIds: string[], tid: string | null) {
+  const chave = [...produtoIds].sort().join(",");
+  return useQuery({
+    queryKey: ["visao360_modulos", chave, tid],
+    enabled: produtoIds.length > 0,
+    staleTime: STALE,
+    queryFn: async (): Promise<Modulo360[]> => {
+      let q = (supabase.from("cliente_produto_modulos") as any)
+        .select("id, cliente_produto_id, quantidade, vlr_mensal, data_ativacao, oem_modulo_codigo, produto_modulos!cliente_produto_modulos_modulo_id_fkey(nome)")
+        .in("cliente_produto_id", produtoIds)
+        .eq("ativo", true);
+      if (tid) q = q.eq("tenant_id", tid);
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? [])
+        .map((r: any) => ({
+          id: r.id,
+          cliente_produto_id: r.cliente_produto_id,
+          nome: r.produto_modulos?.nome ?? "Módulo",
+          quantidade: Number(r.quantidade) || 1,
+          vlr_mensal: Number(r.vlr_mensal) || 0,
+          data_ativacao: r.data_ativacao,
+          oem: r.oem_modulo_codigo != null,
+        }))
+        .sort((a: Modulo360, b: Modulo360) => a.nome.localeCompare(b.nome, "pt-BR"));
+    },
+  });
+}

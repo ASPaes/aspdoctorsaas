@@ -22,7 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useSaudePesos, useTickets360,
+  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useModulos360, useSaudePesos, useTickets360,
   type ClienteBusca,
 } from "./useVisao360";
 import {
@@ -30,7 +30,7 @@ import {
   type Periodo,
 } from "./visao360Calc";
 import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
-import { LinhaDoTempo, MapaDeContato, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
+import { LinhaDoTempo, MapaDeContato, ModulosContratados, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
 import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360Listas";
 import { FinanceiroSubAba } from "./Visao360Financeiro";
 import { SaudeDoCliente } from "./Visao360Saude";
@@ -224,6 +224,8 @@ export default function Visao360Tab() {
   const listaTks = tks.data ?? [];
   const produtos = contrato.data?.produtos ?? [];
   const movimentos = contrato.data?.movimentos ?? [];
+  const idsProdutosAtivos = useMemo(() => produtos.filter((p) => p.ativo).map((p) => p.id), [produtos]);
+  const modulos = useModulos360(idsProdutosAtivos, tid);
 
   const serie = useMemo(() => serieMrr12m(produtos, movimentos, new Date()), [produtos, movimentos]);
   const mrrAtual = serie.length ? serie[serie.length - 1].valor : 0;
@@ -593,6 +595,7 @@ export default function Visao360Tab() {
                   <QuemFala contatos={contatos.data ?? []} />
                   <ProximosEventos eventos={proximos} />
                   <OQueUsa produtos={produtos} />
+                  <ModulosContratados produtos={produtos} modulos={modulos.data ?? []} />
                 </div>
               </div>
             </TabsContent>

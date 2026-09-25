@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Cartao, Chips, Etiqueta, Vazio } from "./Visao360Ui";
 import { brl, diaSP, type Evento360, type Produto360, type TipoEvento } from "./visao360Calc";
-import type { Contato360 } from "./useVisao360";
+import type { Contato360, Modulo360 } from "./useVisao360";
 
 const ICONE: Record<TipoEvento, { Icon: typeof MessageCircle; cls: string }> = {
   atendimento: { Icon: MessageCircle, cls: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
@@ -255,6 +255,48 @@ export function OQueUsa({ produtos }: { produtos: Produto360[] }) {
           ))}
         </ul>
       )}
+    </Cartao>
+  );
+}
+
+/**
+ * Módulos ativos, agrupados pelo produto. Só aparece quando existe ao menos um:
+ * cliente sem módulo não ganha um card vazio.
+ * O valor mensal gravado é por unidade; a linha mostra quantidade × unitário.
+ */
+export function ModulosContratados({ produtos, modulos }: { produtos: Produto360[]; modulos: Modulo360[] }) {
+  if (!modulos.length) return null;
+  const grupos = produtos
+    .filter((p) => p.ativo)
+    .map((p) => ({ produto: p, itens: modulos.filter((m) => m.cliente_produto_id === p.id) }))
+    .filter((g) => g.itens.length);
+  const varios = grupos.length > 1;
+  return (
+    <Cartao titulo="Módulos contratados" sub={`${modulos.length} ativo${modulos.length === 1 ? "" : "s"}`}>
+      <div className="grid gap-3 px-4 pb-4">
+        {grupos.map((g) => (
+          <div key={g.produto.id}>
+            {varios && <div className="mb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{g.produto.produto}</div>}
+            <ul>
+              {g.itens.map((m, i) => {
+                const total = m.vlr_mensal * m.quantidade;
+                return (
+                  <li key={m.id} className={cn("flex items-center justify-between gap-3 py-1.5 text-[13px]", i > 0 && "border-t")}>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-semibold">{m.nome}</span>
+                      {m.quantidade > 1 && <span className="rounded bg-muted px-1.5 text-[11px] font-bold tabular-nums text-muted-foreground">× {m.quantidade}</span>}
+                      {m.oem && <span className="rounded border px-1 text-[10px] font-bold text-muted-foreground">OEM</span>}
+                    </div>
+                    <span className="flex-none text-xs tabular-nums text-muted-foreground">
+                      {total > 0 ? `${brl(total)}/mês` : m.data_ativacao ? `desde ${format(parseISO(m.data_ativacao), "MM/yyyy")}` : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </Cartao>
   );
 }
