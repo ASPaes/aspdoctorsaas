@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Receipt } from 'lucide-react';
+import { ChevronDown, Receipt } from 'lucide-react';
 import { useFinanceiroAccess } from '@/hooks/useFinanceiroAccess';
 import { useFinTitulosDoCliente, FIN_SITUACAO_LABEL, type FinSituacao } from '@/hooks/useFinTitulos';
 import BotaoBoleto from './BotaoBoleto';
@@ -28,6 +28,9 @@ const TOM: Record<FinSituacao, 'default' | 'secondary' | 'destructive' | 'outlin
 
 const EM_ABERTO: FinSituacao[] = ['atrasado', 'vence_hoje', 'a_vencer'];
 
+// A ficha abre sempre recolhida: só as primeiras linhas, o resto sob demanda.
+const LINHAS_RECOLHIDO = 3;
+
 /**
  * Títulos do cliente dentro da ficha. Some por completo para quem não tem acesso
  * ao módulo, então pode ser montado na aba Financeiro sem nenhum outro cuidado.
@@ -35,6 +38,7 @@ const EM_ABERTO: FinSituacao[] = ['atrasado', 'vence_hoje', 'a_vencer'];
 export default function TitulosDoClienteCard({ clienteId }: { clienteId?: string }) {
   const { canAccess } = useFinanceiroAccess();
   const { data: titulos = [], isLoading } = useFinTitulosDoCliente(canAccess ? clienteId : null);
+  const [expandido, setExpandido] = useState(false);
 
   const resumo = useMemo(() => {
     const abertos = titulos.filter((t) => EM_ABERTO.includes(t.situacao));
@@ -104,7 +108,7 @@ export default function TitulosDoClienteCard({ clienteId }: { clienteId?: string
               </tr>
             </thead>
             <tbody>
-              {ordenados.slice(0, 12).map((t) => (
+              {(expandido ? ordenados : ordenados.slice(0, LINHAS_RECOLHIDO)).map((t) => (
                 <tr key={t.id} className="border-t">
                   <td className="py-1.5 tabular-nums">{fmtData(t.vencimento)}</td>
                   <td className="py-1.5 pr-3 text-muted-foreground">
@@ -123,10 +127,17 @@ export default function TitulosDoClienteCard({ clienteId }: { clienteId?: string
               ))}
             </tbody>
           </table>
-          {ordenados.length > 12 && (
-            <p className="pt-2 text-xs text-muted-foreground">
-              Mostrando 12 de {ordenados.length} títulos: primeiro os em aberto, depois o histórico.
-            </p>
+          {ordenados.length > LINHAS_RECOLHIDO && (
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              className="mt-2 flex w-full items-center justify-center gap-1 rounded-md py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+            >
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expandido ? 'rotate-180' : ''}`} />
+              {expandido
+                ? 'Recolher'
+                : `Ver todos os ${ordenados.length} títulos (+${ordenados.length - LINHAS_RECOLHIDO})`}
+            </button>
           )}
         </div>
       )}

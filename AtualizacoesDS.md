@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **Títulos a receber mais enxutos na ficha do cliente** — Na ficha do cliente, o quadro **Títulos a receber** passa a abrir sempre recolhido, com só 3 títulos (os em aberto primeiro). O botão **Ver todos os títulos** mostra o restante do histórico, e **Recolher** volta ao resumo.
+
 - ⬆️ **Abrir o ticket direto da Linha do tempo da Visão 360°** — Em **Clientes › Visão 360° › Linha do tempo**, cada ticket ganha o botão **Abrir ticket**, que abre a tela completa do ticket numa janela por cima, sem sair da Visão 360°. Atendimentos e avaliações ganham o botão **Ver atendimento**, do mesmo jeito.
 
 - ⬆️ **Ficha do cliente abre sem sair da Visão 360°** — Em **Clientes › Visão 360°**, o botão **Abrir ficha** passa a abrir a ficha do cliente numa janela por cima da tela, exatamente como ela é hoje. Voltar, o X e Cancelar fecham a janela e deixam você no mesmo cliente; com alteração não salva, o sistema pergunta antes de fechar. Depois de salvar, os números da Visão 360° se atualizam na hora.
