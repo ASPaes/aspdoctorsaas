@@ -1,6 +1,6 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Suspense } from "react";
-import { Loader2, LogOut } from "lucide-react";
+import { ChevronLeft, Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
@@ -20,9 +20,23 @@ import { useAuth } from "@/contexts/AuthContext";
  * A barra tem exatamente h-14 (3.5rem) porque a tela do chat se dimensiona com
  * `calc(100vh-3.5rem)`; mudar esta altura deixa faixa vazia embaixo do teclado.
  */
+/** Nome de cada módulo no cabeçalho, para a pessoa saber onde está. */
+const TITULOS: Record<string, string> = {
+  "/whatsapp": "Chat",
+  "/whatsapp/contatos": "Contatos",
+  "/tickets": "Tickets",
+  "/implantacao": "Implantação",
+  "/emails": "E-mails",
+};
+
 export default function ChatMobileLayout() {
   useAccentColorSync();
   const { signOut } = useAuth();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  const emModulo = pathname !== "/";
+  const tituloDoModulo = TITULOS[pathname] ?? "DS Mobile";
 
   return (
     <DepartmentFilterProvider>
@@ -42,7 +56,23 @@ export default function ChatMobileLayout() {
         >
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-3">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base font-semibold truncate">DS Mobile</span>
+              {/* Dentro de um módulo o título vira o caminho de volta para a tela
+                  inicial. O gesto do aparelho já faz isso, mas gesto não se
+                  descobre sozinho: sem um alvo visível, trocar de módulo virava
+                  fechar e abrir o aplicativo. */}
+              {emModulo ? (
+                <button
+                  type="button"
+                  onClick={() => navigate("/")}
+                  aria-label="Voltar para a tela inicial"
+                  className="flex min-w-0 items-center gap-1 rounded-md py-1 pr-1 text-base font-semibold"
+                >
+                  <ChevronLeft className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{tituloDoModulo}</span>
+                </button>
+              ) : (
+                <span className="text-base font-semibold truncate">DS Mobile</span>
+              )}
               <AgentPresenceButton />
             </div>
             <div className="flex items-center gap-1">
