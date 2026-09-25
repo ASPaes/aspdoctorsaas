@@ -20,6 +20,8 @@ import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner"
 import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { formatarTelefone } from "@/components/emails/macros/camposMacro";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -156,6 +158,9 @@ export function CreateSupportTicketModal({
 }: Props) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const dialogSize = useTicketDialogSize(open);
+  // No telefone a janela ocupa a tela inteira: o tamanho salvo e em pixels do
+  // computador, e aplicado aqui deixava o rodape 96px fora da borda.
+  const noCelular = useIsMobile() || isChatHost();
 
   const [clienteSearchTerm, setClienteSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
@@ -1102,13 +1107,21 @@ export function CreateSupportTicketModal({
     <>
     <Dialog open={open} onOpenChange={(o) => { if (!o) { requestClose(); } else { onOpenChange(true); } }}>
       <DialogContent
-        className={`p-0 gap-0 overflow-hidden flex flex-col shadow-none ${dialogSize.effectiveSize ? "max-w-none max-h-none" : "max-w-[900px] max-h-[90vh]"}`}
-        style={dialogSize.effectiveSize ? { width: dialogSize.effectiveSize.w, height: dialogSize.effectiveSize.h } : undefined}
+        className={cn(
+          "p-0 gap-0 overflow-hidden flex flex-col shadow-none",
+          noCelular
+            ? "max-w-none max-h-none w-screen h-[100dvh] rounded-none border-0"
+            : dialogSize.effectiveSize
+              ? "max-w-none max-h-none"
+              : "max-w-[900px] max-h-[90vh]"
+        )}
+        style={!noCelular && dialogSize.effectiveSize ? { width: dialogSize.effectiveSize.w, height: dialogSize.effectiveSize.h } : undefined}
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
-        <TicketDialogResizeHandles onStart={dialogSize.startResize} onReset={dialogSize.resetSize} />
+        {/* Redimensionar e coisa de mouse: no toque as alcas so roubam o gesto de rolar. */}
+        {!noCelular && <TicketDialogResizeHandles onStart={dialogSize.startResize} onReset={dialogSize.resetSize} />}
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pr-12 pt-4 pb-3 border-b">
@@ -1215,8 +1228,9 @@ export function CreateSupportTicketModal({
           <div className="flex-1" />
 
           {/* Tipo horário */}
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1">
+          {/* Em 320px os tres botoes mais o selo "Detectado" somavam 334px: quebra. */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex gap-1 flex-wrap">
               {(["auto", "comercial", "plantao"] as const).map((t) => {
                 const isActive =
                   t === "auto" ? modoHorario === "auto" : modoHorario === "manual" && tipoHorario === t;
@@ -1276,9 +1290,14 @@ export function CreateSupportTicketModal({
         </div>
 
         {/* Body */}
-        <div className="grid grid-cols-[1fr_260px] flex-1 overflow-hidden">
+        {/* No telefone as duas colunas viram uma, e quem rola e o corpo inteiro:
+            com 260px fixos a esquerda sobrava ~130px e todo campo saia cortado. */}
+        <div className={cn(
+          "flex-1 overflow-hidden",
+          noCelular ? "flex flex-col overflow-y-auto" : "grid grid-cols-[1fr_260px]"
+        )}>
           {/* Left panel */}
-          <div className="p-4 pr-4 border-r space-y-4 overflow-y-auto">
+          <div className={cn("p-4 pr-4 space-y-4", noCelular ? "" : "border-r overflow-y-auto")}>
             {/* Setor + Status + Responsável */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
@@ -1742,7 +1761,7 @@ export function CreateSupportTicketModal({
           </div>
 
           {/* Right panel */}
-          <div className="p-3.5 space-y-3 overflow-y-auto bg-muted/10">
+          <div className={cn("p-3.5 space-y-3 bg-muted/10", noCelular ? "border-t" : "overflow-y-auto")}>
             {/* Tags */}
             <div className="space-y-2">
               <div className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">Tags</div>
@@ -1907,16 +1926,29 @@ export function CreateSupportTicketModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t">
-          <Button variant="ghost" onClick={requestClose} disabled={isSubmitting}>
+        {/* No telefone os tres botoes somavam 486px numa tela de 390 e o "Criar e
+            continuar" ficava fora da borda. Viram duas linhas: acao principal em
+            cima, ocupando a largura, e as outras duas embaixo. */}
+        <div className={cn(
+          "gap-2 border-t",
+          noCelular
+            ? "flex flex-col-reverse px-3 py-2.5"
+            : "flex items-center justify-between px-5 py-3"
+        )}>
+          <Button
+            variant="ghost"
+            onClick={requestClose}
+            disabled={isSubmitting}
+            className={cn(noCelular && "w-full")}
+          >
             Cancelar
           </Button>
-          <div className="flex items-center gap-2">
+          <div className={cn("flex items-center gap-2", noCelular && "w-full")}>
             <Button
               variant="outline"
               onClick={() => handleSubmit("close")}
               disabled={isSubmitting || hasHardTicketBlock}
-              className="gap-1.5"
+              className={cn("gap-1.5", noCelular && "flex-1 min-w-0 px-2")}
             >
               {submitMode === "close" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1924,17 +1956,17 @@ export function CreateSupportTicketModal({
                 <ArrowLeft className="h-4 w-4" />
               )}
               Criar e fechar
-              <HelpBadge text="Cria o ticket e volta para a lista." />
+              {!noCelular && <HelpBadge text="Cria o ticket e volta para a lista." />}
             </Button>
             <Button
               onClick={() => handleSubmit("continue")}
               disabled={isSubmitting || hasHardTicketBlock}
-              className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+              className={cn("bg-green-600 hover:bg-green-700 text-white gap-1.5", noCelular && "flex-1 min-w-0 px-2")}
             >
               {submitMode === "continue" && <Loader2 className="h-4 w-4 animate-spin" />}
               Criar e continuar
               {submitMode !== "continue" && <ArrowRight className="h-4 w-4" />}
-              <HelpBadge text="Cria o ticket e permanece na tela para continuar o preenchimento (anexo, ocorrências, etc.)." />
+              {!noCelular && <HelpBadge text="Cria o ticket e permanece na tela para continuar o preenchimento (anexo, ocorrências, etc.)." />}
             </Button>
           </div>
         </div>

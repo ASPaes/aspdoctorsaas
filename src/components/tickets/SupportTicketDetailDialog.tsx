@@ -1032,7 +1032,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
   const detailsContent = !ticket ? null : ticket.is_acompanhamento ? acompanhamentoContent : (
     <div className="space-y-4 pr-2 pt-1">
       {/* Setor + Status + Responsável */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Setor</Label>
           <Select
@@ -1198,7 +1198,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       {/* Classificação */}
       <div className="space-y-1.5">
         <Label className="text-xs font-medium">Classificação</Label>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="space-y-1">
             <Label className="text-[10px] text-muted-foreground">Produto</Label>
             <Select value={ticket.produto_id ? String(ticket.produto_id) : ""} onValueChange={(v) => handleFieldUpdate({ produto_id: Number(v) })} disabled={updating}>
@@ -1283,7 +1283,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       </div>
 
       {/* Previsão de encerramento + Agendado para */}
-      <div className="grid grid-cols-2 gap-3 items-end">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Previsão <Badge variant="outline" className="text-[9px] h-4 px-1 ml-1 align-middle">auto</Badge></Label>
           <Input
@@ -1352,7 +1352,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <Clock className="h-3 w-3" />
             Horários de Plantão
           </p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-medium">Início</Label>
               <Input
@@ -1404,7 +1404,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-1.5">
               <Rocket className="h-3.5 w-3.5" /> Implantação
             </p>
-            <div className="grid grid-cols-3 gap-3 items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
               <div className="space-y-1">
                 <Label className="text-xs">Início</Label>
                 <Input
@@ -1966,7 +1966,9 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               <SheetTitle>Detalhes do Ticket</SheetTitle>
             </SheetHeader>
             <div className="flex flex-col h-[calc(95vh-60px)]">
-              <div className="flex gap-2 p-2 border-b shrink-0">
+              {/* px-4 para bater com o p-4 do conteudo: com p-2 as abas ficavam 8px
+                  mais largas que tudo abaixo delas e pareciam sair da tela. */}
+              <div className="flex gap-2 px-4 py-2 border-b shrink-0">
                 <Button
                   variant={mobileView === "details" ? "default" : "outline"}
                   size="sm" className="flex-1"
