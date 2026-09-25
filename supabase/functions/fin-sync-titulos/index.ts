@@ -90,6 +90,9 @@ interface TituloOrigem {
    * estado do dia em que sumiu. Eram 218 assim em 25/09/2026.
    */
   excluido_em?: string | null;
+  /** Código da OS na origem. É a chave para chegar ao PDF da nota e da OS. */
+  os_id?: string | null;
+  numero_nf?: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -229,6 +232,10 @@ Deno.serve(async (req) => {
               // depois restaurado precisa voltar a ser cobrável sozinho, sem
               // alguém lembrar de limpar na mão.
               removido_na_origem_em: t.excluido_em ?? null,
+              // Vinham no bruto do Omie e se perdiam na listagem. Não são o
+              // link do documento: são o que permite ir buscá-lo.
+              origem_os_id: t.os_id ?? null,
+              numero_nf: t.numero_nf ?? null,
               atualizado_em: new Date().toISOString(),
             }));
 
