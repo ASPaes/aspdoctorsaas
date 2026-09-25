@@ -583,14 +583,17 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const deleteTargetName = (contact?.name || contact?.phone_number || "").trim();
   const isGroupConv = (conversation as any)?.is_group === true;
 
+  // Mesma chave do ClienteLinkCard (contact_id antes do embed): se o embed `contact` não
+  // vier, o painel mostrava o cliente e o cabeçalho/encerramento não (DEM-0465).
+  const groupContactId = (conversation as any)?.contact_id ?? conversation.contact?.id ?? null;
   const { data: groupLinkedCliente } = useQuery({
-    queryKey: ["group-linked-cliente", conversation.contact?.id],
-    enabled: isGroupConv && !!conversation.contact?.id,
+    queryKey: ["group-linked-cliente", groupContactId],
+    enabled: isGroupConv && !!groupContactId,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const { data: wc } = await (supabase.from("whatsapp_contacts" as any) as any)
         .select("cliente_id")
-        .eq("id", conversation.contact?.id)
+        .eq("id", groupContactId)
         .maybeSingle();
       if (!wc?.cliente_id) return null;
       const { data: cliente } = await (supabase.from("clientes" as any) as any)

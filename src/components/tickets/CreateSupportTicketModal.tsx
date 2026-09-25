@@ -290,13 +290,44 @@ export function CreateSupportTicketModal({
     enabled: open && fromClosure && !!attendanceId,
     queryFn: async () => {
       const { data, error } = await (supabase.from("support_attendances" as any) as any)
-        .select("opened_at, department_id, plantao_em")
+        .select("opened_at, department_id, plantao_em, clientes:cliente_id(id, nome_fantasia, razao_social, codigo_sequencial, cnpj)")
         .eq("id", attendanceId)
         .maybeSingle();
       if (error) throw error;
-      return data as { opened_at: string; department_id: string | null; plantao_em: string | null } | null;
+      return data as {
+        opened_at: string;
+        department_id: string | null;
+        plantao_em: string | null;
+        clientes: { id: string; nome_fantasia: string | null; razao_social: string | null; codigo_sequencial: number | null; cnpj: string | null } | null;
+      } | null;
     },
   });
+
+  // DEM-0465: o cliente vindo da tela de origem pode chegar DEPOIS da abertura (em grupo,
+  // o vínculo é uma consulta própria do ChatHeader), e o pré-preenchimento acima só roda
+  // na abertura — o campo ficava em branco. Em closure não existe "Trocar", então cliente
+  // vazio aqui só quer dizer "ainda não tinha chegado": completa pela prop atrasada e,
+  // na falta dela, pelo cliente do próprio atendimento, que é de quem o ticket é.
+  useEffect(() => {
+    if (!open || !fromClosure || selectedCliente) return;
+    if (closureClienteId) {
+      setSelectedCliente({
+        id: closureClienteId,
+        nome_fantasia: closureClienteNome || null,
+        razao_social: null,
+        codigo_sequencial: closureClienteCodigo || null,
+        cnpj: null,
+      } as any);
+      return;
+    }
+    if (closureAttendance?.clientes?.id) setSelectedCliente(closureAttendance.clientes as any);
+  }, [open, fromClosure, selectedCliente, closureClienteId, closureClienteNome, closureClienteCodigo, closureAttendance]);
+
+  // Mesmo atraso no produto: em grupo ele depende de uma 2ª consulta (produtos do cliente).
+  useEffect(() => {
+    if (!open || !fromClosure || produtoId || !closureProdutoId) return;
+    setProdutoId(String(closureProdutoId));
+  }, [open, fromClosure, closureProdutoId]);
 
   // Formatação pt-BR / America/Sao_Paulo (usada no painel lateral e no badge).
   const formatSpDateTime = (iso: string) =>
