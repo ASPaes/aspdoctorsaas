@@ -710,3 +710,15 @@ export function dadosDaVenda(
     origens: origens.length ? origens : unicos(contrato.origens),
   };
 }
+
+/**
+ * Chave para saber se dois telefones BR são o mesmo número: DDD + os 8 últimos
+ * dígitos, ignorando o 55 e o nono dígito (o mesmo celular aparece com e sem ele
+ * nos cadastros). `null` quando não dá um número completo.
+ */
+export function chaveTelefoneBR(fone: string | null | undefined): string | null {
+  let d = (fone ?? "").replace(/\D/g, "");
+  if (d.startsWith("55") && d.length >= 12) d = d.slice(2);
+  if (d.length !== 10 && d.length !== 11) return null;
+  return d.slice(0, 2) + d.slice(-8);
+}

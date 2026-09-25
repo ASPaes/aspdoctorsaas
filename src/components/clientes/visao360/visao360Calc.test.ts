@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
-  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda,
+  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda, chaveTelefoneBR,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -238,5 +238,16 @@ describe("vendedor e origem da venda", () => {
   });
   it("sem nada em lugar nenhum, lista vazia", () => {
     expect(dadosDaVenda([], vazioCt)).toEqual({ vendedores: [], origens: [] });
+  });
+});
+
+describe("chave de telefone", () => {
+  it("mesmo celular com e sem 55 e nono dígito", () => {
+    expect(chaveTelefoneBR("5545999812441")).toBe(chaveTelefoneBR("(45) 9981-2441"));
+    expect(chaveTelefoneBR("45 99981-2441")).toBe("4599812441");
+  });
+  it("número incompleto não vira chave", () => {
+    expect(chaveTelefoneBR("99812441")).toBeNull();
+    expect(chaveTelefoneBR("")).toBeNull();
   });
 });

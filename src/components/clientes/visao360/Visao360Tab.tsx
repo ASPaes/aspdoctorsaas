@@ -668,13 +668,16 @@ export default function Visao360Tab() {
             }}
           />
         )}
+        {c && (
         <EnviarSegundaViaDialog
           open={segundaVia.aberto}
           onOpenChange={(o) => setSegundaVia((s) => ({ ...s, aberto: o }))}
           titulos={titulos}
-          conversas={conversas}
+          cliente={{ id: c.id, tenant_id: c.tenant_id, nome, telefone_whatsapp: c.telefone_whatsapp }}
+          contatos={contatos.data ?? []}
           preSelecionado={segundaVia.titulo}
         />
+        )}
         {novoTicket && c && (
           <CreateSupportTicketModal
             open={novoTicket}
