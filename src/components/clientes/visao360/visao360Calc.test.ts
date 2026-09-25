@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
+  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -171,5 +172,41 @@ describe("financeiro", () => {
     expect(ev.map((e) => e.id)).toEqual(["f-v-v", "f-p-p"]);
     expect(ev[1].tags[0].texto).toBe("3 dias de atraso");
     expect(ev[0].titulo).toContain("venceu sem pagamento");
+  });
+});
+
+describe("nota de saúde", () => {
+  const HOJE = new Date("2026-09-25T15:00:00Z");
+  const base = { atendimentos: [], tickets: [], titulos: [], financeiroLigado: false, mrrAtual: 100, mrr12m: 100, cancelado: false, hoje: HOJE };
+
+  it("cliente ideal com contato recente e avaliação 5 fica perto de 100", () => {
+    const s = calcularSaude({ ...base, mrrAtual: 110, atendimentos: [at({ opened_at: "2026-09-20T12:00:00Z", closed_at: "2026-09-20T13:00:00Z", csat_score: 5 })] }, PESOS_SAUDE_PADRAO);
+    expect(s.nota).toBe(100);
+    expect(s.faixa.rotulo).toBe("Saudável");
+  });
+  it("financeiro desligado sai da conta e os pesos se redistribuem", () => {
+    const s = calcularSaude(base, PESOS_SAUDE_PADRAO);
+    const fin = s.fatores.find((f) => f.chave === "financeiro")!;
+    expect(fin.aplica).toBe(false);
+    expect(s.fatores.filter((f) => f.aplica).reduce((a, f) => a + f.pesoEfetivo, 0)).toBeGreaterThanOrEqual(99);
+  });
+  it("cancelado zera a receita e sem contato derruba o engajamento", () => {
+    const s = calcularSaude({ ...base, cancelado: true }, PESOS_SAUDE_PADRAO);
+    expect(s.fatores.find((f) => f.chave === "receita")!.nota).toBe(0);
+    expect(s.fatores.find((f) => f.chave === "engajamento")!.nota).toBe(20);
+  });
+  it("vencido há 40 dias com pontualidade 50% dá financeiro 38", () => {
+    const s = calcularSaude({
+      ...base, financeiroLigado: true,
+      titulos: [
+        { id: "1", numero_documento: null, parcela: null, emissao: null, vencimento: "2026-08-16", valor: 100, valor_pago: null, pago_em: null, situacao: "atrasado", dias_atraso: 40, boleto_gerado: true, codigo_barras: null, pix_copia_cola: null, numero_nf: null, origem_os_id: null, aberto: true },
+        { id: "2", numero_documento: null, parcela: null, emissao: null, vencimento: "2026-07-10", valor: 100, valor_pago: 100, pago_em: "2026-07-10", situacao: "pago", dias_atraso: 0, boleto_gerado: true, codigo_barras: null, pix_copia_cola: null, numero_nf: null, origem_os_id: null, aberto: false },
+        { id: "3", numero_documento: null, parcela: null, emissao: null, vencimento: "2026-06-10", valor: 100, valor_pago: 100, pago_em: "2026-06-20", situacao: "pago", dias_atraso: 0, boleto_gerado: true, codigo_barras: null, pix_copia_cola: null, numero_nf: null, origem_os_id: null, aberto: false },
+      ],
+    }, PESOS_SAUDE_PADRAO);
+    expect(s.fatores.find((f) => f.chave === "financeiro")!.nota).toBe(38);
+  });
+  it("pesos gravados incompletos são completados com o padrão", () => {
+    expect(normalizarPesos({ satisfacao: 40 } as any)).toEqual({ ...PESOS_SAUDE_PADRAO, satisfacao: 40 });
   });
 });

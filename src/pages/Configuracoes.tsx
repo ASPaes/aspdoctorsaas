@@ -63,6 +63,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import AccessDenied from "@/pages/AccessDenied";
 import { SECTION_TO_RESOURCE } from "@/components/configuracoes/SettingsSidebar";
 import NotificacoesTab from "@/components/configuracoes/NotificacoesTab";
+import SaudeClienteConfig from "@/components/configuracoes/SaudeClienteConfig";
 
 
 const schema = z.object({
@@ -107,6 +108,7 @@ const SECTION_META: Record<string, { breadcrumb: string[]; title: string; descri
   kb: { breadcrumb: ["Atendimento", "Base de conhecimento"], title: "Base de conhecimento", description: "Artigos e documentos para suporte ao atendimento." },
   importacao: { breadcrumb: ["Dados", "Importação"], title: "Importação de Dados", description: "Importe sua base de clientes a partir de um arquivo CSV ou planilha." },
   geral: { breadcrumb: ["Sistema", "Geral"], title: "Geral", description: "Fuso horário e configurações globais do sistema." },
+  "saude-cliente": { breadcrumb: ["Sistema", "Saúde do cliente"], title: "Saúde do cliente", description: "Quanto cada fator pesa na nota de saúde que aparece em Clientes › Visão 360°." },
   setup: { breadcrumb: ["Sistema", "Guia de configuração"], title: "Guia de configuração", description: "Passos recomendados para configurar a plataforma." },
   notificacoes: { breadcrumb: ["Sistema", "Théo"], title: "Théo", description: "O Théo é quem envia todos os avisos da plataforma — do pulso diário aos alertas críticos. Configure aqui quem recebe cada aviso e por quais canais." },
   integracoes: { breadcrumb: ["Integrações"], title: "Integrações", description: "Sistemas conectados ao DoctorSaaS. Clique numa integração para configurar a conexão." },
@@ -470,6 +472,8 @@ export default function Configuracoes() {
         );
       case "tickets-config":
         return <TicketSettingsTab />;
+      case "saude-cliente":
+        return <SaudeClienteConfig />;
       case "geral":
         return <ChatTimezoneSelector />;
       case "setup":

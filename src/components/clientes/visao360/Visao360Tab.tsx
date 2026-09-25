@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
-import { usePortao } from "@/hooks/usePortao";
+import { useEhAdmin, usePortao } from "@/hooks/usePortao";
 import { lazyWithReload } from "@/lib/staleChunkReload";
 import { filtroOrBuscaCliente } from "@/lib/buscaCliente";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
@@ -22,17 +22,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useTickets360,
+  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useSaudePesos, useTickets360,
   type ClienteBusca,
 } from "./useVisao360";
 import {
-  brl, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
+  brl, calcularSaude, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
   type Periodo,
 } from "./visao360Calc";
 import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
 import { LinhaDoTempo, MapaDeContato, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
 import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360Listas";
 import { FinanceiroSubAba } from "./Visao360Financeiro";
+import { SaudeDoCliente } from "./Visao360Saude";
 
 // Os dois pesam: o detalhe do ticket tem 2.600 linhas. Só descem quando alguém clica.
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
@@ -184,6 +185,7 @@ export default function Visao360Tab() {
   const clienteId = sp.get("cliente");
   const podeChat = usePortao("atendimento_chat");
   const podeTicket = usePortao("tickets");
+  const ehAdmin = useEhAdmin();
 
   const escolher = useCallback((id: string) => {
     const p = new URLSearchParams(sp);
@@ -238,6 +240,20 @@ export default function Visao360Tab() {
   const eventos = useMemo(
     () => montarLinhaDoTempo(listaAts, listaTks, movimentos, nomeAgente, per, titulos),
     [listaAts, listaTks, movimentos, nomeAgente, per, titulos],
+  );
+
+  // Nota de saúde: só depois que tudo que entra nela chegou, para o anel não
+  // aparecer com um número e mudar para outro um segundo depois.
+  const pesosQ = useSaudePesos(c?.tenant_id ?? null);
+  const pronto = !!c && ats.isSuccess && tks.isSuccess && contrato.isSuccess && !fin.isLoading && pesosQ.isSuccess;
+  const saude = useMemo(
+    () => pronto
+      ? calcularSaude({
+          atendimentos: listaAts, tickets: listaTks, titulos, financeiroLigado: finHab,
+          mrrAtual, mrr12m: mrr12, cancelado: !!c?.cancelado, hoje: new Date(),
+        }, pesosQ.data!.pesos)
+      : null,
+    [pronto, listaAts, listaTks, titulos, finHab, mrrAtual, mrr12, c?.cancelado, pesosQ.data],
   );
 
   const proximos: ProximoEvento[] = useMemo(() => {
@@ -353,7 +369,7 @@ export default function Visao360Tab() {
       <section
         ref={heroRef}
         onPointerMove={moverLuz}
-        className="relative grid gap-5 overflow-hidden rounded-2xl bg-slate-900 p-5 text-slate-200 sm:p-6"
+        className="relative grid items-center gap-5 overflow-hidden lg:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] rounded-2xl bg-slate-900 p-5 text-slate-200 sm:p-6"
         style={{
           backgroundImage:
             "radial-gradient(420px 220px at var(--mx,70%) var(--my,0%), rgba(255,255,255,.07), transparent 70%)," +
@@ -369,6 +385,7 @@ export default function Visao360Tab() {
           </div>
         ) : (
           <>
+            <div className="grid min-w-0 gap-5">
             <div className="flex min-w-0 items-center gap-4">
               <div className="grid h-16 w-16 flex-none place-items-center rounded-2xl bg-gradient-to-br from-emerald-500 to-sky-500 text-2xl font-extrabold text-white shadow-[0_10px_30px_-10px_rgba(34,197,94,.6)]">
                 {iniciais(nome)}
@@ -463,6 +480,8 @@ export default function Visao360Tab() {
                 <FileText className="h-4 w-4" />Abrir ficha
               </button>
             </div>
+            </div>
+            {saude && <div className="relative z-[1] lg:row-span-2"><SaudeDoCliente saude={saude} podeAjustar={ehAdmin} personalizado={pesosQ.data?.personalizado ?? false} /></div>}
           </>
         )}
       </section>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
-import type { Atendimento360, Movimento360, Produto360, Ticket360, Titulo360 } from "./visao360Calc";
+import { normalizarPesos, type Atendimento360, type Movimento360, type PesosSaude, type Produto360, type Ticket360, type Titulo360 } from "./visao360Calc";
 
 /**
  * Tudo o que a Visão 360° mostra de um cliente. Cada lista é buscada INTEIRA
@@ -280,6 +280,27 @@ export function useFinanceiro360(clienteId: string | null, tenantId: string | nu
       });
       const titulos = [...(ab.data ?? []).map((r: any) => norm(r, true)), ...hi.map((r) => norm(r, false))];
       return { habilitado: true, atualizadoEm: (leituras[leituras.length - 1] as string) ?? null, titulos };
+    },
+  });
+}
+
+/**
+ * Pesos da nota de saúde da empresa (`configuracoes.saude_cliente_pesos`).
+ * Sem linha, sem coluna ou com erro, vale o padrão da plataforma: a nota nunca
+ * deixa de aparecer por causa da configuração.
+ */
+export function useSaudePesos(tenantId: string | null) {
+  return useQuery({
+    queryKey: ["visao360_saude_pesos", tenantId],
+    enabled: !!tenantId,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<{ pesos: PesosSaude; personalizado: boolean }> => {
+      const { data, error } = await (supabase.from("configuracoes" as any) as any)
+        .select("saude_cliente_pesos")
+        .eq("tenant_id", tenantId)
+        .maybeSingle();
+      if (error || !data?.saude_cliente_pesos) return { pesos: normalizarPesos(null), personalizado: false };
+      return { pesos: normalizarPesos(data.saude_cliente_pesos), personalizado: true };
     },
   });
 }

@@ -34,6 +34,9 @@ export const SECTION_TO_RESOURCE: Record<string, string> = {
   "permissoes": "cfg.permissoes",
   // Sistema
   "geral": "cfg.geral",
+  // Mesmo portão de Geral: é configuração da empresa, do admin, e evita uma
+  // chave nova no RBAC só para uma tela de pesos.
+  "saude-cliente": "cfg.geral",
   "setup": "cfg.setup",
   "notificacoes": "cfg.notificacoes",
   // Atendimento
@@ -131,6 +134,7 @@ export default function SettingsSidebar({ activeSection, onSectionChange, isAdmi
         {
           items: [
             { value: "geral", label: "Geral" },
+            { value: "saude-cliente", label: "Saúde do cliente" },
             { value: "notificacoes", label: "Théo" },
             { value: "setup", label: "Guia de configuração" },
           ],
