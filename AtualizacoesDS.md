@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 24/09
 
+- 🔧 **No celular, mensagem que responde outra saía pela lateral da tela** — Quando alguém responde citando uma mensagem anterior, o trecho citado esticava o balão e parte da conversa ficava fora da tela, cortada na borda direita — pior ainda quando a mensagem citada tinha menções. Agora o trecho citado respeita a largura do aparelho e o balão volta para dentro da tela. Junto disso, a barra de rolagem que aparecia por cima dos selos no topo da conversa (Ativa, setor, número) deixou de aparecer, e a faixa ganhou um pouco mais de espaço. No computador nada muda.
+
 - 🆕 **Resumo da IA vai para o chat com um clique** — Nos **Detalhes** da conversa, o resumo gerado pela IA ganhou o botão **Enviar para o chat**: em conversa individual, logo abaixo do resumo na seção **Resumos**; em grupo, no rodapé do resumo aberto na janela **Resumo do grupo com IA**, ao lado de "Copiar resumo". O texto vai para o campo de mensagem já formatado para o WhatsApp, com títulos em negrito e itens em lista, sem precisar copiar e colar. Nada é enviado sozinho: o atendente revisa e envia. No grupo, as correções feitas no resumo vão junto, mesmo antes de salvar.
 
 - 🔧 **Aviso de pausa não saía no horário de almoço** — Quando o setor tem intervalo de almoço configurado no horário de atendimento, a mensagem automática da pausa (ex.: "Almoço") não era enviada ao cliente que escrevia nesse intervalo, fosse texto, áudio, imagem ou resposta a um modelo de mensagem. Agora o cliente recebe o aviso da pausa em qualquer horário, uma vez por pausa, como já acontecia no resto do dia.
