@@ -10,6 +10,7 @@
 // `oem_sync_fila.payload->>'fonte'`); o rótulo mora aqui, junto dos outros.
 export const ORIGEM_DO_PEDIDO: Record<string, string> = {
   calculadora: "Integração Calculadora",
+  venda_inicial: "Venda inicial",
 };
 
 export const rotuloDaFonte = (fonte: string | null | undefined): string | null =>

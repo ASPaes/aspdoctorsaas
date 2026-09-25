@@ -123,6 +123,13 @@ export default function HistoricoModulosProduto({ clienteProdutoId }: { clienteP
                       </TableCell>
                       <TableCell className="font-medium">
                         {e.modulo_nome}
+                        {/* Módulo que veio junto com o produto não é up-sell:
+                            sem este selo as duas vendas pareciam iguais. */}
+                        {e.fonte === "venda_inicial" && (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            Venda inicial
+                          </span>
+                        )}
                         {e.acao === "preco" && (
                           <span className="block text-xs font-normal text-muted-foreground tabular-nums">
                             {brl(Number(e.vlr_custo_anterior || 0))} → {brl(Number(e.vlr_custo || 0))} por licença

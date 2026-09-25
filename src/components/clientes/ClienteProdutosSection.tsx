@@ -47,6 +47,7 @@ import SugestaoMRRDialog from "./SugestaoMRRDialog";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import HistoricoModulosProduto from "./HistoricoModulosProduto";
+import ModulosDaVendaSection, { type ModulosDaVenda, modulosParaGravar } from "./ModulosDaVendaSection";
 import ContratoAnexoSection, {
   type ContratoAnexo,
   type AnexoTipo,
@@ -1839,12 +1840,16 @@ function ProdutoDialog({
   const [formaPagAtivacaoId, setFormaPagAtivacaoId] = useState<string>("");
   const [formaPagMensalidadeId, setFormaPagMensalidadeId] = useState<string>("");
   const [observacoesContratuais, setObservacoesContratuais] = useState("");
+  // Módulos contratados junto com o produto (só na inclusão).
+  const [modulosVenda, setModulosVenda] = useState<ModulosDaVenda>({});
 
   // Fornecedor padrão do cadastro do produto. Só preenche campo VAZIO: quem já
   // escolheu um fornecedor à mão não tem a escolha reescrita — na base há
   // produto atendido por mais de um fornecedor (PDV Legal, ASP Sistemas).
   const handleProdutoChange = (v: string) => {
     setProdutoId(v);
+    // Módulo é do catálogo do produto: trocar o produto invalida a escolha.
+    if (v !== produtoId) setModulosVenda({});
     if (fornecedorId) return;
     const padrao = produtos.find(p => String(p.id) === v)?.fornecedor_id;
     if (padrao != null) setFornecedorId(String(padrao));
@@ -2047,6 +2052,7 @@ function ProdutoDialog({
       setObservacoesContratuais(e?.observacoes_contratuais ?? "");
       setStagedFiles([]);
       setStagedTipo("contrato");
+      setModulosVenda({});
       setTimeout(() => setDataProximoReajuste(e?.data_proximo_reajuste ?? ""), 0);
     }
   }, [open, edit]);
@@ -2165,6 +2171,9 @@ function ProdutoDialog({
           forma_pagamento_ativacao_id: formaPagAtivacaoId ? Number(formaPagAtivacaoId) : null,
           forma_pagamento_mensalidade_id: formaPagMensalidadeId ? Number(formaPagMensalidadeId) : null,
           observacoes_contratuais: observacoesContratuais || null,
+          // Nascem na mesma transação do produto, como venda inicial: sem
+          // upsell e sem mandar o contrato ao Omie antes da pessoa decidir.
+          modulos: modulosParaGravar(modulosVenda),
         };
         const { data: novoCliProdId, error } = await (supabase.rpc as any)("create_cliente_produto_with_contract", {
           p_cliente_id: clienteId,
@@ -2463,6 +2472,20 @@ function ProdutoDialog({
             </div>
           </div>
         </div>
+
+        {!isEdit && produtoId && (
+          <>
+            <Separator />
+            <ModulosDaVendaSection
+              clienteId={clienteId}
+              produtoId={produtoId}
+              tenantId={resolvedTenantId}
+              vlrMensalProduto={vlrMensal}
+              value={modulosVenda}
+              onChange={setModulosVenda}
+            />
+          </>
+        )}
 
         <Separator />
 
