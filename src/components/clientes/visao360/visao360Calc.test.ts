@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos,
+  FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
   type Atendimento360, type Movimento360, type Produto360, type Ticket360,
 } from "./visao360Calc";
@@ -134,5 +134,42 @@ describe("tabela de atendimentos: funil e ordenação", () => {
   it("período por dia de São Paulo", () => {
     const f = { ...FILTROS_ATENDIMENTO_VAZIOS, aberto: { de: "2026-09-11", ate: "2026-09-12" } };
     expect(ids(filtrarOrdenarAtendimentos(lista, f, { coluna: "aberto", dir: "asc" }, nome))).toEqual(["3", "2"]);
+  });
+});
+
+describe("financeiro", () => {
+  const tit = (o: Partial<Titulo360>): Titulo360 => ({
+    id: "t", numero_documento: "000918", parcela: "1/1", emissao: "2026-08-20", vencimento: "2026-09-12", valor: 100,
+    valor_pago: null, pago_em: null, situacao: "a_vencer", dias_atraso: 0, boleto_gerado: true, codigo_barras: null,
+    pix_copia_cola: null, numero_nf: null, origem_os_id: null, aberto: true, ...o,
+  });
+  const HOJE = new Date("2026-09-25T15:00:00Z");
+
+  it("em aberto, vencido, pago em 12 meses e pontualidade", () => {
+    const k = kpisFinanceiro([
+      tit({ id: "1", situacao: "atrasado", dias_atraso: 13, valor: 150 }),
+      tit({ id: "2", situacao: "a_vencer", vencimento: "2026-10-10", valor: 150 }),
+      tit({ id: "3", situacao: "pago", aberto: false, vencimento: "2026-08-10", pago_em: "2026-08-10", valor: 140 }),
+      tit({ id: "4", situacao: "pago", aberto: false, vencimento: "2026-07-10", pago_em: "2026-07-18", valor: 140 }),
+      tit({ id: "5", situacao: "pago", aberto: false, vencimento: "2025-01-10", pago_em: "2025-01-10", valor: 999 }),
+    ], HOJE);
+    expect(k.abertoValor).toBe(300);
+    expect(k.vencidoValor).toBe(150);
+    expect(k.maiorAtraso).toBe(13);
+    expect(k.pago12Valor).toBe(280);
+    expect(k.pontualidade).toBe(50);
+    expect(k.atrasoMedio).toBe(8);
+    expect(k.proximo?.id).toBe("2");
+  });
+
+  it("linha do tempo: pagamento com atraso e vencido sem pagamento", () => {
+    const ev = montarLinhaDoTempo([], [], [], () => null, SET, [
+      tit({ id: "p", situacao: "pago", aberto: false, vencimento: "2026-09-05", pago_em: "2026-09-08", valor_pago: 100 }),
+      tit({ id: "v", situacao: "atrasado", vencimento: "2026-09-12", dias_atraso: 13 }),
+      tit({ id: "f", situacao: "a_vencer", vencimento: "2026-09-28" }),
+    ]);
+    expect(ev.map((e) => e.id)).toEqual(["f-v-v", "f-p-p"]);
+    expect(ev[1].tags[0].texto).toBe("3 dias de atraso");
+    expect(ev[0].titulo).toContain("venceu sem pagamento");
   });
 });

@@ -200,7 +200,7 @@ export function mapaDeContato(ats: Atendimento360[], hoje: Date) {
   return dias;
 }
 
-export type TipoEvento = "atendimento" | "avaliacao" | "ticket" | "contrato";
+export type TipoEvento = "atendimento" | "avaliacao" | "ticket" | "contrato" | "financeiro";
 
 export interface Evento360 {
   id: string;
@@ -247,6 +247,58 @@ export function minutos(seg: number | null | undefined): string {
 
 export function brl(v: number | null | undefined): string {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+/* ------------------------------------------------------------ financeiro */
+
+/**
+ * Título a receber do cliente. `aberto` vem de `vw_fin_titulos_abertos`, que só
+ * devolve o que a origem reconfirmou na última leitura; o histórico (pago,
+ * cancelado) vem da tabela. Título em aberto lido da tabela crua pode ser zumbi,
+ * apagado no ERP e parado aqui para sempre, então a tela nunca o usa.
+ */
+export interface Titulo360 {
+  id: string;
+  numero_documento: string | null;
+  parcela: string | null;
+  emissao: string | null;
+  vencimento: string;
+  valor: number;
+  valor_pago: number | null;
+  pago_em: string | null;
+  situacao: "a_vencer" | "vence_hoje" | "atrasado" | "pago" | "parcial" | "cancelado" | string;
+  dias_atraso: number;
+  boleto_gerado: boolean;
+  codigo_barras: string | null;
+  pix_copia_cola: string | null;
+  numero_nf: string | null;
+  origem_os_id: string | null;
+  aberto: boolean;
+}
+
+export function kpisFinanceiro(titulos: Titulo360[], hoje: Date) {
+  const abertos = titulos.filter((t) => t.aberto);
+  const vencidos = abertos.filter((t) => t.situacao === "atrasado");
+  const corte = diaSP(new Date(hoje.getTime() - 365 * DIA));
+  const pagos12 = titulos.filter((t) => (t.situacao === "pago" || t.situacao === "parcial") && t.pago_em && t.pago_em >= corte);
+  const atrasos = pagos12.map((t) => Math.round((new Date(t.pago_em as string).getTime() - new Date(t.vencimento).getTime()) / DIA));
+  const atrasados = atrasos.filter((d) => d > 0);
+  const soma = (xs: Titulo360[], f: (t: Titulo360) => number) => Math.round(xs.reduce((a, t) => a + f(t), 0) * 100) / 100;
+  const proximo = abertos
+    .filter((t) => t.situacao !== "atrasado")
+    .sort((a, b) => a.vencimento.localeCompare(b.vencimento))[0] ?? null;
+  return {
+    abertoValor: soma(abertos, (t) => t.valor),
+    abertoQtd: abertos.length,
+    vencidoValor: soma(vencidos, (t) => t.valor),
+    vencidoQtd: vencidos.length,
+    maiorAtraso: vencidos.reduce((m, t) => Math.max(m, t.dias_atraso), 0),
+    pago12Valor: soma(pagos12, (t) => t.valor_pago ?? t.valor),
+    pago12Qtd: pagos12.length,
+    pontualidade: pagos12.length ? Math.round(((pagos12.length - atrasados.length) / pagos12.length) * 100) : null,
+    atrasoMedio: media(atrasados),
+    proximo,
+  };
 }
 
 /* ---------------------------------------------- tabela de atendimentos */
@@ -366,8 +418,39 @@ export function montarLinhaDoTempo(
   movs: Movimento360[],
   nomeAgente: (uid: string | null) => string | null,
   p: Periodo,
+  titulos: Titulo360[] = [],
 ): Evento360[] {
   const ev: Evento360[] = [];
+
+  // Financeiro: o pagamento (no dia em que entrou) e o vencimento que passou
+  // sem pagamento. Título a vencer não é acontecimento, é agenda.
+  for (const t of titulos) {
+    const doc = [t.numero_documento, t.parcela].filter(Boolean).join(" · ");
+    if (t.pago_em && (t.situacao === "pago" || t.situacao === "parcial")) {
+      const quando = `${t.pago_em}T15:00:00Z`;
+      if (dentro(quando, p)) {
+        const atraso = Math.round((new Date(t.pago_em).getTime() - new Date(t.vencimento).getTime()) / DIA);
+        ev.push({
+          id: `f-${t.id}-p`, tipo: "financeiro", quando,
+          titulo: `${t.situacao === "parcial" ? "Pagamento parcial" : "Pagamento"} de ${brl(t.valor_pago ?? t.valor)}`,
+          detalhe: [`Vencimento ${t.vencimento.split("-").reverse().join("/")}`, doc || null].filter(Boolean).join(" · "),
+          tags: atraso > 0
+            ? [{ texto: `${atraso} dia${atraso > 1 ? "s" : ""} de atraso`, tom: "alerta" }]
+            : [{ texto: "Em dia", tom: "ok" }],
+        });
+      }
+    } else if (t.situacao === "atrasado") {
+      const quando = `${t.vencimento}T15:00:00Z`;
+      if (dentro(quando, p)) {
+        ev.push({
+          id: `f-${t.id}-v`, tipo: "financeiro", quando,
+          titulo: `Título de ${brl(t.valor)} venceu sem pagamento`,
+          detalhe: doc || null,
+          tags: [{ texto: `Em atraso há ${t.dias_atraso} dia${t.dias_atraso === 1 ? "" : "s"}`, tom: "ruim" }],
+        });
+      }
+    }
+  }
 
   for (const a of ats) {
     const agente = nomeAgente(a.assigned_to);

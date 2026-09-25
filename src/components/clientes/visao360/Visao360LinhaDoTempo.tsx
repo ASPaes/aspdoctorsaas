@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, parseISO, isToday, isYesterday, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageCircle, Ticket, Star, FileText, CalendarClock, ShieldCheck, Phone, Mail } from "lucide-react";
+import { MessageCircle, Ticket, Star, FileText, CalendarClock, ShieldCheck, Phone, Mail, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Cartao, Chips, Etiqueta, Vazio } from "./Visao360Ui";
@@ -13,6 +13,7 @@ const ICONE: Record<TipoEvento, { Icon: typeof MessageCircle; cls: string }> = {
   ticket: { Icon: Ticket, cls: "bg-sky-500/15 text-sky-700 dark:text-sky-400" },
   avaliacao: { Icon: Star, cls: "bg-violet-500/15 text-violet-700 dark:text-violet-400" },
   contrato: { Icon: FileText, cls: "bg-muted text-muted-foreground" },
+  financeiro: { Icon: Receipt, cls: "bg-amber-500/15 text-amber-700 dark:text-amber-400" },
 };
 
 function rotuloDia(iso: string) {
@@ -63,6 +64,7 @@ export function LinhaDoTempo({
             { id: "ticket", label: "Tickets", qtd: contagem.ticket ?? 0 },
             { id: "avaliacao", label: "Avaliações", qtd: contagem.avaliacao ?? 0 },
             { id: "contrato", label: "Contrato", qtd: contagem.contrato ?? 0 },
+            ...(contagem.financeiro ? [{ id: "financeiro" as const, label: "Financeiro", qtd: contagem.financeiro }] : []),
           ]}
         />
       }
@@ -194,7 +196,7 @@ export interface ProximoEvento {
   data: string;
   titulo: string;
   sub: string;
-  icone: "reajuste" | "certificado";
+  icone: "reajuste" | "certificado" | "boleto";
 }
 
 export function ProximosEventos({ eventos }: { eventos: ProximoEvento[] }) {
@@ -207,7 +209,7 @@ export function ProximosEventos({ eventos }: { eventos: ProximoEvento[] }) {
           {eventos.map((e, i) => {
             const d = parseISO(e.data);
             const falta = differenceInCalendarDays(d, new Date());
-            const Icon = e.icone === "certificado" ? ShieldCheck : CalendarClock;
+            const Icon = e.icone === "certificado" ? ShieldCheck : e.icone === "boleto" ? Receipt : CalendarClock;
             return (
               <li key={i} className={cn("grid grid-cols-[44px_1fr] items-center gap-2.5 py-2", i > 0 && "border-t")}>
                 <div className="rounded-lg border py-0.5 text-center leading-tight">

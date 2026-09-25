@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
-import type { Atendimento360, Movimento360, Produto360, Ticket360 } from "./visao360Calc";
+import type { Atendimento360, Movimento360, Produto360, Ticket360, Titulo360 } from "./visao360Calc";
 
 /**
  * Tudo o que a Visão 360° mostra de um cliente. Cada lista é buscada INTEIRA
@@ -29,6 +29,7 @@ export interface Cliente360 {
   cidade: string | null;
   uf: string | null;
   unidade: string | null;
+  tenant_id: string | null;
 }
 
 export function useCliente360(clienteId: string | null) {
@@ -38,7 +39,7 @@ export function useCliente360(clienteId: string | null) {
     staleTime: STALE,
     queryFn: async (): Promise<Cliente360 | null> => {
       const { data, error } = await (supabase.from("clientes") as any)
-        .select(`id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado,
+        .select(`id, tenant_id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado,
           data_cadastro, data_ativacao, data_cancelamento, telefone_whatsapp, cert_a1_vencimento,
           cidades:cidade_id(nome), estados:estado_id(sigla), unidades_base:unidade_base_id(nome)`)
         .eq("id", clienteId)
@@ -227,4 +228,58 @@ export interface ClienteBusca {
   cnpj: string | null;
   codigo_sequencial: number;
   cancelado: boolean;
+}
+
+const COLS_TITULO =
+  "id, numero_documento, parcela, emissao, vencimento, valor, valor_pago, pago_em, situacao, boleto_gerado, codigo_barras, pix_copia_cola, numero_nf, origem_os_id";
+
+/**
+ * Títulos a receber do cliente, quando a empresa tem o Financeiro ligado.
+ *
+ * `habilitado` vem de `fin_sync_estado`: sem nenhuma leitura registrada para o
+ * tenant, o módulo não está ligado (ou o RLS não deixa ver) e a sub-aba some.
+ * Em aberto sai da VIEW, que descarta o título apagado no ERP; o histórico sai
+ * da tabela, só com o que já terminou (pago, parcial, cancelado).
+ */
+export function useFinanceiro360(clienteId: string | null, tenantId: string | null) {
+  return useQuery({
+    queryKey: ["visao360_financeiro", clienteId, tenantId],
+    enabled: !!clienteId && !!tenantId,
+    staleTime: STALE,
+    queryFn: async () => {
+      const { data: estados, error: eErr } = await (supabase.from("fin_sync_estado" as any) as any)
+        .select("origem, ultima_leitura_ok")
+        .eq("tenant_id", tenantId);
+      if (eErr) throw eErr;
+      const leituras = (estados ?? []).map((e: any) => e.ultima_leitura_ok).filter(Boolean).sort();
+      if (!(estados ?? []).length) return { habilitado: false, atualizadoEm: null, titulos: [] as Titulo360[] };
+
+      const [ab, hi] = await Promise.all([
+        (supabase.from("vw_fin_titulos_abertos" as any) as any)
+          .select(`${COLS_TITULO}, dias_atraso`)
+          .eq("tenant_id", tenantId)
+          .eq("cliente_id", clienteId),
+        fetchAllRows<any>(() =>
+          (supabase.from("fin_titulos" as any) as any)
+            .select(COLS_TITULO)
+            .eq("tenant_id", tenantId)
+            .eq("cliente_id", clienteId)
+            .in("situacao", ["pago", "parcial", "cancelado"])
+            .is("removido_na_origem_em", null)
+            .order("vencimento", { ascending: false }),
+        ),
+      ]);
+      if (ab.error) throw ab.error;
+      const norm = (r: any, aberto: boolean): Titulo360 => ({
+        ...r,
+        valor: Number(r.valor) || 0,
+        valor_pago: r.valor_pago != null ? Number(r.valor_pago) : null,
+        dias_atraso: Number(r.dias_atraso) || 0,
+        boleto_gerado: !!r.boleto_gerado,
+        aberto,
+      });
+      const titulos = [...(ab.data ?? []).map((r: any) => norm(r, true)), ...hi.map((r) => norm(r, false))];
+      return { habilitado: true, atualizadoEm: (leituras[leituras.length - 1] as string) ?? null, titulos };
+    },
+  });
 }

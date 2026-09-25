@@ -5,7 +5,7 @@ import { endOfDay, formatDistanceStrict, parseISO, startOfDay, subDays, differen
 import { ptBR } from "date-fns/locale";
 import {
   Search, MessageCircle, Ticket, FileText, MapPin, TrendingUp, Star, Clock, AlertTriangle,
-  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users,
+  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -22,16 +22,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useTickets360,
+  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useTickets360,
   type ClienteBusca,
 } from "./useVisao360";
 import {
-  brl, kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
+  brl, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
   type Periodo,
 } from "./visao360Calc";
 import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
 import { LinhaDoTempo, MapaDeContato, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
 import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360Listas";
+import { FinanceiroSubAba } from "./Visao360Financeiro";
 
 // Os dois pesam: o detalhe do ticket tem 2.600 linhas. Só descem quando alguém clica.
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
@@ -204,6 +205,10 @@ export default function Visao360Tab() {
   const agentes = useAgentes360(tid);
 
   const c = cliente.data;
+  const fin = useFinanceiro360(clienteId, c?.tenant_id ?? null);
+  const finHab = fin.data?.habilitado === true;
+  const titulos = useMemo(() => fin.data?.titulos ?? [], [fin.data]);
+  const kFin = useMemo(() => kpisFinanceiro(titulos, new Date()), [titulos]);
   useEffect(() => {
     if (c) gravarRecente({ id: c.id, nome: nomeDoCliente(c), cancelado: c.cancelado });
   }, [c]);
@@ -231,8 +236,8 @@ export default function Visao360Tab() {
     });
   }, [listaAts]);
   const eventos = useMemo(
-    () => montarLinhaDoTempo(listaAts, listaTks, movimentos, nomeAgente, per),
-    [listaAts, listaTks, movimentos, nomeAgente, per],
+    () => montarLinhaDoTempo(listaAts, listaTks, movimentos, nomeAgente, per, titulos),
+    [listaAts, listaTks, movimentos, nomeAgente, per, titulos],
   );
 
   const proximos: ProximoEvento[] = useMemo(() => {
@@ -249,19 +254,28 @@ export default function Visao360Tab() {
       const f = differenceInCalendarDays(parseISO(c.cert_a1_vencimento), hoje);
       if (f >= -30 && f <= 120) out.push({ data: c.cert_a1_vencimento, titulo: "Vencimento do certificado A1", sub: "e-CNPJ", icone: "certificado" });
     }
+    if (kFin.proximo) {
+      out.push({ data: kFin.proximo.vencimento, titulo: "Próximo vencimento", sub: brl(kFin.proximo.valor), icone: "boleto" });
+    }
     return out.sort((a, b) => (a.data < b.data ? -1 : 1));
-  }, [produtos, c]);
+  }, [produtos, c, kFin.proximo]);
 
   // O que pede atenção agora. Só aparece o que for verdade para este cliente.
   const alertas = useMemo(() => {
     const out: { tom: "ruim" | "alerta" | "info" | "ok"; Icon: typeof AlertTriangle; titulo: string; sub: string }[] = [];
     const esperando = listaAts.filter((a) => a.status === "waiting").length;
     if (esperando) out.push({ tom: "alerta", Icon: Clock, titulo: `${esperando} atendimento${esperando > 1 ? "s" : ""} na fila agora`, sub: "O cliente está esperando alguém assumir." });
+    if (kFin.vencidoQtd) out.push({
+      tom: "ruim", Icon: Receipt,
+      titulo: `${brl(kFin.vencidoValor)} vencido${kFin.vencidoQtd > 1 ? ` em ${kFin.vencidoQtd} títulos` : ""}`,
+      sub: `O mais antigo está vencido há ${kFin.maiorAtraso} dia${kFin.maiorAtraso === 1 ? "" : "s"}.`,
+    });
     const velhos = listaTks.filter((t) => !t.status_final && differenceInCalendarDays(new Date(), parseISO(t.aberto_em)) > 7);
     if (velhos.length) out.push({ tom: "ruim", Icon: Ticket, titulo: `${velhos.length} ticket${velhos.length > 1 ? "s" : ""} aberto${velhos.length > 1 ? "s" : ""} há mais de 7 dias`, sub: velhos.slice(0, 2).map((t) => t.ticket_code).filter(Boolean).join(", ") });
     const detrator = listaAts.find((a) => a.csat_score != null && a.csat_score <= 2 && differenceInCalendarDays(new Date(), parseISO(a.csat_respondido_em ?? a.closed_at ?? a.opened_at)) <= 30);
     if (detrator) out.push({ tom: "ruim", Icon: Star, titulo: `Avaliação ${detrator.csat_score} ★ nos últimos 30 dias`, sub: detrator.csat_reason ? `"${detrator.csat_reason}"` : `Atendimento ${detrator.attendance_code ?? ""}` });
     for (const p of proximos) {
+      if (p.icone === "boleto") continue; // o vencido já tem aviso próprio; a vencer é agenda, não alerta
       const f = differenceInCalendarDays(parseISO(p.data), new Date());
       if (f <= 30) out.push({
         tom: f < 0 ? "ruim" : "info",
@@ -275,7 +289,7 @@ export default function Visao360Tab() {
       if (elogio) out.push({ tom: "ok", Icon: Star, titulo: "Elogio recente", sub: `"${elogio.csat_reason}"` });
     }
     return out.slice(0, 4);
-  }, [listaAts, listaTks, proximos]);
+  }, [listaAts, listaTks, proximos, kFin]);
 
   // Conversas do cliente, da mais recente para a mais antiga, sem repetir.
   const conversas = useMemo(() => {
@@ -389,6 +403,11 @@ export default function Visao360Tab() {
                       {produtosAtivos} produto{produtosAtivos > 1 ? "s" : ""} ativo{produtosAtivos > 1 ? "s" : ""}
                     </span>
                   )}
+                  {kFin.vencidoQtd > 0 && (
+                    <span className="rounded-full bg-red-500/20 px-2.5 py-0.5 text-[11.5px] font-bold text-red-300">
+                      {kFin.vencidoQtd} título{kFin.vencidoQtd > 1 ? "s" : ""} vencido{kFin.vencidoQtd > 1 ? "s" : ""}
+                    </span>
+                  )}
                   {kTk.abertos > 0 && (
                     <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11.5px] font-bold text-amber-300">
                       {kTk.abertos} ticket{kTk.abertos > 1 ? "s" : ""} aberto{kTk.abertos > 1 ? "s" : ""}
@@ -449,7 +468,7 @@ export default function Visao360Tab() {
       </section>
 
       {/* ------------------------------------------------ números */}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", finHab ? "lg:grid-cols-3 xl:grid-cols-5" : "xl:grid-cols-4")}>
         <Numero rotulo="MRR atual" Icon={TrendingUp} carregando={contrato.isLoading}
           valor={brl(mrrAtual)}
           sub={varMrr != null ? <><b className={varMrr >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>{varMrr >= 0 ? "▲" : "▼"} {Math.abs(varMrr).toFixed(1).replace(".", ",")}%</b> em 12 meses</> : "sem histórico de 12 meses"}
@@ -478,6 +497,19 @@ export default function Visao360Tab() {
             </div>
           }
         />
+        {finHab && (
+          <Numero rotulo="Financeiro em aberto" Icon={Receipt} carregando={fin.isLoading}
+            valor={brl(kFin.abertoValor)}
+            sub={kFin.vencidoQtd
+              ? <b className="text-red-600 dark:text-red-400">{brl(kFin.vencidoValor)} vencido</b>
+              : `${kFin.abertoQtd} título${kFin.abertoQtd === 1 ? "" : "s"}, nada vencido`}
+            grafico={
+              <button type="button" onClick={() => setSubAba("financeiro")} className="mt-2 text-xs font-semibold text-primary hover:underline">
+                Ver títulos{kFin.pontualidade != null ? ` · pontualidade ${kFin.pontualidade}%` : ""}
+              </button>
+            }
+          />
+        )}
       </section>
 
       {/* ------------------------------------------------ atenção */}
@@ -510,6 +542,7 @@ export default function Visao360Tab() {
             <SubAba valor="atendimentos" qtd={listaAts.length}>Atendimentos</SubAba>
             <SubAba valor="tickets" qtd={listaTks.length}>Tickets</SubAba>
             <SubAba valor="avaliacoes" qtd={listaAts.filter((a) => a.csat_score != null).length}>Avaliações</SubAba>
+            {finHab && <SubAba valor="financeiro" qtd={kFin.abertoQtd}>Financeiro</SubAba>}
           </TabsList>
           <DateRangePicker dateRange={periodo} onDateRangeChange={(r) => setPeriodo(r)} allowAllTime align="end" />
         </div>
@@ -540,6 +573,11 @@ export default function Visao360Tab() {
             <TabsContent value="avaliacoes" className="mt-4">
               <AvaliacoesLista atendimentos={listaAts} periodo={per} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} />
             </TabsContent>
+            {finHab && (
+              <TabsContent value="financeiro" className="mt-4">
+                <FinanceiroSubAba titulos={titulos} atualizadoEm={fin.data?.atualizadoEm ?? null} />
+              </TabsContent>
+            )}
           </>
         )}
       </Tabs>
