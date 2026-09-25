@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, parseISO, isToday, isYesterday, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MessageCircle, Ticket, Star, FileText, CalendarClock, ShieldCheck, Phone, Mail, Receipt } from "lucide-react";
+import { MessageCircle, Ticket, Star, FileText, CalendarClock, ShieldCheck, Phone, Mail, Receipt, SquareArrowOutUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Cartao, Chips, Etiqueta, Vazio } from "./Visao360Ui";
@@ -113,9 +113,19 @@ export function LinhaDoTempo({
                     {e.citacao && (
                       <p className="mt-1.5 border-l-2 pl-2.5 text-[12.5px] italic text-muted-foreground">"{e.citacao}"</p>
                     )}
-                    {e.tags.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {(e.tags.length > 0 || clicavel) && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {e.tags.map((t, k) => <Etiqueta key={k} tom={t.tom}>{t.texto}</Etiqueta>)}
+                        {clicavel && (
+                          <button
+                            type="button"
+                            onClick={() => (e.ticketId ? onAbrirTicket(e.ticketId) : e.attendanceId && onAbrirAtendimento(e.attendanceId))}
+                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                          >
+                            <SquareArrowOutUpRight className="h-3 w-3" />
+                            {e.ticketId ? "Abrir ticket" : "Ver atendimento"}
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
