@@ -3,13 +3,13 @@ import { lazyWithReload } from "@/lib/staleChunkReload";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { normalizarBuscaCliente } from "@/lib/buscaCliente";
+import { filtroOrBuscaCliente as buildSearchOr } from "@/lib/buscaCliente";
 import { useLookups } from "@/hooks/useLookups";
 import { useClientesFilters, storeNavIds } from "@/hooks/useClientesFilters";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { format, parseISO } from "date-fns";
-import { cn, escapeLike } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 
@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck, GitCompareArrows, ClipboardList } from "lucide-react";
+import { Plus, Search, Filter, ChevronDown, ChevronUp, ArrowUpDown, ArrowUp, ArrowDown, Users, TrendingUp, UserPlus, X, Activity, MessageCircle, Check, Percent, Download, ShieldCheck, GitCompareArrows, ClipboardList, Orbit } from "lucide-react";
 import MovimentosMrrTab from "@/components/clientes/MovimentosMrrTab";
 import ReajustesTab from "@/components/clientes/ReajustesTab";
 import AprovacaoOemTab from "@/components/clientes/AprovacaoOemTab";
@@ -36,6 +36,9 @@ const DivergenciasHiperTab = lazyWithReload(() => import("@/components/clientes/
 // Sob demanda pelo mesmo motivo: a tela de saneamento só interessa a quem tem
 // cadastro incompleto, e no bundle inicial ela custaria a todos.
 const CadastroIncompletoTab = lazyWithReload(() => import("@/components/clientes/CadastroIncompletoTab"));
+// Sob demanda: a Visão 360° traz gráficos e as janelas de ticket e atendimento,
+// que só interessam a quem abre a aba.
+const Visao360Tab = lazyWithReload(() => import("@/components/clientes/visao360/Visao360Tab"));
 import { useAprovacaoOemVisivel, useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
 import { useCadastroIncompleto } from "@/hooks/useCadastroIncompleto";
 import { useHiperDivergenciasVisivel, useHiperDivergenciasPendentes } from "@/hooks/useHiperDivergencias";
@@ -60,37 +63,6 @@ function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
       </div>
     </div>
   );
-}
-
-/**
- * Constrói a cláusula OR de busca. Quando o termo for numérico, também
- * tenta casar pelo CNPJ/CPF mascarado (que é como o valor é gravado no DB),
- * permitindo digitar apenas os dígitos.
- */
-function buildSearchOr(term: string): string {
-  const trimmed = term.trim();
-  const s = `%${escapeLike(trimmed)}%`;
-  const POSTGRES_INT_MAX = 2147483647;
-  // busca_nome = nome fantasia + razao social, sem acento e em maiuscula (coluna
-  // gerada). Sem ela, procurar "VARANDAO" nao achava o cadastro gravado "VARANDÃO"
-  // — foi assim que nasceu um cliente duplicado em 11/09/2026.
-  const parts = [
-    `busca_nome.ilike.%${escapeLike(normalizarBuscaCliente(trimmed))}%`,
-  ];
-  // cnpj_digits = coluna gerada (só dígitos). Normaliza o termo pra dígitos e
-  // compara — funciona digitando formatado OU não, independente de como o
-  // cnpj original está gravado.
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length >= 3) {
-    parts.push(`cnpj_digits.ilike.%${digits}%`);
-  }
-  if (/^\d+$/.test(trimmed)) {
-    const codigo = Number(trimmed);
-    if (Number.isInteger(codigo) && codigo <= POSTGRES_INT_MAX) {
-      parts.push(`codigo_sequencial.eq.${codigo}`);
-    }
-  }
-  return parts.join(",");
 }
 
 export default function Clientes() {
@@ -133,7 +105,7 @@ export default function Clientes() {
   // que ESTE usuário não tem, deixaria o Tabs com um `value` sem par e a página
   // abriria em branco. Cai na primeira aba em vez de não desenhar nada.
   const abasValidas = ["clientes", "movimentos", "reajustes", "divergencias-hiper",
-                       "cadastro-incompleto", "aprovacao-oem"];
+                       "cadastro-incompleto", "aprovacao-oem", "visao-360"];
   const aba =
     !abasValidas.includes(abaAtiva) ||
     (abaAtiva === "aprovacao-oem" && aprovacaoOemVisivel !== true) ||
@@ -878,6 +850,12 @@ export default function Clientes() {
               )}
             </TabsTrigger>
           )}
+          {/* Para todo mundo que abre Clientes: o que cada um enxerga dentro dela
+              é o RLS de atendimentos e tickets, igual ao Chat. */}
+          <TabsTrigger value="visao-360">
+            <Orbit className="h-4 w-4 mr-1" />
+            Visão 360°
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="clientes" className="space-y-4 mt-4">
@@ -1364,6 +1342,12 @@ export default function Clientes() {
             <AprovacaoOemTab />
           </TabsContent>
         )}
+
+        <TabsContent value="visao-360" className="mt-4">
+          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+            <Visao360Tab />
+          </Suspense>
+        </TabsContent>
       </Tabs>
     </div>
   );
