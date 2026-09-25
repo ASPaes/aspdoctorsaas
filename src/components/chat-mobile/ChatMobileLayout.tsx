@@ -10,6 +10,7 @@ import { FaixaPermitirAvisos } from "./FaixaPermitirAvisos";
 import AgentPresenceButton from "@/components/whatsapp/presence/AgentPresenceButton";
 import { useAccentColorSync } from "@/hooks/useAccentColorSync";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 /**
  * Layout do endereço chat.doctorsaas.com.br: sem menu lateral, sem seletor de
@@ -37,6 +38,7 @@ export default function ChatMobileLayout() {
 
   const emModulo = pathname !== "/";
   const tituloDoModulo = TITULOS[pathname] ?? "DS Mobile";
+  const gerenciaProprioScroll = pathname.startsWith("/whatsapp");
 
   return (
     <DepartmentFilterProvider>
@@ -90,7 +92,19 @@ export default function ChatMobileLayout() {
           </header>
           <FaixaPermitirAvisos />
 
-          <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
+          {/* Quem rola é o `main`, MENOS no chat.
+              O chat se dimensiona com `calc(100vh-3.5rem)` e gerencia a própria
+              rolagem (lista de conversas e mensagens rolam por dentro); deixar o
+              main rolar ali criaria duas barras concorrentes. Já as telas vindas
+              do sistema — tickets, implantação, e-mails — foram feitas para rolar
+              na PÁGINA, e com `overflow-hidden` aqui elas simplesmente não
+              desciam: a lista de tickets aparecia cortada e o dedo não movia nada. */}
+          <main
+            className={cn(
+              "flex-1 min-h-0 min-w-0",
+              gerenciaProprioScroll ? "overflow-hidden" : "overflow-y-auto overscroll-contain"
+            )}
+          >
             <ErrorBoundary>
               <Suspense
                 fallback={

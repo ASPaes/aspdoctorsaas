@@ -5,9 +5,12 @@ import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove 
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download, Code2 } from "lucide-react";
+import { TicketCheck, Plus, Search, MessageCircle, Phone, User, Mail, Inbox, Calendar, Clock, SlidersHorizontal, X, Headphones, LayoutList, LayoutGrid, Bell, Building2, Download, Code2, MoreHorizontal } from "lucide-react";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
 import { DateRangePicker, rangeDoPreset, isPeriodoPresetId, type PeriodoPresetId, type PeriodoRange } from "@/components/ui/DateRangePicker";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
+import { cn } from "@/lib/utils";
 import { PendingClosuresTab } from "@/components/tickets/PendingClosuresTab";
 import { AttendancesTab } from "@/components/tickets/AttendancesTab";
 import { Button } from "@/components/ui/button";
@@ -221,6 +224,11 @@ export default function SupportTickets() {
   }, [searchParams, setSearchParams]);
   const [createOpen, setCreateOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // No telefone a barra mostra periodo, situacao e busca; o resto entra pelos
+  // tres pontos. Revelar em vez de duplicar num menu: o bloco de filtros sozinho
+  // tem ~150 linhas, e duas copias se separariam na primeira alteracao.
+  const [maisFiltros, setMaisFiltros] = useState(false);
+  const noCelular = useIsMobile() || isChatHost();
   const [ticketsView, setTicketsView] = useState<string>(() => {
     const salva = textoSalvo(filtrosSalvos.ticketsView, "lista");
     return VIEWS_VALIDAS.includes(salva) ? salva : "lista";
@@ -1307,6 +1315,10 @@ export default function SupportTickets() {
             </Select>
           </>
         )}
+        {/* No telefone a barra guarda o essencial — periodo, situacao e busca — e
+            estes ficam atras dos tres pontos. `contents` mantem o layout da barra
+            igual quando eles aparecem. */}
+        <div className={cn("contents", noCelular && !maisFiltros && "hidden")}>
         {(ticketsView === "lista" || emTicketDev) && (
           <Select value={sortBy} onValueChange={setSortBy}>
             <SelectTrigger className="h-9 w-[180px] text-sm"><SelectValue /></SelectTrigger>
@@ -1326,6 +1338,7 @@ export default function SupportTickets() {
             ))}
           </SelectContent>
         </Select>
+        </div>
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -1335,6 +1348,10 @@ export default function SupportTickets() {
             className="h-9 pl-9 text-sm"
           />
         </div>
+        {/* No telefone a barra guarda o essencial — periodo, situacao e busca — e
+            estes ficam atras dos tres pontos. `contents` mantem o layout da barra
+            igual quando eles aparecem. */}
+        <div className={cn("contents", noCelular && !maisFiltros && "hidden")}>
         <Popover open={clientePopoverOpen} onOpenChange={setClientePopoverOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -1699,9 +1716,25 @@ export default function SupportTickets() {
           <Download className="h-4 w-4" />
           {exporting ? "Exportando..." : "Exportar"}
         </Button>
+        </div>
+        {noCelular && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 p-0 shrink-0"
+            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
+            aria-expanded={maisFiltros}
+            onClick={() => setMaisFiltros((v) => !v)}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        )}
         <div className="flex-1" />
         {/* View switcher */}
-        <div className="flex items-center border rounded-md overflow-hidden">
+        {/* Cinco visoes nao cabem em 390px: no telefone a faixa rola de lado, em
+            vez de os ultimos botoes ficarem fora da tela (medido: "Ticket Dev"
+            terminava em 480 numa tela de 390). */}
+        <div className={cn("flex items-center border rounded-md", noCelular ? "w-full min-w-0 overflow-x-auto scrollbar-none" : "overflow-hidden")}>
           {[
             { id: "lista", label: "Lista", Icon: LayoutList },
             ...(departmentFilter !== "all" ? [{ id: "kanban", label: "Kanban", Icon: LayoutGrid }] : []),
