@@ -119,6 +119,7 @@ export default function CadastrosTab({ section }: CadastrosTabProps = {}) {
         { key: "cargo", label: "Cargo" },
         { key: "email", label: "Email de contato", hint: "Não é o e-mail de login. Para trocar o acesso ao sistema, use Configurações > Acessos da Equipe." },
         { key: "department_id", label: "Setor", type: "select", valueType: "string", options: departmentOptions, render: (_val, row) => row.support_departments?.name ?? "—" },
+        { key: "so_propria_carteira", label: "Só a própria carteira", type: "boolean", hint: "Na Visão 360° do cliente, esta pessoa só encontra e só abre os clientes em que ela é o vendedor. As outras telas não mudam." },
         { key: "ativo", label: "Ativo", type: "boolean" },
       ],
     },

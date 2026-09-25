@@ -362,3 +362,50 @@ export function useModulos360(produtoIds: string[], tid: string | null) {
     },
   });
 }
+
+/**
+ * A marca "Só a própria carteira" do usuário logado (Configurações › Cadastros
+ * › Funcionários). Lida a cada login: o perfil traz o funcionario_id e a marca
+ * vem do cadastro dele.
+ *
+ * `restrito` só vira true com a marca confirmada. Enquanto carrega, ou se a
+ * leitura falhar, vale false: a tela não esconde clientes por engano. Quem
+ * decide é o dado, e um erro de rede não pode sumir com a carteira de ninguém.
+ */
+export function useMinhaCarteira(funcionarioId: number | null | undefined) {
+  const q = useQuery({
+    queryKey: ["visao360_minha_carteira", funcionarioId],
+    enabled: funcionarioId != null,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase.from("funcionarios") as any)
+        .select("nome, so_propria_carteira")
+        .eq("id", funcionarioId)
+        .maybeSingle();
+      if (error) return { restrito: false, nome: null as string | null };
+      return { restrito: data?.so_propria_carteira === true, nome: (data?.nome as string) ?? null };
+    },
+  });
+  return {
+    restrito: q.data?.restrito === true,
+    nome: q.data?.nome ?? null,
+    carregando: funcionarioId != null && q.isPending,
+  };
+}
+
+/** O cliente está na carteira deste vendedor? (vendedor em algum produto, ativo ou não) */
+export function useClienteNaCarteira(clienteId: string | null, funcionarioId: number | null | undefined, ativo: boolean) {
+  return useQuery({
+    queryKey: ["visao360_na_carteira", clienteId, funcionarioId],
+    enabled: ativo && !!clienteId && funcionarioId != null,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { count, error } = await (supabase.from("cliente_produtos") as any)
+        .select("id", { count: "exact", head: true })
+        .eq("cliente_id", clienteId)
+        .eq("funcionario_id", funcionarioId);
+      if (error) throw error;
+      return (count ?? 0) > 0;
+    },
+  });
+}

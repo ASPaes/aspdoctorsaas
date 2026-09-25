@@ -5,11 +5,12 @@ import { endOfDay, formatDistanceStrict, parseISO, startOfDay, subDays, differen
 import { ptBR } from "date-fns/locale";
 import {
   Search, MessageCircle, Ticket, FileText, MapPin, TrendingUp, Star, Clock, AlertTriangle,
-  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone,
+  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone, Lock,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useEhAdmin, usePortao } from "@/hooks/usePortao";
+import { useAuth } from "@/contexts/AuthContext";
 import { lazyWithReload } from "@/lib/staleChunkReload";
 import { filtroOrBuscaCliente } from "@/lib/buscaCliente";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
@@ -22,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useFinanceiro360, useModulos360, useSaudePesos, useTickets360,
+  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useClienteNaCarteira, useFinanceiro360, useMinhaCarteira, useModulos360, useSaudePesos, useTickets360,
   type ClienteBusca,
 } from "./useVisao360";
 import {
@@ -74,7 +75,7 @@ const periodoPadrao = (): PeriodoRange => ({ from: startOfDay(subDays(new Date()
 
 /* ------------------------------------------------------------------ busca */
 
-function BuscaCliente({ onEscolher, grande }: { onEscolher: (c: ClienteBusca) => void; grande?: boolean }) {
+function BuscaCliente({ onEscolher, grande, carteiraDe = null }: { onEscolher: (c: ClienteBusca) => void; grande?: boolean; carteiraDe?: number | null }) {
   const { effectiveTenantId: tid } = useTenantFilter();
   const [aberto, setAberto] = useState(false);
   const [termo, setTermo] = useState("");
@@ -91,17 +92,22 @@ function BuscaCliente({ onEscolher, grande }: { onEscolher: (c: ClienteBusca) =>
   }, []);
 
   const { data = [], isFetching } = useQuery({
-    queryKey: ["visao360_busca", tid, debounced],
+    queryKey: ["visao360_busca", tid, debounced, carteiraDe],
     enabled: aberto && debounced.trim().length >= 2,
     staleTime: 30_000,
     queryFn: async (): Promise<ClienteBusca[]> => {
       let q = (supabase.from("clientes") as any)
-        .select("id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado")
+        // Vendedor com "só a própria carteira": o inner join nos produtos deixa só
+        // os clientes em que ele é o vendedor.
+        .select(carteiraDe != null
+          ? "id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado, cliente_produtos!inner(funcionario_id)"
+          : "id, nome_fantasia, razao_social, cnpj, codigo_sequencial, cancelado")
         .or(filtroOrBuscaCliente(debounced))
         .order("cancelado", { ascending: true })
         .order("nome_fantasia", { ascending: true })
         .limit(20);
       if (tid) q = q.eq("tenant_id", tid);
+      if (carteiraDe != null) q = q.eq("cliente_produtos.funcionario_id", carteiraDe);
       const { data, error } = await q;
       if (error) throw error;
       return data ?? [];
@@ -188,6 +194,11 @@ export default function Visao360Tab() {
   const podeChat = usePortao("atendimento_chat");
   const podeTicket = usePortao("tickets");
   const ehAdmin = useEhAdmin();
+  const { profile } = useAuth();
+  const carteira = useMinhaCarteira(profile?.funcionario_id);
+  // funcionario_id quando a regra vale; null para quem vê todos.
+  const carteiraDe = carteira.restrito ? (profile?.funcionario_id ?? null) : null;
+  const naCarteira = useClienteNaCarteira(clienteId, profile?.funcionario_id, carteiraDe != null);
 
   const escolher = useCallback((id: string) => {
     const p = new URLSearchParams(sp);
@@ -344,12 +355,33 @@ export default function Visao360Tab() {
           <h2 className="text-xl font-extrabold tracking-tight">Visão 360° do cliente</h2>
           <p className="mt-1 text-sm text-muted-foreground">Atendimentos, tickets, avaliações e contrato de um cliente numa tela só.</p>
         </div>
-        <BuscaCliente grande onEscolher={(x) => escolher(x.id)} />
+        <BuscaCliente grande onEscolher={(x) => escolher(x.id)} carteiraDe={carteiraDe} />
+        {carteiraDe != null && <AvisoCarteira nome={carteira.nome} />}
         <div className="flex justify-center"><Recentes onEscolher={escolher} atual={null} /></div>
       </div>
     );
   }
 
+
+  /* ---- vendedor com "só a própria carteira": cliente de fora não abre */
+  if (carteiraDe != null && naCarteira.data === false) {
+    return (
+      <div className="grid gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-[260px] flex-1"><BuscaCliente onEscolher={(x) => escolher(x.id)} carteiraDe={carteiraDe} /></div>
+        </div>
+        <AvisoCarteira nome={carteira.nome} />
+        <div className="rounded-2xl border bg-card px-6 py-10 text-center">
+          <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
+          <h2 className="mt-3 text-lg font-bold">Este cliente não está na sua carteira</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Na Visão 360° você vê só os clientes em que é o vendedor. Busque um cliente seu acima.</p>
+        </div>
+      </div>
+    );
+  }
+  if (carteira.carregando || (carteiraDe != null && naCarteira.isPending)) {
+    return <div className="grid gap-4"><Skeleton className="h-10 w-full" /><Skeleton className="h-44 w-full rounded-2xl" /></div>;
+  }
   const carregando = cliente.isLoading;
   const nome = c ? nomeDoCliente(c) : "";
   const desde = c?.data_ativacao || c?.data_cadastro;
@@ -367,8 +399,9 @@ export default function Visao360Tab() {
   return (
     <div className="grid min-w-0 gap-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-[260px] flex-1"><BuscaCliente onEscolher={(x) => escolher(x.id)} /></div>
+        <div className="min-w-[260px] flex-1"><BuscaCliente onEscolher={(x) => escolher(x.id)} carteiraDe={carteiraDe} /></div>
         <Recentes onEscolher={escolher} atual={clienteId} />
+        {carteiraDe != null && <AvisoCarteira nome={carteira.nome} />}
       </div>
 
       {/* ------------------------------------------------ topo */}
@@ -708,5 +741,15 @@ function ChipDado({ Icon, rotulo, valores }: { Icon: typeof Tag; rotulo: string;
       <Icon className="h-3 w-3 flex-none" />
       <span className="truncate">{vazio ? `Sem ${rotulo.toLowerCase()}` : valores.join(", ")}</span>
     </span>
+  );
+}
+
+/** Aviso para quem tem "só a própria carteira": a busca não mostra a base inteira. */
+function AvisoCarteira({ nome }: { nome: string | null }) {
+  return (
+    <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+      <Lock className="h-3.5 w-3.5" />
+      Você vê só os clientes da sua carteira{nome ? ` (vendedor ${nome})` : ""}.
+    </div>
   );
 }

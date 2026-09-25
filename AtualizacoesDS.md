@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- 🆕 **Vendedor vê só a própria carteira na Visão 360°** — Em **Configurações › Cadastros › Funcionários**, a nova opção **Só a própria carteira** faz a pessoa encontrar e abrir, em **Clientes › Visão 360°**, apenas os clientes em que ela é o vendedor. Quem não está marcado, como a equipe de suporte, continua vendo todos. A regra vale a cada login e só para a Visão 360°; as outras telas não mudam. Para o vendedor achar todos os clientes dele, o vendedor precisa estar preenchido nos produtos do cliente.
+
 - ⬆️ **Módulos contratados na Visão 360°** — Em **Clientes › Visão 360°**, na aba **Linha do tempo**, o novo cartão **Módulos contratados** mostra os módulos ativos do cliente, separados por produto, com a quantidade, a marca OEM quando o módulo vem de lá e o valor mensal (ou desde quando está ativo). Módulos cancelados não aparecem, e o cartão só aparece para quem tem algum módulo ativo.
 
 - ⬆️ **Segmento, vendedor e origem da venda no topo da Visão 360°** — Em **Clientes › Visão 360°**, ao lado de "Ativo" e "Cliente há", aparecem o **segmento** do cliente, o **vendedor** e a **origem da venda**. Vendedor e origem vêm dos produtos do cliente (e do contrato, quando o produto não tem). Quando o dado não está no cadastro, a etiqueta aparece apagada, como "Sem segmento" ou "Sem vendedor", para mostrar o que falta preencher na ficha.
