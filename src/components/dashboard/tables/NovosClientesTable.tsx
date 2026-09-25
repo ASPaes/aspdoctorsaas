@@ -337,7 +337,16 @@ export function NovosClientesTable({ items, tvMode }: Props) {
                   <TableCell>{c.vendedor}</TableCell>
                   <TableCell className="max-w-[150px] truncate" title={c.origem}>{c.origem}</TableCell>
                   <TableCell className="text-right">{fmt(c.valorAtivacao)}</TableCell>
-                  <TableCell className="text-right font-medium">{fmt(c.mensalidade)}</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {c.canceladoEm ? (
+                      <div title="MRR que o cliente tinha antes de cancelar">
+                        <span className="text-red-500 line-through decoration-red-500/60">{fmt(c.mensalidade)}</span>
+                        <span className="block text-xs font-normal text-red-500/80">cancelado em {fmtData(c.canceladoEm)}</span>
+                      </div>
+                    ) : (
+                      fmt(c.mensalidade)
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

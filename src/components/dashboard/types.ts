@@ -166,4 +166,6 @@ export interface NovoClienteListItem {
   origem: string;
   valorAtivacao: number;
   mensalidade: number;
+  /** 'YYYY-MM-DD' quando o cliente já estava cancelado no fim do período; senão null. */
+  canceladoEm: string | null;
 }

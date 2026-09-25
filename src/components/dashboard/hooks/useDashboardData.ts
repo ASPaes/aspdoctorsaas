@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, startOfMonth, endOfMonth, subMonths, subDays, differenceInDays, differenceInCalendarMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subDays, parseISO, differenceInDays, differenceInCalendarMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { DashboardFilters, KPIMetrics, TimeSeriesData, DistributionData, DistributionDataPoint, CanceladoListItem, NovoClienteListItem, DownsellListItem } from '../types';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
@@ -82,7 +82,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const novosClientesPromise = fetchAllRows<any>(() => {
         let q = supabase
           .from('vw_clientes_financeiro')
-          .select('id, mensalidade, valor_ativacao, data_venda_efetiva, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
+          .select('id, mensalidade, valor_ativacao, data_venda_efetiva, cancelado, data_cancelamento, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
           .gte('data_venda_efetiva', periodoInicioStr)
           .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
@@ -222,7 +222,19 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         ? (novosClientes || []).filter(c => fornecedorClientIds!.has(c.id))
         : (novosClientes || []);
       const novosCount = novosClientesFilt.length;
-      const newMrr = novosClientesFilt.reduce((sum, c) => sum + mrrDe(c.id, periodoFimStr), 0);
+      // Cliente que já cancelou até o fim do período: `mrrDe` no fim devolve o produto
+      // (já inativo, 0) MAIS o movimento de churn (−valor) — a baixa descontada duas vezes,
+      // e a venda entrava NEGATIVA no New MRR e na lista. O que foi vendido é o MRR da
+      // véspera do cancelamento; a perda já aparece no churn do período.
+      const canceladoAteFim = (c: any): string | null => {
+        const canc = c.cancelado === true && c.data_cancelamento ? String(c.data_cancelamento).slice(0, 10) : null;
+        return canc && canc <= periodoFimStr ? canc : null;
+      };
+      const mrrVendidoDe = (c: any): number => {
+        const canc = canceladoAteFim(c);
+        return mrrDe(c.id, canc ? format(subDays(parseISO(canc), 1), 'yyyy-MM-dd') : periodoFimStr);
+      };
+      const newMrr = novosClientesFilt.reduce((sum, c) => sum + mrrVendidoDe(c), 0);
       const totalImplantacao = novosClientesFilt.reduce((sum, c) => sum + (Number(c.valor_ativacao) || 0), 0);
 
       // MRR Atual por cliente = base + Σ movimentos recorrentes (upsell, cross, downsell, reajuste).
@@ -931,6 +943,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       setCanceladosList(canceladosListItems);
 
       // Novos clientes list
+      // Mesma régua do card de New MRR (`mrrVendidoDe`); o cancelamento é sinalizado à parte.
       const novosListItems: NovoClienteListItem[] = (novosClientesFilt || [])
         .map(c => ({
           id: c.id,
@@ -940,7 +953,8 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           vendedor: c.funcionario_id ? (funcMap[c.funcionario_id] || '—') : '—',
           origem: c.origem_venda_id ? (origemMap[c.origem_venda_id] || '—') : '—',
           valorAtivacao: Number(c.valor_ativacao) || 0,
-          mensalidade: mrrDe(c.id, periodoFimStr),
+          mensalidade: mrrVendidoDe(c),
+          canceladoEm: canceladoAteFim(c),
         }))
         .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
       if (seq !== fetchSeqRef.current) return;

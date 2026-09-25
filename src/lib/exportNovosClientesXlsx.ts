@@ -10,8 +10,8 @@ function numCell(v: number): number {
   return Number.isFinite(v) ? round2(v) : 0;
 }
 
-/** Índice da coluna "Data Venda" no cabeçalho abaixo. */
-const COL_DATA = 2;
+/** Índices das colunas de data no cabeçalho abaixo ("Data Venda" e "Cancelado em"). */
+const COLS_DATA = [2, 7];
 
 export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
   const header = [
@@ -22,6 +22,7 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
     "Origem",
     "Vlr Ativação (R$)",
     "Vlr MRR (R$)",
+    "Cancelado em",
   ];
 
   const aoa: any[][] = [header];
@@ -35,6 +36,7 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
       c.origem ?? "",
       numCell(c.valorAtivacao),
       numCell(c.mensalidade),
+      c.canceladoEm ? dataCell(c.canceladoEm) : "",
     ]);
   }
 
@@ -48,14 +50,17 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
     { wch: 24 }, // Origem
     { wch: 16 }, // Vlr Ativação
     { wch: 16 }, // Vlr MRR
+    { wch: 12 }, // Cancelado em
   ];
 
   // A data é um serial numérico, então o formato vai POR COLUNA. Varrer por
   // `cell.t === "n"` carimbaria de data as colunas de valor também.
   const range = XLSX.utils.decode_range(ws["!ref"]!);
   for (let R = 1; R <= range.e.r; R++) {
-    const cell = ws[XLSX.utils.encode_cell({ r: R, c: COL_DATA })];
-    if (cell) cell.z = "dd/mm/yyyy";
+    for (const C of COLS_DATA) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (cell) cell.z = "dd/mm/yyyy";
+    }
   }
 
   const wb = XLSX.utils.book_new();
