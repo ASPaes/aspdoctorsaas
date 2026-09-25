@@ -96,6 +96,14 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     chatInputRef.current?.insertText(texto);
   }, []));
 
+  // DEM-0463: "Enviar para o chat" do resumo nos Detalhes. Mesmo caminho do
+  // AcessoFast: escreve no campo, quem envia é o operador.
+  const enviarResumoParaCampo = useCallback((texto: string) => {
+    if (!chatInputRef.current) return false;
+    chatInputRef.current.insertText(texto);
+    return true;
+  }, []);
+
   // Selection mode
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
@@ -506,6 +514,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
               onConversationClosed={onClose}
               onGoToNote={setNoteToFocus}
               onGoToMessage={setMessageToFocus}
+              onSendToComposer={enviarResumoParaCampo}
               variant="mobile"
             />
           </div>
@@ -517,6 +526,7 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
             onConversationClosed={onClose}
             onGoToNote={setNoteToFocus}
             onGoToMessage={setMessageToFocus}
+            onSendToComposer={enviarResumoParaCampo}
           />
         )
       )}

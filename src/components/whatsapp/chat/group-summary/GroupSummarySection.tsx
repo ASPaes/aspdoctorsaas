@@ -9,10 +9,12 @@ interface Props {
   conversationId: string;
   groupName: string;
   onGoToMessage?: (target: { id: string; at: string }) => void;
+  /** DEM-0463: leva o resumo para o campo de mensagem (escreve, não envia). */
+  onSendToComposer?: (texto: string) => boolean;
 }
 
 /** DEM-0277: seção "Resumo do grupo (IA)" do painel Detalhes, só em grupos. */
-export function GroupSummarySection({ conversationId, groupName, onGoToMessage }: Props) {
+export function GroupSummarySection({ conversationId, groupName, onGoToMessage, onSendToComposer }: Props) {
   const { timezone } = useAppTimezone();
   const { summaries, names, isLoading } = useGroupSummaries(conversationId);
   const [open, setOpen] = useState(false);
@@ -90,6 +92,7 @@ export function GroupSummarySection({ conversationId, groupName, onGoToMessage }
           groupName={groupName}
           start={start}
           onGoToMessage={onGoToMessage}
+          onSendToComposer={onSendToComposer}
         />
       )}
     </div>

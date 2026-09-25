@@ -61,6 +61,15 @@ import { Input } from "@/components/ui/input";
 import KBEditDialog from "@/components/configuracoes/kb/KBEditDialog";
 import { GroupSummarySection } from "./group-summary/GroupSummarySection";
 
+/** Resumo da seção "Resumos" no formato do WhatsApp (negrito com *, lista com •). */
+function resumoParaMensagem(s: { summary?: string | null; key_points?: string[] | null; action_items?: string[] | null }): string {
+  const partes: string[] = ["*Resumo do atendimento*"];
+  if (s.summary?.trim()) partes.push(s.summary.trim());
+  if (s.key_points?.length) partes.push(s.key_points.map((p) => `• ${p}`).join("\n"));
+  if (s.action_items?.length) partes.push(`*Recomendações:*\n${s.action_items.map((p) => `• ${p}`).join("\n")}`);
+  return partes.join("\n\n");
+}
+
 interface Props {
   conversation: ConversationWithContact;
   onClose: () => void;
@@ -71,13 +80,18 @@ interface Props {
   /** Clique na hora de um item do resumo do grupo: o chat rola até a mensagem */
   onGoToMessage?: (target: { id: string; at: string }) => void;
   /**
+   * DEM-0463: leva o resumo para o campo de mensagem. Escreve, não envia.
+   * Devolve false quando não há compositor (atendimento encerrado).
+   */
+  onSendToComposer?: (texto: string) => boolean;
+  /**
    * "mobile": ocupa a tela inteira em vez da coluna de 320px. Em 390px a coluna
    * fixa deixaria o chat com pouco mais de 70px ao lado dela.
    */
   variant?: "desktop" | "mobile";
 }
 
-export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote, onGoToMessage, variant = "desktop" }: Props) {
+export function DetailsSidebar({ conversation, onClose, onNavigateToConversation, onConversationClosed, onGoToNote, onGoToMessage, onSendToComposer, variant = "desktop" }: Props) {
   const { timezone } = useAppTimezone();
   const contact = conversation.contact;
   const isGroup = (conversation as any)?.is_group === true;
@@ -89,6 +103,18 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
   const { data: latestResolucao } = useLatestAttendanceResolucao(conversation.id);
   const { data: topicsData } = useConversationTopics(conversation.id);
   const categorizeMutation = useCategorizeConversation();
+
+  // DEM-0463: resumo (1:1 ou de grupo) vai para o campo de mensagem.
+  const enviarResumoParaCampo = (texto: string): boolean => {
+    if (!onSendToComposer?.(texto)) {
+      toast.error("Não há campo de mensagem aberto neste atendimento.");
+      return false;
+    }
+    toast.success("Resumo colocado no campo de mensagem. Revise e envie.");
+    // No celular os Detalhes cobrem o chat: fecha para mostrar o campo.
+    if (variant === "mobile") onClose();
+    return true;
+  };
   const { updateContact, isUpdatingContact } = useWhatsAppActions();
   const { profile } = useAuth();
 
@@ -325,6 +351,7 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
               conversationId={conversation.id}
               groupName={name}
               onGoToMessage={onGoToMessage}
+              onSendToComposer={onSendToComposer ? enviarResumoParaCampo : undefined}
             />
           )}
 
@@ -609,6 +636,15 @@ export function DetailsSidebar({ conversation, onClose, onNavigateToConversation
                     </div>
                   )}
                 </div>
+              )}
+              {conversationSummary && onSendToComposer && (
+                <Button
+                  size="sm"
+                  className="h-6 w-full text-[10px] gap-1"
+                  onClick={() => enviarResumoParaCampo(resumoParaMensagem(conversationSummary))}
+                >
+                  <Send className="h-3 w-3" /> Enviar para o chat
+                </Button>
               )}
             </div>
           </CollapsibleSection>

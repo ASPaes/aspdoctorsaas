@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { endOfDay, startOfDay, subDays } from "date-fns";
 import {
-  AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, History, Info, Loader2, RotateCcw, Save, Sparkles, Trash2, X,
+  AlertTriangle, ArrowLeft, Check, ChevronDown, Copy, History, Info, Loader2, RotateCcw, Save, Send, Sparkles, Trash2, X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -35,6 +35,8 @@ interface Props {
   groupName: string;
   start: GroupSummaryStart;
   onGoToMessage?: (target: { id: string; at: string }) => void;
+  /** DEM-0463: leva o resumo para o campo de mensagem (escreve, não envia). */
+  onSendToComposer?: (texto: string) => boolean;
 }
 
 type View = "filter" | "progress" | "result" | "history";
@@ -101,7 +103,7 @@ export function useGroupAttendances(conversationId: string, enabled: boolean) {
   });
 }
 
-export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupName, start, onGoToMessage }: Props) {
+export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupName, start, onGoToMessage, onSendToComposer }: Props) {
   const { timezone } = useAppTimezone();
   const { profile } = useAuth();
   const { summaries, names } = useGroupSummaries(conversationId);
@@ -246,6 +248,7 @@ export function GroupSummaryDialog({ open, onOpenChange, conversationId, groupNa
             onBack={() => setView(from === "history" ? "history" : "filter")}
             onRetry={() => { setFrom("new"); setView("filter"); }}
             onGoTo={goTo}
+            onSend={onSendToComposer ? (texto) => { if (onSendToComposer(texto)) onOpenChange(false); } : undefined}
             onSave={async (sections) => {
               try { await saveEdit.mutateAsync({ id: current.id, sections }); toast.success("Correções salvas"); }
               catch (e: any) { toast.error(e.message); }
@@ -472,6 +475,7 @@ function ResultView(p: {
   canDelete: boolean; backLabel: string; onBack: () => void; onRetry: () => void;
   onGoTo: (item: { message_id: string | null; msg_at: string | null }) => void;
   onSave: (s: Sections) => void; saving: boolean; onDelete: () => void;
+  onSend?: (texto: string) => void;
 }) {
   const s = p.summary;
   const [draft, setDraft] = useState<Sections>(() => structuredClone(s.sections ?? {}));
@@ -497,6 +501,18 @@ function ResultView(p: {
     }
     try { await navigator.clipboard.writeText(lines.join("\n")); toast.success("Resumo copiado"); }
     catch { toast.error("O navegador não deixou copiar. Selecione o texto e copie manualmente."); }
+  };
+
+  // Mesmo conteúdo do "Copiar", no formato do WhatsApp (negrito com *). Leva o
+  // que está na tela, com as correções mesmo que ainda não salvas.
+  const send = () => {
+    const lines = [`*Resumo do grupo: ${p.label}* (${fmt(s.period_start, p.timezone)} a ${fmt(s.period_end, p.timezone)})`];
+    for (const sec of SECTIONS) {
+      const items = (draft[sec.key] ?? []).filter((it) => it.texto.trim());
+      if (!items.length) continue;
+      lines.push("", `*${sec.label}:*`, ...items.map((it) => `• ${it.texto.trim()}`));
+    }
+    p.onSend?.(lines.join("\n"));
   };
 
   if (s.status === "failed") {
@@ -600,6 +616,9 @@ function ResultView(p: {
           <Button variant="outline" size="sm" className="gap-1.5" disabled={p.saving} onClick={() => { p.onSave(draft); setDirty(false); }}>
             {p.saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}Salvar correções
           </Button>
+        )}
+        {p.onSend && (
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={send}><Send className="h-3.5 w-3.5" />Enviar para o chat</Button>
         )}
         <Button size="sm" className="gap-1.5 bg-green-600 text-white hover:bg-green-700" onClick={copy}><Copy className="h-3.5 w-3.5" />Copiar resumo</Button>
       </div>
