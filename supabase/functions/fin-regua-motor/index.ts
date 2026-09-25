@@ -311,9 +311,25 @@ Deno.serve(async (req) => {
         alvo.setUTCDate(alvo.getUTCDate() - toque.dias_offset);
         const vencimentoAlvo = alvo.toISOString().slice(0, 10);
 
+        // ⚠️ A VIEW, NUNCA A TABELA. Correção de 25/09/2026, e o erro era meu.
+        //
+        // `fin_titulos` guarda o último estado conhecido de cada título, e
+        // "último conhecido" não é "ainda existe". Título apagado no Omie é
+        // marcado como excluído no espelho do DoctorOMIE, a listagem pula linha
+        // excluída, e o que nunca mais chega fica parado aqui para sempre — com
+        // a situação e o boleto do dia em que sumiu.
+        //
+        // Medido em 25/09: a tabela tinha 1.120 títulos em aberto e a view 902.
+        // Os 218 de diferença são zumbis, e o motor lendo a tabela cobraria
+        // todos eles. Cobrar quem já não deve é o pior defeito que esta régua
+        // pode ter.
+        //
+        // A view só devolve título que a origem RECONFIRMOU numa leitura
+        // recente: 10 minutos para vencido e para o dia, 7 dias para o que está
+        // por vencer.
         const titulos = await buscarTodos((de, ate) =>
           service
-            .from('fin_titulos')
+            .from('vw_fin_titulos_abertos')
             .select('id, cliente_id, vencimento, valor, situacao, numero_documento, parcela, boleto_gerado')
             .eq('tenant_id', tenant.id)
             .eq('vencimento', vencimentoAlvo)
