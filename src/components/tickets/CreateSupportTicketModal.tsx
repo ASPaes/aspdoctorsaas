@@ -20,6 +20,7 @@ import { ClientAlertBanner } from "@/components/whatsapp/chat/ClientAlertBanner"
 import { useClientAlerts, resolveAlertsFor, blocksFor } from "@/hooks/useClientAlerts";
 import { formatarTelefone } from "@/components/emails/macros/camposMacro";
 import { cn } from "@/lib/utils";
+import { maskCNPJ, maskCPF } from "@/lib/masks";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 function HelpBadge({ text }: { text: string }) {
@@ -85,6 +86,24 @@ interface Props {
 }
 
 const Req = () => <span className="text-destructive">*</span>;
+
+// DEM-0477: só o fantasia não basta para distinguir clientes parecidos. A razão social aparece
+// quando difere do fantasia, e o documento sai mascarado como CPF ou CNPJ conforme o tamanho.
+function DetalheCliente({ cliente }: { cliente: Pick<ClienteSearchResult, "nome_fantasia" | "razao_social" | "cnpj"> }) {
+  const fantasia = (cliente.nome_fantasia ?? "").trim();
+  const razao = (cliente.razao_social ?? "").trim();
+  const mostraRazao = !!razao && !!fantasia && razao.toLocaleLowerCase("pt-BR") !== fantasia.toLocaleLowerCase("pt-BR");
+  const digitos = (cliente.cnpj ?? "").replace(/\D/g, "");
+  const documento = digitos.length === 11 ? maskCPF(digitos) : digitos ? maskCNPJ(digitos) : "";
+  if (!mostraRazao && !documento) return null;
+  return (
+    <div className="truncate text-[11px] text-muted-foreground">
+      {mostraRazao && <span>{razao}</span>}
+      {mostraRazao && documento && <span> · </span>}
+      {documento && <span className="tabular-nums">{documento}</span>}
+    </div>
+  );
+}
 
 const PRIORIDADES = [
   { id: "baixa", name: "Baixa", color: "#10b981" },
@@ -1334,10 +1353,13 @@ export function CreateSupportTicketModal({
               <Label className="text-xs font-medium">Cliente <Req /></Label>
               {selectedCliente ? (
                 <div className="flex items-center justify-between gap-2 rounded-md border border-input bg-muted/30 px-3 py-2">
-                  <span className="text-sm truncate">
-                    <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
-                    {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
-                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm truncate">
+                      <span className="text-muted-foreground">#{selectedCliente.codigo_sequencial}</span>{" "}
+                      {selectedCliente.nome_fantasia || selectedCliente.razao_social || "Sem nome"}
+                    </div>
+                    <DetalheCliente cliente={selectedCliente} />
+                  </div>
                   {!fromClosure && (
                     <Button
                       type="button"
@@ -1389,8 +1411,11 @@ export function CreateSupportTicketModal({
                               });
                           }}
                         >
-                          <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
-                          {c.nome_fantasia || c.razao_social}
+                          <div className="truncate">
+                            <span className="text-muted-foreground">#{c.codigo_sequencial}</span>{" "}
+                            <span className="font-medium">{c.nome_fantasia || c.razao_social}</span>
+                          </div>
+                          <DetalheCliente cliente={c} />
                         </button>
                       ))}
                     </div>
