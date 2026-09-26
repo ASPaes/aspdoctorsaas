@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 26/09
 
+- ⬆️ **No telefone, cada e-mail da lista mostra o que dá para fazer com ele** — O cartão já abria o e-mail ao toque, mas nada na tela dizia isso. Agora cada um traz **Abrir**, **mover para pasta** e **arquivar**, os mesmos botões que a lista tem no computador. Abrir mostra a mensagem inteira com **Responder**, **Responder a todos**, **Encaminhar**, **Mover para** e **Arquivar**.
+
 - 🔧 **No celular, os números da tela inicial mostravam o movimento da empresa inteira** — Os cartões de **Chat**, **Tickets**, **Implantação** e **E-mails** contavam tudo do tenant: aparecia 99+ em Tickets e 7 em Chat para quem não tinha nenhum dos dois no próprio nome. Agora cada número é a sua carteira: os atendimentos **atribuídos a você**, os tickets e as jornadas em que **você é o responsável**, e os e-mails por ler dos **setores de que você participa**. Quem não tem nada em aberto vê o cartão sem número.
 
 - 🔧 **No telefone, chegava aviso de coisa que não é de ninguém em particular** — O aparelho tocava para falha de sincronismo do Omie, divergência e aprovação do OEM, estouro de cota de IA, relatório semanal e queda de instância do WhatsApp — avisos de operação, que vão para vários administradores de uma vez. Agora só acorda o telefone o que tem dono: **atendimento atribuído a você**, **cliente esperando sua resposta**, **mensagem nova numa conversa sua**, **mensagem ou agendamento seu que não saiu**, **ticket** e **jornada de implantação** que passaram a ser seus. Dentro do sistema nada muda: o sino continua mostrando tudo.
@@ -28,8 +30,6 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 - 🔧 **No telefone, não dava para fechar a ficha do ticket nem a da jornada** — O X do canto existia, mas com o tamanho do computador e quase transparente, e ainda ficava atrás do título: não se via e não se acertava com o dedo. Para sair era preciso tocar fora da janela. Agora é um botão de toque no canto direito, em qualquer ficha ou janela aberta no celular. No computador continua o X discreto de sempre.
 
 - ⬆️ **No celular, a seta do topo volta um passo, não direto para o início** — Estando dentro de uma conversa do Chat, tocar na seta ao lado do nome do módulo jogava você na tela inicial do aplicativo. Agora ela devolve a **lista de conversas**, e só sai para a tela inicial quando você já está na lista — o mesmo caminho do gesto de voltar do aparelho.
-
-### 26/09
 
 - ⬆️ **Cartões da aba Tickets da Visão 360° mostram a lista de tickets** — Em **Clientes › Visão 360° › Tickets**, os cartões **Abertos agora**, **Encerrados no período**, **Categoria mais comum** e **Total na história** passam a ser clicáveis. Cada um abre a lista dos tickets que formam aquele número, com código, assunto, categoria, responsável e status, e o botão **Abrir ticket** em cada linha abre a tela completa do ticket sem sair da Visão 360°.
 
