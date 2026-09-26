@@ -2301,7 +2301,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                     </p>
                   </div>
                 )}
-                <div className="min-w-0 pr-10">
+                <div className="min-w-0 pr-12 sm:pr-10">
                   <div className="flex items-center gap-2 flex-wrap">
                     {journey.ticket_code && (
                       <span className="font-mono text-xs text-primary font-semibold">{journey.ticket_code}</span>

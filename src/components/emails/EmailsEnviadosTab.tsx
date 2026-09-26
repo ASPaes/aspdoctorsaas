@@ -337,6 +337,58 @@ export default function EmailsEnviadosTab() {
               : "Quando a operação enviar e-mail ao cliente, cada envio aparece aqui com a origem e a situação."}
           </p>
         </div>
+      ) : noCelular ? (
+        /* Mesma razao da caixa de entrada: a tabela de 10 colunas so se lia
+           arrastando para o lado. No telefone cada envio vira um cartao. */
+        <div className="space-y-2">
+          {linhas.map((linha) => {
+            const { data: dia, hora } = dataHora(linha.created_at);
+            const cliente = nomeDoCliente(linha);
+            const recusado = linha.status !== "enviado";
+            return (
+              <div
+                key={linha.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setLendo(linha.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLendo(linha.id); } }}
+                className={cn(
+                  "cursor-pointer rounded-lg border p-3 transition-colors",
+                  recusado && "border-destructive/40 bg-destructive/5",
+                )}
+              >
+                <div className="flex items-baseline gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm">para {linha.para.join(", ")}</span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{dia} {hora}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm font-medium">{linha.assunto}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  {recusado ? (
+                    <span className="inline-flex items-center gap-1 font-medium text-destructive">
+                      <XCircle className="h-3 w-3" /> Recusado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-success">
+                      <CheckCircle2 className="h-3 w-3" /> Enviado
+                    </span>
+                  )}
+                  <span className="truncate">{ROTULO_ORIGEM[linha.origem] ?? linha.origem}</span>
+                  {cliente && <span className="max-w-[45%] truncate">{cliente}</span>}
+                  {linha.support_departments?.name && <span className="truncate">{linha.support_departments.name}</span>}
+                  {linha.email_pastas && (
+                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border px-1.5">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-sm" style={{ background: linha.email_pastas.cor }} aria-hidden />
+                      <span className="truncate">{linha.email_pastas.nome}</span>
+                    </span>
+                  )}
+                </div>
+                {recusado && (linha.erro ?? "") && (
+                  <p className="mt-1 line-clamp-2 text-[11px] text-destructive/90">{(linha.erro ?? "").split(" [")[0]}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="rounded-lg border">
           <Table>

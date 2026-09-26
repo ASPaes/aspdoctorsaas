@@ -36,6 +36,22 @@ export default function ChatMobileLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
+  /**
+   * Um passo atras, nao direto para o inicio. Estando dentro de uma conversa, a
+   * seta tem que devolver a LISTA de conversas — era isso que ela pulava, jogando
+   * quem estava lendo um atendimento na tela de modulos. Quem marca que existe
+   * esse passo a mais e o `pushState({ dsConversa })` da tela de chat, o mesmo que
+   * faz o gesto de voltar do aparelho funcionar; sem ele, a seta vai para o inicio
+   * como antes.
+   */
+  function voltar() {
+    if (typeof window !== "undefined" && (window.history.state as any)?.dsConversa) {
+      window.history.back();
+      return;
+    }
+    navigate("/");
+  }
+
   const emModulo = pathname !== "/";
   const tituloDoModulo = TITULOS[pathname] ?? "DS Mobile";
   const gerenciaProprioScroll = pathname.startsWith("/whatsapp");
@@ -65,8 +81,8 @@ export default function ChatMobileLayout() {
               {emModulo ? (
                 <button
                   type="button"
-                  onClick={() => navigate("/")}
-                  aria-label="Voltar para a tela inicial"
+                  onClick={voltar}
+                  aria-label="Voltar"
                   className="flex min-w-0 items-center gap-1 rounded-md py-1 pr-1 text-base font-semibold"
                 >
                   <ChevronLeft className="h-5 w-5 shrink-0 text-muted-foreground" />

@@ -16,8 +16,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
 import {
-  Archive, ArchiveRestore, ChevronLeft, ChevronRight, Eye, FolderInput, Inbox, Loader2, Lock, Mail, RefreshCw, RotateCcw,
-  Search, Trash2,
+  Archive, ArchiveRestore, ChevronLeft, ChevronRight, Eye, FolderInput, Inbox, Loader2, Lock, Mail, MoreHorizontal, Paperclip,
+  RefreshCw, RotateCcw, Search, Trash2,
 } from "lucide-react";
 import { AnexosDoEmail } from "./AnexosDoEmail";
 import { LerEmailDialog } from "./LerEmailDialog";
@@ -28,6 +28,8 @@ import { subDays } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
 import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { FiltroMulti } from "./FiltroMulti";
 import { useOpcoesFiltro } from "./useEmailsEnviados";
@@ -78,6 +80,9 @@ export default function EmailsRecebidosTab() {
     pasta: null,
   });
   const [pagina, setPagina] = useState(0);
+  const noCelular = useIsMobile() || isChatHost();
+  // No telefone a barra guarda so a busca; o resto sai daqui.
+  const [maisFiltros, setMaisFiltros] = useState(false);
   const [selecionados, setSelecionados] = useState<string[]>([]);
   const [confirmarExclusao, setConfirmarExclusao] = useState(false);
   /** id do e-mail aberto para leitura */
@@ -257,7 +262,7 @@ export default function EmailsRecebidosTab() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[260px] flex-1">
+        <div className={cn("relative", noCelular ? "min-w-0 flex-1" : "min-w-[260px] flex-1")}>
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="busca-recebidos"
@@ -267,6 +272,20 @@ export default function EmailsRecebidosTab() {
             className="h-9 pl-9"
           />
         </div>
+        {noCelular && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 w-9 shrink-0 p-0"
+            aria-label={maisFiltros ? "Esconder os demais filtros" : "Mostrar os demais filtros"}
+            aria-expanded={maisFiltros}
+            onClick={() => setMaisFiltros((v) => !v)}
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        )}
+        {/* `contents` mantem o desenho da barra identico no computador. */}
+        <div className={cn("contents", noCelular && !maisFiltros && "hidden")}>
         {(contagem?.triagem ?? 0) > 0 || soTriagem ? (
           <button
             type="button"
@@ -333,6 +352,7 @@ export default function EmailsRecebidosTab() {
             </Button>
           </>
         )}
+        </div>
       </div>
 
       {caixasLendo.length > 0 && (
@@ -412,6 +432,77 @@ export default function EmailsRecebidosTab() {
             Quando um cliente responder a um e-mail enviado daqui, ou escrever para um endereço que abre ticket, a
             mensagem aparece nesta lista.
           </p>
+        </div>
+      ) : noCelular ? (
+        /* No telefone a tabela de 9 colunas somava ~1270px e a lista só se lia
+           arrastando para o lado. Aqui cada mensagem é um cartão que cabe na
+           tela, como em qualquer aplicativo de e-mail: quem escreveu e quando,
+           o assunto, a prévia, e embaixo cliente, setor e pasta. */
+        <div className="space-y-2">
+          {linhas.map((linha) => {
+            const { data: dia, hora } = dataHora(linha.recebido_em);
+            // Hoje mostra a hora; antes disso, o dia. Data inteira com ano rouba a
+            // linha do remetente, que e o que a pessoa procura.
+            const deHoje = dia === new Date().toLocaleDateString("pt-BR");
+            const quando = deHoje ? hora : dia.slice(0, 5);
+            const cliente = nomeDoClienteRecebido(linha);
+            const naTriagem = linha.acao === "triagem" && !filtros.lixeira;
+            const distingueLido = !filtros.lixeira && !filtros.arquivadas;
+            const naoLido = distingueLido && !linha.lido_em;
+            const temAnexo = Array.isArray(linha.anexos) && linha.anexos.length > 0;
+            return (
+              <div
+                key={linha.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setLendo(linha.id)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLendo(linha.id); } }}
+                className={cn(
+                  "cursor-pointer rounded-lg border p-3 transition-colors",
+                  naTriagem && "border-warning/50 bg-warning/5",
+                  naoLido ? "bg-primary/[0.05]" : "text-muted-foreground",
+                )}
+              >
+                <div className="flex items-baseline gap-2">
+                  {naoLido && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="ainda não aberto" />}
+                  <span className={cn("min-w-0 flex-1 truncate text-sm", naoLido && "font-semibold text-foreground")}>
+                    {linha.de_nome || linha.de_email}
+                  </span>
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{quando}</span>
+                </div>
+                <p className={cn("mt-1 line-clamp-2 text-sm", naoLido ? "font-bold text-foreground" : "font-normal")}>
+                  {linha.assunto || "(sem assunto)"}
+                </p>
+                {linha.corpo_texto && (
+                  <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">
+                    {linha.corpo_texto.replace(/s+/g, " ").slice(0, 160)}
+                  </p>
+                )}
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                  {temAnexo && (
+                    <span className="inline-flex items-center gap-1">
+                      <Paperclip className="h-3 w-3" />
+                      {linha.anexos.length}
+                    </span>
+                  )}
+                  {cliente && <span className="max-w-[45%] truncate">{cliente}</span>}
+                  {cliente && linha.support_departments?.name && <span aria-hidden>·</span>}
+                  {linha.support_departments?.name && <span className="truncate">{linha.support_departments.name}</span>}
+                  {linha.email_pastas && (
+                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border px-1.5">
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-sm" style={{ background: linha.email_pastas.cor }} aria-hidden />
+                      <span className="truncate">{linha.email_pastas.nome}</span>
+                    </span>
+                  )}
+                </div>
+                {naTriagem && podeTriar && (
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <CaixaTriagem linha={linha} setores={setores} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
