@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 26/09
 
+- ⬆️ **Ajuda no Ranking de vendedores** — Em **Dashboard › Vendas**, o gráfico **Ranking de vendedores** ganhou um **?** ao lado do título. Ele explica cada número da linha (vendas, MRR vendido e margem %), a fatia de cada vendedor no total e o que as cores da margem querem dizer: verde a partir de 50%, amarelo entre 30% e 49%, vermelho abaixo de 30%. Também avisa que margem negativa quase sempre é custo cadastrado errado no produto do cliente.
+
 - 🆕 **Gráfico de faturamento separa o recorrente da ativação** — Em **Dashboard › Visão Geral**, o gráfico **Faturamento — recorrente + ativação** ganhou três botões ao lado do título: **Total**, **Só MRR** e **Só ativação**. A ativação é cobrada uma vez só, na venda, então um mês com menos vendas achatava o faturamento mesmo com o recorrente subindo. Agora dá para ver cada parte sozinha e saber qual das duas mexeu na linha.
 
 - 🔧 **Origem, vendedor e datas preenchidos em massa não apareciam na lista de Clientes nem nos gráficos** — Quem preenchia pela aba **Clientes › Cadastro incompleto** via o campo sumir da aba, mas a lista de **Clientes** (filtro **Origem da Venda: Nulo**) e o gráfico de **Canal** em **Dashboard › Vendas** continuavam mostrando "sem informação". Numa unidade, o gráfico mostrava 34 vendas sem canal que já tinham sido preenchidas. Agora o preenchimento em massa grava também no contrato, que é a base do cadastro. Se o contrato já tiver a informação, ela prevalece. O que já tinha sido preenchido antes foi acertado.

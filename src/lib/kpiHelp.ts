@@ -427,6 +427,14 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
       "Reduzir dependência de produtos de baixa margem",
     ],
   },
+  ranking_vendedores: {
+    title: "Ranking de vendedores",
+    definition: "Vendas novas do período por vendedor. Em cada linha: quantidade de vendas · New MRR vendido · margem %. A barra e o % à direita mostram a fatia do vendedor no New MRR total.",
+    why_it_matters: "Mostra quem vende mais e quem vende melhor. A cor da margem avisa a rentabilidade: verde ≥ 50%, amarelo 30–49%, vermelho < 30%. Margem negativa quase sempre é custo cadastrado errado no produto do cliente (ex.: valor do setup lançado como custo mensal).",
+    formula: "Margem % = (MRR − custo) ÷ MRR, somando as vendas do vendedor no período",
+    example: "2 vendas: R$ 540 de MRR e R$ 702 de custo → (540 − 702) ÷ 540 = −30%",
+    unit: '%',
+  },
   ltv_cac_3m: {
     title: "LTV/CAC (Janela 3M)",
     definition: "Razão LTV/CAC calculada com médias dos últimos 3 meses de churn, ARPA e MC%.",

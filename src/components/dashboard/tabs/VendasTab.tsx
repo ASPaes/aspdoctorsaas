@@ -3,6 +3,7 @@ import { Users, DollarSign, Rocket, TrendingUp, ChevronDown, ChevronUp, Sparkles
 import { Button } from '@/components/ui/button';
 import { SectionHeader } from '../SectionHeader';
 import { KPICardEnhanced } from '../cards/KPICardEnhanced';
+import { KpiHelpPopover } from '../KpiHelpPopover';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -362,7 +363,10 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
       {/* Ranking de vendedores */}
       <Card>
         <CardHeader className={tvMode ? 'pb-2' : ''}>
-          <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>Ranking de vendedores</CardTitle>
+          <CardTitle className={cn('flex items-center justify-center gap-2', tvMode ? 'text-2xl' : 'text-lg')}>
+            Ranking de vendedores
+            <KpiHelpPopover kpiKey="ranking_vendedores" labelSize={tvMode ? 'tv' : 'lg'} />
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {rankVend.length === 0 ? (
