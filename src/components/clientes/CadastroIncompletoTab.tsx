@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useLookups } from "@/hooks/useLookups";
 import { useCadastroIncompleto, type CampoIncompleto } from "@/hooks/useCadastroIncompleto";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,17 @@ const dataBR = (v: string | null) => {
 export default function CadastroIncompletoTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const { campos, carregando } = useCadastroIncompleto();
+  const { unidades: unidadesPermitidas, selectedUnidadeIds, viewKey, unidadeFilterReady } = useUnidadeFilter();
+  /**
+   * As unidades que esta tela oferece: as que o usuário pode ver e, com o
+   * filtro global marcado, só as dele. O banco aplica a mesma régua — isto é
+   * para o seletor não oferecer o que a consulta não vai trazer.
+   */
+  const unidadesDaTela = useMemo(
+    () => unidadesPermitidas.filter((u) => u.is_active
+      && (selectedUnidadeIds.length === 0 || selectedUnidadeIds.includes(u.id))),
+    [unidadesPermitidas, selectedUnidadeIds],
+  );
   const lookups = useLookups();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -76,6 +88,10 @@ export default function CadastroIncompletoTab() {
   /** Ordenação escolhida no cabeçalho. `null` = a ordem padrão do campo. */
   const [ordem, setOrdem] = useState<{ col: string; dir: "asc" | "desc" } | null>(null);
   const [gravando, setGravando] = useState(false);
+
+  // Trocou o filtro global de unidade: a seleção e a unidade escolhida aqui
+  // podiam ser de uma unidade que saiu da tela.
+  useEffect(() => { setUnidade(""); setSel(new Set()); }, [viewKey]);
 
   const limparFiltros = () => {
     setBusca(""); setUnidade(""); setProduto(""); setValor(""); setSel(new Set()); setOrdem(null);
@@ -101,9 +117,9 @@ export default function CadastroIncompletoTab() {
   };
 
   const { data: linhas = [], isPending: listando } = useQuery({
-    queryKey: ["cadastro_incompleto_lista", tid, campo?.campo, busca, unidade, produto,
+    queryKey: ["cadastro_incompleto_lista", tid, viewKey, campo?.campo, busca, unidade, produto,
                ordem?.col ?? null, ordem?.dir ?? null],
-    enabled: !!tid && !!campo,
+    enabled: !!tid && !!campo && unidadeFilterReady,
     queryFn: async (): Promise<LinhaFalta[]> => {
       const { data, error } = await (supabase.rpc as any)("fn_cadastro_incompleto_lista", {
         p_tenant_id: tid,
@@ -130,7 +146,7 @@ export default function CadastroIncompletoTab() {
   const opcoes = useMemo(() => {
     if (!campo) return [] as { id: string; nome: string }[];
     const mapa: Record<string, { id: any; nome: string }[]> = {
-      unidade_base_id: (lookups.unidadesBase.data ?? []).filter((u: any) => u.is_active),
+      unidade_base_id: unidadesDaTela,
       area_atuacao_id: lookups.areasAtuacao.data ?? [],
       segmento_id: lookups.segmentos.data ?? [],
       fornecedor_id: lookups.fornecedores.data ?? [],
@@ -140,7 +156,7 @@ export default function CadastroIncompletoTab() {
         .map((m: any) => ({ id: m.id, nome: m.descricao })),
     };
     return (mapa[campo.campo] ?? []).map((o: any) => ({ id: String(o.id), nome: o.nome }));
-  }, [campo, lookups]);
+  }, [campo, lookups, unidadesDaTela]);
 
   const ehData = campo?.campo === "data_venda" || campo?.campo === "data_ativacao";
   const podeGravar = !!campo?.em_lote && sel.size > 0 && !!valor && !gravando;
@@ -440,8 +456,7 @@ export default function CadastroIncompletoTab() {
           <select className={selectCls + " w-44"} value={unidade}
             onChange={(e) => { setUnidade(e.target.value); setSel(new Set()); }}>
             <option value="">Todas</option>
-            {(lookups.unidadesBase.data ?? []).filter((u: any) => u.is_active)
-              .map((u: any) => <option key={u.id} value={u.id}>{u.nome}</option>)}
+            {unidadesDaTela.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
           </select>
         </div>
         <div className="space-y-1">

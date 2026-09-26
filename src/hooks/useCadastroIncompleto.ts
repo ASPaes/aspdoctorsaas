@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 
 export type CampoIncompleto = {
   campo: string;
@@ -25,13 +26,16 @@ export type CampoIncompleto = {
 export function useCadastroIncompleto() {
   const { profile, profileLoading } = useAuth();
   const { effectiveTenantId: tid } = useTenantFilter();
+  // O banco conta só as unidades que o usuário vê e as do filtro global — a
+  // chave muda com o filtro para os números acompanharem.
+  const { viewKey, unidadeFilterReady } = useUnidadeFilter();
 
   const papelPassa =
     profile?.is_super_admin === true || profile?.role === "admin" || profile?.role === "head";
 
   const q = useQuery({
-    queryKey: ["cadastro_incompleto_resumo", tid],
-    enabled: !!tid && papelPassa && !profileLoading,
+    queryKey: ["cadastro_incompleto_resumo", tid, viewKey],
+    enabled: !!tid && papelPassa && !profileLoading && unidadeFilterReady,
     // O resumo são 14 counts sobre a carteira. Não é caro, mas também não muda
     // de minuto a minuto: só refaz quando a aba é reaberta.
     staleTime: 60_000,

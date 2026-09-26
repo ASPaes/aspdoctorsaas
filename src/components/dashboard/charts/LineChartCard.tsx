@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -23,9 +24,11 @@ interface LineChartCardProps {
   seriesLabel?: string;
   /** Abre a composição do valor no tooltip (ex.: recorrente x ativação) */
   tooltipRows?: TooltipRow[];
+  /** Controles à direita do título (mesmo padrão do MultiLineChartCard) */
+  headerRight?: ReactNode;
 }
 
-export function LineChartCard({ title, data, dataKey = 'value', formatValue = v => v.toLocaleString('pt-BR'), tvMode = false, className, color = 'hsl(var(--primary))', height = 300, seriesLabel, tooltipRows }: LineChartCardProps) {
+export function LineChartCard({ title, data, dataKey = 'value', formatValue = v => v.toLocaleString('pt-BR'), tvMode = false, className, color = 'hsl(var(--primary))', height = 300, seriesLabel, tooltipRows, headerRight }: LineChartCardProps) {
   const chartHeight = tvMode ? height * 1.5 : height;
 
   if (!data || data.length === 0) {
@@ -39,7 +42,10 @@ export function LineChartCard({ title, data, dataKey = 'value', formatValue = v 
 
   return (
     <Card className={cn(className)}>
-      <CardHeader className={tvMode ? 'pb-2' : ''}><CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>{title}</CardTitle></CardHeader>
+      <CardHeader className={cn(tvMode ? 'pb-2' : '', headerRight && 'flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 space-y-0')}>
+        <CardTitle className={cn(tvMode ? 'text-2xl' : 'text-lg')}>{title}</CardTitle>
+        {headerRight}
+      </CardHeader>
       <CardContent>
         <div style={{ height: chartHeight }}>
           <ResponsiveContainer width="100%" height="100%">

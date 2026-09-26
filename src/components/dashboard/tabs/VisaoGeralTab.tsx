@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { cn } from '@/lib/utils';
 import {
   Users, DollarSign, Target, BarChart3, Percent,
   ShieldCheck, AlertTriangle, Clock, RefreshCw, Zap, UserX,
@@ -83,6 +84,9 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
   const [diagOpen, setDiagOpen] = useState(false);
   const [mostrarClientes, setMostrarClientes] = useState(true);
   const [semReajuste, setSemReajuste] = useState(false);
+  // Ativação é cobrada uma vez só: um mês de pouca venda derruba o faturamento
+  // mesmo com o recorrente subindo. Separar as parcelas deixa isso visível.
+  const [fatModo, setFatModo] = useState<'total' | 'mrr' | 'ativacao'>('total');
 
 
   // ── Eficiência & Saúde ──
@@ -262,12 +266,28 @@ export function VisaoGeralTab({ metrics, timeSeries, tvMode, mcData, periodoInic
             }
           />
           <LineChartCard
-            title="Faturamento — recorrente + ativação (12 meses)"
-            seriesLabel="Faturamento"
+            title={fatModo === 'mrr' ? 'Faturamento — só recorrente (12 meses)'
+              : fatModo === 'ativacao' ? 'Faturamento — só ativação (12 meses)'
+              : 'Faturamento — recorrente + ativação (12 meses)'}
+            seriesLabel={fatModo === 'mrr' ? 'MRR recorrente' : fatModo === 'ativacao' ? 'Ativação' : 'Faturamento'}
             data={timeSeries.faturamentoEvolution}
+            dataKey={fatModo === 'mrr' ? 'mrr' : fatModo === 'ativacao' ? 'ativacoes' : 'value'}
             formatValue={fmt}
             tvMode={tvMode}
             height={340}
+            headerRight={
+              <div className="flex items-center gap-1.5 shrink-0">
+                {([['total', 'Total'], ['mrr', 'Só MRR'], ['ativacao', 'Só ativação']] as const).map(([id, rotulo]) => (
+                  <button key={id} type="button" onClick={() => setFatModo(id)}
+                    className={cn('px-3 py-1.5 rounded-full text-xs border transition-colors whitespace-nowrap',
+                      fatModo === id
+                        ? 'bg-primary/10 border-primary text-primary'
+                        : 'bg-transparent border-border text-muted-foreground hover:text-foreground')}>
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+            }
             tooltipRows={[
               { key: 'mrr', label: 'MRR recorrente' },
               { key: 'ativacoes', label: (p: any) => `Ativação${p?.vendas ? ` (${p.vendas} vendas)` : ''}` },
