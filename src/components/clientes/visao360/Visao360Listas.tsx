@@ -1,7 +1,8 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, SquareArrowOutUpRight } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ColumnFilter, FiltroData, FiltroFaixa, FiltroOpcoes, FiltroTexto } from "@/components/ui/ColumnFilter";
@@ -237,6 +238,7 @@ export function TicketsLista({
 }) {
   const [filtro, setFiltro] = useState<"abertos" | "periodo">("abertos");
   const [limite, setLimite] = useState(LOTE);
+  const [cartao, setCartao] = useState<{ titulo: string; itens: Ticket360[] } | null>(null);
   const k = kpisTicket(tickets, periodo);
   // "Abertos" ignora o período de propósito: ticket esquecido há 3 meses é
   // justamente o que precisa aparecer.
@@ -247,11 +249,30 @@ export function TicketsLista({
   return (
     <div className="grid gap-3.5">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Mini rotulo="Abertos agora" valor={k.abertos} sub={k.maisAntigoDias != null ? `mais antigo: ${k.maisAntigoDias} dia${k.maisAntigoDias === 1 ? "" : "s"}` : "nenhum pendente"} />
-        <Mini rotulo="Encerrados no período" valor={k.concluidosNoPeriodo} sub={k.duracaoMediaDias != null ? `levaram ${k.duracaoMediaDias.toFixed(1).replace(".", ",")} dias em média` : undefined} />
-        <Mini rotulo="Categoria mais comum" valor={<span className="text-base">{k.categoriaTop?.nome ?? "—"}</span>} sub={k.categoriaTop ? `${k.categoriaTop.pct}% dos abertos no período` : undefined} />
-        <Mini rotulo="Total na história" valor={tickets.length} />
+        <Mini
+          rotulo="Abertos agora" valor={k.abertos}
+          sub={k.maisAntigoDias != null ? `mais antigo: ${k.maisAntigoDias} dia${k.maisAntigoDias === 1 ? "" : "s"}` : "nenhum pendente"}
+          onClick={() => setCartao({ titulo: "Tickets abertos agora", itens: tickets.filter((t) => !t.status_final) })}
+        />
+        <Mini
+          rotulo="Encerrados no período" valor={k.concluidosNoPeriodo}
+          sub={k.duracaoMediaDias != null ? `levaram ${k.duracaoMediaDias.toFixed(1).replace(".", ",")} dias em média` : undefined}
+          onClick={() => setCartao({ titulo: "Tickets encerrados no período", itens: tickets.filter((t) => t.status_final && noPeriodo(t.concluido_em, periodo)) })}
+        />
+        <Mini
+          rotulo="Categoria mais comum" valor={<span className="text-base">{k.categoriaTop?.nome ?? "—"}</span>}
+          sub={k.categoriaTop ? `${k.categoriaTop.pct}% dos abertos no período` : undefined}
+          onClick={k.categoriaTop ? () => setCartao({
+            titulo: `Categoria ${k.categoriaTop!.nome}, abertos no período`,
+            itens: tickets.filter((t) => noPeriodo(t.aberto_em, periodo) && (t.categoria || "Sem categoria") === k.categoriaTop!.nome),
+          }) : undefined}
+        />
+        <Mini
+          rotulo="Total na história" valor={tickets.length}
+          onClick={() => setCartao({ titulo: "Todos os tickets do cliente", itens: tickets })}
+        />
       </div>
+      <TicketsDoCartao cartao={cartao} onFechar={() => setCartao(null)} onAbrir={onAbrir} nomeAgente={nomeAgente} />
       <Cartao
         titulo="Tickets"
         acao={
@@ -400,5 +421,67 @@ export function AvaliacoesLista({
         </Cartao>
       </div>
     </div>
+  );
+}
+
+/**
+ * Os tickets que formam o número de um cartão da aba Tickets. "Abrir ticket"
+ * abre o detalhe por cima desta lista; fechar o detalhe volta para ela.
+ */
+function TicketsDoCartao({
+  cartao, onFechar, onAbrir, nomeAgente,
+}: {
+  cartao: { titulo: string; itens: Ticket360[] } | null;
+  onFechar: () => void;
+  onAbrir: (id: string) => void;
+  nomeAgente: (uid: string | null) => string | null;
+}) {
+  const itens = [...(cartao?.itens ?? [])].sort((a, b) => (b.aberto_em > a.aberto_em ? 1 : -1));
+  return (
+    <Dialog open={!!cartao} onOpenChange={(o) => !o && onFechar()}>
+      <DialogContent className="max-h-[88vh] w-[96vw] max-w-6xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{cartao?.titulo}</DialogTitle>
+          <DialogDescription>{itens.length} ticket{itens.length === 1 ? "" : "s"}</DialogDescription>
+        </DialogHeader>
+        {itens.length === 0 ? (
+          <Vazio>Nenhum ticket aqui.</Vazio>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap">Código</TableHead><TableHead className="whitespace-nowrap">Aberto em</TableHead><TableHead className="whitespace-nowrap">Assunto</TableHead>
+                  <TableHead className="whitespace-nowrap">Categoria</TableHead><TableHead className="whitespace-nowrap">Responsável</TableHead><TableHead className="whitespace-nowrap">Status</TableHead><TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {itens.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="whitespace-nowrap font-mono text-xs">{t.ticket_code ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">{format(parseISO(t.aberto_em), "dd/MM/yy")}</TableCell>
+                    <TableCell className="max-w-[220px] truncate" title={t.assunto}>{t.assunto}</TableCell>
+                    <TableCell className="whitespace-nowrap">{t.categoria ?? "Sem categoria"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{nomeAgente(t.responsavel_user_id) ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-semibold">
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: t.status_cor || (t.status_final ? "#22C55E" : "#0EA5E9") }} />
+                        {t.status_nome ?? (t.status_final ? "Encerrado" : "Aberto")}
+                        {t.status_final && t.concluido_em ? ` em ${format(parseISO(t.concluido_em), "dd/MM/yy")}` : ""}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-xs" onClick={() => onAbrir(t.id)}>
+                        <SquareArrowOutUpRight className="h-3.5 w-3.5" />Abrir ticket
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

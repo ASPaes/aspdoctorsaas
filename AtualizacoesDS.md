@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 26/09
+
+- ⬆️ **Cartões da aba Tickets da Visão 360° mostram a lista de tickets** — Em **Clientes › Visão 360° › Tickets**, os cartões **Abertos agora**, **Encerrados no período**, **Categoria mais comum** e **Total na história** passam a ser clicáveis. Cada um abre a lista dos tickets que formam aquele número, com código, assunto, categoria, responsável e status, e o botão **Abrir ticket** em cada linha abre a tela completa do ticket sem sair da Visão 360°.
+
 ### 25/09
 
 - ⬆️ **Conversa aberta pela Visão 360° vai para uma nova aba, e dá para chamar em outro número** — Em **Clientes › Visão 360° › Abrir conversa**, clicar numa conversa do cliente abre o Chat numa nova aba do navegador, e a Visão 360° continua aberta onde estava. A nova opção **Nova conversa em outro número** abre a mesma janela "Nova Conversa" do Chat, para escolher a instância e buscar um contato ou digitar um número avulso; a conversa já nasce ligada ao cliente e também abre numa nova aba.

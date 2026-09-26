@@ -84,13 +84,27 @@ export function Cartao({ titulo, sub, acao, children, className }: { titulo?: Re
   );
 }
 
-export function Mini({ rotulo, valor, sub, tom }: { rotulo: string; valor: ReactNode; sub?: ReactNode; tom?: "ruim" }) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <div className="text-xs font-medium text-muted-foreground">{rotulo}</div>
+/** Cartão de número. Com `onClick` vira botão, com o "Ver lista" à mostra para ninguém ter de adivinhar. */
+export function Mini({ rotulo, valor, sub, tom, onClick }: { rotulo: string; valor: ReactNode; sub?: ReactNode; tom?: "ruim"; onClick?: () => void }) {
+  const corpo = (
+    <>
+      <div className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">
+        {rotulo}
+        {onClick && <span className="text-[11px] font-semibold text-primary opacity-70 transition-opacity group-hover:opacity-100">Ver lista</span>}
+      </div>
       <div className={cn("mt-1 text-xl font-extrabold tabular-nums tracking-tight", tom === "ruim" && "text-red-600 dark:text-red-400")}>{valor}</div>
       {sub && <div className="text-[11.5px] text-muted-foreground">{sub}</div>}
-    </div>
+    </>
+  );
+  if (!onClick) return <div className="rounded-xl border bg-card px-4 py-3">{corpo}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn("group rounded-xl border bg-card px-4 py-3 text-left transition duration-300 hover:-translate-y-0.5 hover:border-primary/50", EASE)}
+    >
+      {corpo}
+    </button>
   );
 }
 
