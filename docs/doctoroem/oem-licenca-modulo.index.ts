@@ -488,6 +488,30 @@ const num = (v)=>{
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) ? n : undefined;
 };
+// ============================================================================
+// Nenhuma resposta sai com segredo da licença (26/09/2026).
+//
+// O parceiro devolve, na gravação e na leitura, a SENHA do usuário master e o
+// TokenWS da licença do cliente. Esta função repassava a resposta crua
+// (`resposta`, `leitura_crua`), e o DoctorSaaS guardava isso em
+// oem_sync_fila, oem_baixa_modulo_log e oem_estado_licenca_log: medido em
+// 26/09, 241 registros com a senha de licenças de clientes reais.
+//
+// A limpeza é no ÚNICO ponto de saída: toda resposta passa por `responder`.
+// Chave com senha/password/token, em qualquer profundidade, vira [removido].
+// ============================================================================
+const semSegredos = (v: unknown): unknown => {
+  if (Array.isArray(v)) return v.map(semSegredos);
+  if (v && typeof v === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+      out[k] = /senha|password|token/i.test(k) ? "[removido]" : semSegredos(x);
+    }
+    return out;
+  }
+  return v;
+};
+const responder = (corpo: unknown, init?: ResponseInit) => Response.json(semSegredos(corpo), init);
 Deno.serve(async (req)=>{
   if (req.method === "OPTIONS") return new Response(null, {
     headers: cors
@@ -495,7 +519,7 @@ Deno.serve(async (req)=>{
   try {
     const chave = req.headers.get("x-api-key") ?? (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
     if (!chave) {
-      return Response.json({
+      return responder({
         ok: false,
         mensagem: "Informe a chave em x-api-key."
       }, {
@@ -510,7 +534,7 @@ Deno.serve(async (req)=>{
     });
     const { data: registro } = await db.from("oem_api_chaves").select("id, tenant_id, ativa, revogada_em").eq("token_hash", await sha256Hex(chave)).maybeSingle();
     if (!registro || !registro.ativa || registro.revogada_em) {
-      return Response.json({
+      return responder({
         ok: false,
         mensagem: "Chave inválida."
       }, {
@@ -563,7 +587,7 @@ Deno.serve(async (req)=>{
     const novoDesativado = boolPedido(corpo.novo_desativado);
     const modoEstado = moduloCodigo === undefined && !modoCadastro && (novoBloqueado !== undefined || novoDesativado !== undefined);
     if (novoBloqueado === "invalido" || novoDesativado === "invalido") {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "entrada",
         mensagem: "novo_bloqueado e novo_desativado precisam ser true ou false. Nada foi enviado."
@@ -573,7 +597,7 @@ Deno.serve(async (req)=>{
       });
     }
     if (!empresa || !filial || (moduloCodigo === undefined && !modoCadastro && !modoEstado)) {
-      return Response.json({
+      return responder({
         ok: false,
         mensagem: 'Informe empresa e filial, mais modulo_codigo (módulo), novo_nome/novo_cnpj (cadastro) ou novo_bloqueado/novo_desativado (estado). Ex.: {"empresa":"32801","filial":"39751","modulo_codigo":10,"nova_quantidade":1}'
       }, {
@@ -584,7 +608,7 @@ Deno.serve(async (req)=>{
     // Documento inválido não vai para o parceiro: é ele que fatura por este
     // número, e a rota salva a filial inteira sem validar nada.
     if (novoCnpj !== undefined && novoCnpj.length !== 11 && novoCnpj.length !== 14) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "entrada",
         mensagem: `novo_cnpj precisa ter 11 (CPF) ou 14 (CNPJ) dígitos. Recebi ${novoCnpj.length}. Nada foi enviado.`
@@ -594,7 +618,7 @@ Deno.serve(async (req)=>{
       });
     }
     if (novoNome !== undefined && novoNome === "") {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "entrada",
         mensagem: "novo_nome vazio apagaria o nome da loja no OEM. Nada foi enviado."
@@ -607,7 +631,7 @@ Deno.serve(async (req)=>{
     // por vez, e gravar o primeiro devolvendo sucesso deixaria o resto por
     // fazer sem ninguém saber — exatamente o que se está consertando.
     if (alteracoes.length > 1 && !(corpo.par_documentado === true)) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "entrada",
         mensagem: "Lote de módulos só pelo caminho documentado. Envie par_documentado: true. Nada foi enviado."
@@ -693,7 +717,7 @@ Deno.serve(async (req)=>{
         }
       }
       if (codProdutoDoc === undefined) {
-        return Response.json({
+        return responder({
           ok: false, etapa: "produto",
           mensagem: `Não deu para descobrir o código do produto da filial ${empresa}/${filial}. Informe "codproduto" no corpo, ou rode a carga do OEM para esta filial.`
         }, { status: 409, headers: cors });
@@ -705,14 +729,14 @@ Deno.serve(async (req)=>{
       const rDoc = await fetch(urlLer, { headers: { Authorization: `Bearer ${tk}`, Accept: "application/json" } });
       const lido = await rDoc.json().catch(()=>null);
       if (!rDoc.ok || !lido) {
-        return Response.json({
+        return responder({
           ok: false, etapa: "leitura", http: rDoc.status, url: urlLer,
           mensagem: "A leitura documentada da filial não respondeu."
         }, { status: 502, headers: cors });
       }
       const modsLidos = Array.isArray(pega(lido, "modulos")) ? pega(lido, "modulos") : null;
       if (!modsLidos || modsLidos.length === 0) {
-        return Response.json({
+        return responder({
           ok: false, etapa: "leitura",
           mensagem: "A leitura documentada não trouxe módulos. Nada foi enviado ao OEM.",
           leitura: lido
@@ -731,7 +755,7 @@ Deno.serve(async (req)=>{
       });
       const cruPl = await rPl.json().catch(()=>null);
       if (!rPl.ok || !cruPl) {
-        return Response.json({
+        return responder({
           ok: false, etapa: "leitura_complementar", http: rPl.status,
           mensagem: "A leitura complementar da filial não respondeu. Sem ela, gravar zeraria tipo de negócio, origem da venda e os contadores. Nada foi enviado."
         }, { status: 502, headers: cors });
@@ -891,7 +915,7 @@ Deno.serve(async (req)=>{
 
         if (simular) {
           const m = podeGravar && !faltamObrigatorios.length ? montarCorpo() : null;
-          return Response.json({
+          return responder({
             ok: true,
             simulado: true,
             modo: "estado",
@@ -913,7 +937,7 @@ Deno.serve(async (req)=>{
           });
         }
         if (!podeGravar || faltamObrigatorios.length) {
-          return Response.json({
+          return responder({
             ok: false,
             etapa: "mapeamento",
             modo: "estado",
@@ -927,7 +951,7 @@ Deno.serve(async (req)=>{
           });
         }
         if (semMudanca) {
-          return Response.json({
+          return responder({
             ok: true,
             modo: "estado",
             sem_mudanca: true,
@@ -1050,7 +1074,7 @@ Deno.serve(async (req)=>{
             }
           }
         }
-        return Response.json({
+        return responder({
           ok: rEst.ok,
           http: rEst.status,
           modo: "estado",
@@ -1077,7 +1101,7 @@ Deno.serve(async (req)=>{
       // --------------------------------------------------------- modificar
       const montado = montarPayloadDocumentado(lido, escalares, alteracoes, cancelados);
       if (montado.erro) {
-        return Response.json({
+        return responder({
           ok: false, etapa: "modulo", ...montado.erro
         }, { status: montado.erro.status ?? 400, headers: cors });
       }
@@ -1091,7 +1115,7 @@ Deno.serve(async (req)=>{
       const completados = montado.completados;
 
       if (simular) {
-        return Response.json({
+        return responder({
           ok: true, simulado: true, par: "documentado",
           codproduto: codProdutoDoc, url_leitura: urlLer,
           url_gravacao: `${LEITURA}/licenciamento/minhaslicencas/saveFilial`,
@@ -1152,7 +1176,7 @@ Deno.serve(async (req)=>{
         }
       }
 
-      return Response.json({
+      return responder({
         ok: rSave.ok, http: rSave.status, par: "documentado",
         codproduto: codProdutoDoc, alvo: alvoDescrito, alvos, completados, diferencas,
         reafirmados: montado.reafirmados,
@@ -1174,7 +1198,7 @@ Deno.serve(async (req)=>{
       cru = JSON.parse(cruTexto);
     } catch  {}
     if (!rLer.ok) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "leitura",
         http: rLer.status,
@@ -1240,7 +1264,7 @@ Deno.serve(async (req)=>{
       if (semValor.length) faltando.push(`valor dos módulos ${semValor.join(", ")}`);
     }
     if (faltando.length) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "mapeamento",
         mensagem: "A leitura da filial não trouxe campos obrigatórios da gravação. Nada foi enviado ao OEM.",
@@ -1278,7 +1302,7 @@ Deno.serve(async (req)=>{
       if (novoNome === undefined && (payload.nomeLoja === undefined || payload.nomeLoja === null)) faltaCadastro.push("nomeLoja");
       if (novoCnpj === undefined && (payload.cpfCnpj === undefined || payload.cpfCnpj === null)) faltaCadastro.push("cpfCnpj");
       if (faltaCadastro.length) {
-        return Response.json({
+        return responder({
           ok: false,
           etapa: "mapeamento",
           mensagem: "A leitura da filial não trouxe um campo de cadastro que seria regravado. Nada foi enviado ao OEM.",
@@ -1301,7 +1325,7 @@ Deno.serve(async (req)=>{
         cpfCnpj: payload.cpfCnpj ?? null
       };
       if (antes.nomeLoja === depois.nomeLoja && antes.cpfCnpj === depois.cpfCnpj) {
-        return Response.json({
+        return responder({
           ok: true,
           modo: "cadastro",
           sem_mudanca: true,
@@ -1312,7 +1336,7 @@ Deno.serve(async (req)=>{
         });
       }
       if (simular) {
-        return Response.json({
+        return responder({
           ok: true,
           simulado: true,
           modo: "cadastro",
@@ -1338,7 +1362,7 @@ Deno.serve(async (req)=>{
       try {
         respCad = JSON.parse(txtCad);
       } catch  {}
-      return Response.json({
+      return responder({
         ok: rCad.ok,
         http: rCad.status,
         modo: "cadastro",
@@ -1532,7 +1556,7 @@ Deno.serve(async (req)=>{
     // O código 8 é o produto (GESTAO LEGAL), não um módulo: mexer nele por aqui
     // não tem significado.
     if (moduloCodigo === 8) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "modulo",
         mensagem: "O código 8 é o produto da licença, não um módulo. Nada foi enviado."
@@ -1555,7 +1579,7 @@ Deno.serve(async (req)=>{
       const antes = num(payload[campo]) ?? 0;
       payload[campo] = novaQtd;
       if (simular) {
-        return Response.json({
+        return responder({
           ok: true,
           simulado: true,
           campo,
@@ -1579,7 +1603,7 @@ Deno.serve(async (req)=>{
       try {
         respC = JSON.parse(txtC);
       } catch  {}
-      return Response.json({
+      return responder({
         ok: rC.ok,
         http: rC.status,
         campo,
@@ -1635,7 +1659,7 @@ Deno.serve(async (req)=>{
     if (!achou && novaQtd > 0) {
       const unit = num(corpo.valor_unitario);
       if (unit === undefined) {
-        return Response.json({
+        return responder({
           ok: false,
           etapa: "modulo",
           mensagem: `O módulo ${moduloCodigo} não está na licença ${empresa}/${filial}. Para acrescentá-lo, informe valor_unitario.`
@@ -1654,7 +1678,7 @@ Deno.serve(async (req)=>{
       achou = true;
     }
     if (!achou) {
-      return Response.json({
+      return responder({
         ok: false,
         etapa: "modulo",
         mensagem: `A licença ${empresa}/${filial} não tem o módulo ${moduloCodigo}. Nada foi enviado.`,
@@ -1665,7 +1689,7 @@ Deno.serve(async (req)=>{
       });
     }
     if (simular) {
-      return Response.json({
+      return responder({
         ok: true,
         simulado: true,
         payload,
@@ -1689,7 +1713,7 @@ Deno.serve(async (req)=>{
     try {
       resposta = JSON.parse(respTexto);
     } catch  {}
-    return Response.json({
+    return responder({
       ok: rGravar.ok,
       http: rGravar.status,
       payload,
@@ -1700,7 +1724,7 @@ Deno.serve(async (req)=>{
       headers: cors
     });
   } catch (e) {
-    return Response.json({
+    return responder({
       ok: false,
       mensagem: e instanceof Error ? e.message : String(e)
     }, {
