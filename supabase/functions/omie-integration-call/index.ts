@@ -496,10 +496,17 @@ Deno.serve(async (req)=>{
       // ====================================================================
       if (!criarCadastroProprio && !contratoJaNoOmie) {
         const prova = await decidirContrato("dry_run");
+        // v19 (25/09/2026): cliente sem de/para (customers_mapping) nao e falha da prova, e o
+        // estado normal de quem nunca foi ao Omie. O contrato-criar so sabe conferir contrato
+        // depois que o cliente existe no de/para, entao aqui a prova nao tem contra o que rodar
+        // -- igual ao cadastro proprio. Tratar isso como falha travava TODO contrato de cliente
+        // novo (M M. EVENTOS, 25/09). O cliente vai primeiro e o contrato e conferido logo abaixo.
+        const provaErro = prova.body?.error;
+        const provaClientePendente = typeof provaErro === "string" && /não sincronizado|customers_mapping/i.test(provaErro);
         // A prova que FALHA (nao 'bloqueado': erro de leitura, rede, faultstring do Omie) tambem
         // para tudo. Ate a v17 ela era ignorada, e a promessa de "nao tocar o cliente sem o
         // contrato passar" valia so para a recusa formal.
-        if (prova.operacao !== "bloqueado" && prova.ok === false) {
+        if (prova.operacao !== "bloqueado" && prova.ok === false && !provaClientePendente) {
           return json({
             ok: false,
             modo: "criar",
