@@ -232,3 +232,48 @@ export function useSalvarCanalDaRegua() {
     onError: (e: any) => toast.error(e?.message ?? 'Não consegui salvar o número'),
   });
 }
+
+/**
+ * Liga e desliga a régua, e mexe na lista de telefones de teste.
+ *
+ * ⚠️ Estes dois campos são o que separa "o robô está mudo" de "o robô fala com
+ * os seus clientes". Só super admin consegue gravar, e quem barra é o gatilho
+ * `fn_fin_protege_chaves_de_liberacao`, no BANCO — a tela é conveniência, não
+ * é a trava.
+ *
+ * Enquanto `liberada` é falso, só os números da lista recebem. Depois de
+ * liberada a lista deixa de filtrar e vira histórico de quem testou; desligar a
+ * chave volta tudo ao modo de teste na hora, sem deploy.
+ */
+export function useSalvarPortaoDaRegua() {
+  const qc = useQueryClient();
+  const { effectiveTenantId } = useTenantFilter();
+
+  return useMutation({
+    mutationFn: async (campos: { liberada?: boolean; telefones?: string[] }) => {
+      const patch: Record<string, unknown> = {};
+      if (campos.liberada !== undefined) patch.fin_regua_liberada = campos.liberada;
+      if (campos.telefones !== undefined) patch.fin_regua_telefones_teste = campos.telefones;
+      const { error } = await (supabase.from('configuracoes' as any) as any)
+        .update(patch)
+        .eq('tenant_id', effectiveTenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fin-regua-estado'] }),
+    onError: (e: any) => toast.error(e?.message ?? 'Não consegui salvar'),
+  });
+}
+
+/**
+ * Deixa o telefone só com dígitos e com DDI do Brasil.
+ *
+ * A comparação lá no motor é por DDD + os 8 últimos dígitos, então o nono
+ * dígito não atrapalha — mas guardar bonito evita a dúvida de quem lê a lista
+ * depois.
+ */
+export function normalizarTelefone(bruto: string): string {
+  const d = String(bruto ?? '').replace(/\D/g, '');
+  if (!d) return '';
+  if (d.length <= 11) return `55${d}`;
+  return d;
+}

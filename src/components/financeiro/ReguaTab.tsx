@@ -27,6 +27,7 @@ import {
   useSalvarToque,
   type FinToque,
 } from '@/hooks/useFinRegua';
+import PortaoDaRegua from './PortaoDaRegua';
 
 /**
  * Régua de cobrança — configuração e estado.
@@ -130,6 +131,8 @@ export default function ReguaTab() {
                 </div>
               </div>
             )}
+
+            <PortaoDaRegua estado={estado} temCanal={!!estado?.instance_id} />
           </div>
         </div>
       </Card>
