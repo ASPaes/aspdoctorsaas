@@ -1,4 +1,4 @@
-import { useMemo, useState, type DragEvent } from "react";
+import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { usePortao } from "@/hooks/usePortao";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -82,6 +82,11 @@ interface Props {
   proximaFaseNome: string | null;
   agrupado: boolean;
   onOpenJourney: (journeyId: string, sub?: { id: string; code: string | null }) => void;
+  /** No telefone o quadro mostra UMA etapa por vez, escolhida nas abas de cima.
+   *  As etapas continuam chegando inteiras: e delas que saem as contagens. */
+  etapaVisivelId?: string | null;
+  /** Quantos cartoes em cada etapa, para o numero da aba bater com o da coluna. */
+  onContagemPorEtapa?: (porEtapa: Record<string, number>) => void;
 }
 
 const STATUS_COR: Record<string, string> = {
@@ -116,7 +121,7 @@ function goLiveCurto(iso: string): string {
 }
 
 /** Coluna virtual — não é etapa de pipeline, então não pode colidir com um uuid. */
-const GOLIVE_COL_ID = "__impl_golive__";
+export const GOLIVE_COL_ID = "__impl_golive__";
 
 /** Resumo de um ticket pai a partir dos seus sub-tickets. */
 interface GrupoResumo {
@@ -276,7 +281,7 @@ function GrupoTicketCard({
 
 export default function ImplantacaoBoard({
   stages, rows, jornadasSemTreino, goLivePorJornada, goLiveForaDaJanela, proximaFaseNome,
-  agrupado, onOpenJourney,
+  agrupado, onOpenJourney, etapaVisivelId, onContagemPorEtapa,
 }: Props) {
   const queryClient = useQueryClient();
   // Quadro de treinos: hoje qualquer um arrasta. O portão é o mesmo do kanban
@@ -436,6 +441,24 @@ export default function ImplantacaoBoard({
       .sort((a, b) => (b.ultimoFeito ?? "").localeCompare(a.ultimoFeito ?? ""));
   }, [porEtapa, etapaFinalId, filhosPorPai]);
 
+  /** Mesma conta do cabecalho de cada coluna — a aba nao pode dizer um numero e a
+   *  coluna outro. Na etapa final o cartao e o ticket pai, nao o sub-ticket. */
+  const contagens = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const s of stages) {
+      const isFinal = s.id === etapaFinalId;
+      const itens = isFinal ? 0 : (porEtapa[s.id] ?? []).length;
+      const grupos = isFinal ? gruposFinalizados.length : 0;
+      m[s.id] = itens + grupos + (semTreinoPorEtapa[s.id] ?? []).length;
+    }
+    // A coluna de conclusao nao vem de onboarding_stages, mas e uma aba como as outras.
+    m[GOLIVE_COL_ID] = concluidas.length;
+    return m;
+  }, [stages, porEtapa, etapaFinalId, gruposFinalizados, semTreinoPorEtapa, concluidas.length]);
+  useEffect(() => {
+    onContagemPorEtapa?.(contagens);
+  }, [contagens, onContagemPorEtapa]);
+
   // ── Visão agrupada ────────────────────────────────────────────────────────
   if (agrupado) {
     if (grupos.length === 0) {
@@ -464,7 +487,7 @@ export default function ImplantacaoBoard({
 
   // ── Quadro por etapa ──────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-x-auto p-4">
+    <div className={etapaVisivelId ? "flex-1 overflow-y-auto p-3" : "flex-1 overflow-x-auto p-4"}>
       {goLiveForaDaJanela > 0 && (
         <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md border border-[#22C55E]/30 bg-[#22C55E]/[0.06] text-[11px] text-muted-foreground">
           <Search className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
@@ -475,8 +498,8 @@ export default function ImplantacaoBoard({
           </span>
         </div>
       )}
-      <div className="flex flex-row gap-3 min-h-full pb-2">
-        {stages.map((col) => {
+      <div className={etapaVisivelId ? "flex flex-col" : "flex flex-row gap-3 min-h-full pb-2"}>
+        {(etapaVisivelId ? stages.filter((s) => s.id === etapaVisivelId) : stages).map((col) => {
           // Na etapa final o cartão é o ticket pai; nas outras, o sub-ticket.
           const isFinal = col.id === etapaFinalId;
           const items = isFinal ? [] : porEtapa[col.id] ?? [];
@@ -500,16 +523,19 @@ export default function ImplantacaoBoard({
                 if (tid) handleDrop(tid, col.id, from);
                 setDragOverCol(null);
               }}
-              className={`flex flex-col min-w-[280px] w-[280px] bg-muted/30 border border-border rounded-lg transition-all ${isOver ? "ring-2" : ""}`}
+              className={`flex flex-col transition-all ${etapaVisivelId ? "w-full" : "min-w-[280px] w-[280px] bg-muted/30 border border-border rounded-lg"} ${isOver ? "ring-2" : ""}`}
               style={isOver ? { boxShadow: `0 0 0 2px ${color}66` } : undefined}
             >
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-xs font-medium truncate">{col.nome}</span>
-                <Badge variant="outline" className="ml-auto text-[10px]">{cartoes}</Badge>
-              </div>
+              {/* No telefone o nome da etapa ja esta na aba selecionada acima. */}
+              {!etapaVisivelId && (
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="text-xs font-medium truncate">{col.nome}</span>
+                  <Badge variant="outline" className="ml-auto text-[10px]">{cartoes}</Badge>
+                </div>
+              )}
 
-              <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+              <div className={`flex-1 space-y-2 ${etapaVisivelId ? "" : "p-2 overflow-y-auto max-h-[75vh]"}`}>
                 {cartoes === 0 ? (
                   <div className="text-center text-[11px] text-muted-foreground/60 py-6 px-2">
                     Nenhum treinamento aqui.
@@ -730,6 +756,7 @@ export default function ImplantacaoBoard({
         {/* Coluna de conclusão, espelhando "Onboarding concluído": a etapa final do
             pipeline é para o filho encerrado com irmão ainda em andamento; quando TUDO
             encerra, o go-live traz o ticket inteiro para cá. */}
+        {(!etapaVisivelId || etapaVisivelId === GOLIVE_COL_ID) && (
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -741,21 +768,23 @@ export default function ImplantacaoBoard({
             setDragOverCol(null);
             toast.error("O go-live é dado pelo ticket, e só com todos os treinamentos encerrados.");
           }}
-          className={`flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5 transition-all ${
-            dragOverCol === GOLIVE_COL_ID ? "ring-2 ring-emerald-500/60" : ""
-          }`}
+          className={`flex flex-col transition-all ${
+            etapaVisivelId ? "w-full" : "min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5"
+          } ${dragOverCol === GOLIVE_COL_ID ? "ring-2 ring-emerald-500/60" : ""}`}
         >
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
-            <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#22C55E" }} />
-            <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
-              Implantação concluída
-            </span>
-            <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
-              {concluidas.length}
-            </Badge>
-          </div>
+          {!etapaVisivelId && (
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: "#22C55E" }} />
+              <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
+                Implantação concluída
+              </span>
+              <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+                {concluidas.length}
+              </Badge>
+            </div>
+          )}
 
-          <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+          <div className={`flex-1 space-y-2 ${etapaVisivelId ? "" : "p-2 overflow-y-auto max-h-[75vh]"}`}>
             {concluidas.length === 0 ? (
               <div className="text-center text-[11px] text-muted-foreground/50 py-6 px-2">
                 Nenhuma implantação concluída nos últimos 30 dias.
@@ -798,6 +827,7 @@ export default function ImplantacaoBoard({
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

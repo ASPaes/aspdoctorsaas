@@ -44,6 +44,8 @@ export default function AcompanhamentoBoard({
   busca,
   onOpenTicket,
   onTotalChange,
+  etapaVisivelId,
+  onContagemPorEtapa,
 }: {
   stages: AcompanhamentoStage[];
   tenantId: string | null;
@@ -52,6 +54,11 @@ export default function AcompanhamentoBoard({
   /** Quantos tickets estão no quadro agora. Os tickets são buscados aqui dentro, então
    *  esta é a única forma de o cabeçalho da página mostrar o total desta jornada. */
   onTotalChange?: (total: number) => void;
+  /** No telefone o quadro mostra UMA etapa por vez, escolhida nas abas de cima.
+   *  As etapas continuam chegando inteiras: e delas que saem as contagens. */
+  etapaVisivelId?: string | null;
+  /** Quantos cartoes em cada etapa, para o numero das abas bater com o da coluna. */
+  onContagemPorEtapa?: (porEtapa: Record<string, number>) => void;
 }) {
   const qc = useQueryClient();
   const podeMover = usePortao("onb.mover");
@@ -107,6 +114,14 @@ export default function AcompanhamentoBoard({
     onTotalChange?.(total);
   }, [total, onTotalChange]);
 
+  const contagens = useMemo(
+    () => Object.fromEntries(stages.map((s) => [s.id, porEtapa[s.id]?.length ?? 0])),
+    [stages, porEtapa],
+  );
+  useEffect(() => {
+    onContagemPorEtapa?.(contagens);
+  }, [contagens, onContagemPorEtapa]);
+
   async function handleDrop(ticketId: string, stageId: string) {
     const atual = tickets.find((t) => t.id === ticketId);
     if (!atual || atual.acompanhamento_stage_id === stageId) return;
@@ -131,9 +146,9 @@ export default function AcompanhamentoBoard({
   }
 
   return (
-    <div className="flex-1 overflow-x-auto p-4">
-      <div className="flex flex-row gap-3 min-h-full pb-2">
-        {stages.map((col) => {
+    <div className={etapaVisivelId ? "flex-1 overflow-y-auto p-3" : "flex-1 overflow-x-auto p-4"}>
+      <div className={etapaVisivelId ? "flex flex-col" : "flex flex-row gap-3 min-h-full pb-2"}>
+        {(etapaVisivelId ? stages.filter((s) => s.id === etapaVisivelId) : stages).map((col) => {
           const items = porEtapa[col.id] ?? [];
           const cor = col.cor ?? "#6B7280";
           return (
@@ -150,19 +165,22 @@ export default function AcompanhamentoBoard({
                 if (id) handleDrop(id, col.id);
                 setDragOverCol(null);
               }}
-              className={`flex flex-col min-w-[280px] w-[280px] rounded-lg border border-border bg-muted/20 transition-all ${
-                dragOverCol === col.id ? "ring-2 ring-primary/60" : ""
-              }`}
+              className={`flex flex-col transition-all ${
+                etapaVisivelId ? "w-full" : "min-w-[280px] w-[280px] rounded-lg border border-border bg-muted/20"
+              } ${dragOverCol === col.id ? "ring-2 ring-primary/60" : ""}`}
             >
-              <div className="flex items-center gap-2 px-3 py-2 border-b border-border rounded-t-lg">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor }} />
-                <span className="text-xs font-medium truncate">{col.nome}</span>
-                <Badge variant="outline" className="ml-auto text-[10px]">
-                  {items.length}
-                </Badge>
-              </div>
+              {/* No telefone o nome da etapa ja esta na aba selecionada acima. */}
+              {!etapaVisivelId && (
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-border rounded-t-lg">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: cor }} />
+                  <span className="text-xs font-medium truncate">{col.nome}</span>
+                  <Badge variant="outline" className="ml-auto text-[10px]">
+                    {items.length}
+                  </Badge>
+                </div>
+              )}
 
-              <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+              <div className={`flex-1 space-y-2 ${etapaVisivelId ? "" : "p-2 overflow-y-auto max-h-[75vh]"}`}>
                 {items.length === 0 ? (
                   <div className="text-center text-[11px] text-muted-foreground/50 py-6">
                     Nenhum acompanhamento aqui

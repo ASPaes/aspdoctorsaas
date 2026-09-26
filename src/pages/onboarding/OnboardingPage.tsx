@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DateRangePicker } from "@/components/ui/DateRangePicker";
-import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, LayoutList, MoreHorizontal } from "lucide-react";
+import { Loader2, Plus, Pause, Clock, Calendar, Settings2, CheckCircle2, Ban, X, Search, GraduationCap, Tag, ChevronDown, ChevronLeft, ChevronRight, LayoutList, MoreHorizontal } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { NewJourneyModal } from "./NewJourneyModal";
 import JourneyDetailSheet from "./JourneyDetailSheet";
 import { SaidaSemTreinoDialog } from "./SaidaSemTreinoDialog";
-import ImplantacaoBoard, { type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
+import ImplantacaoBoard, { GOLIVE_COL_ID, type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
 import AcompanhamentoBoard from "./AcompanhamentoBoard";
 import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
@@ -182,6 +182,19 @@ export default function OnboardingPage() {
   const [detailSubTicket, setDetailSubTicket] = useState<{ id: string; code: string | null } | null>(null);
   const [busca, setBusca] = useState("");
   const noCelular = useIsMobile() || isChatHost();
+  /** Etapa unica em cartaz no telefone. No computador e sempre null e o quadro
+   *  continua inteiro, lado a lado. */
+  const [etapaSelId, setEtapaSelId] = useState<string | null>(null);
+  /** Quantos cartoes por etapa. Onboarding calcula aqui (tem journeysByStage); os
+   *  outros dois quadros reportam, porque a conta deles mora la dentro. */
+  const [contagensDoQuadro, setContagensDoQuadro] = useState<Record<string, number>>({});
+  const receberContagens = useCallback((m: Record<string, number>) => {
+    setContagensDoQuadro((atual) => {
+      const chaves = Object.keys(m);
+      if (chaves.length === Object.keys(atual).length && chaves.every((k) => atual[k] === m[k])) return atual;
+      return m;
+    });
+  }, []);
   // No telefone a barra guarda so a busca; o resto sai daqui.
   const [maisFiltros, setMaisFiltros] = useState(false);
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>("todos");
@@ -885,6 +898,42 @@ export default function OnboardingPage() {
     );
   }
 
+  /** As etapas como o quadro as desenha. No Onboarding existe uma coluna a mais que
+   *  nao vem de onboarding_stages: a de concluido, montada no proprio JSX. Sem ela
+   *  aqui, a aba dela sumiria no telefone. */
+  const etapasDoQuadro = useMemo(() => {
+    const base = stages.map((s) => ({ id: s.id, nome: s.nome, cor: s.cor || "#6B7280" }));
+    if (isAcompanhamento) return base;
+    // Os dois quadros tem uma coluna que nao vem de onboarding_stages. No telefone
+    // ela precisa de aba propria, senao aparecia colada na etapa escolhida.
+    if (isImplantacao) return [...base, { id: GOLIVE_COL_ID, nome: "Implantação concluída", cor: "#22C55E" }];
+    if (!proximaPhase) return base;
+    return [...base, { id: ONB_DONE_COL_ID, nome: `${phaseAtual?.nome ?? "Jornada"} concluído`, cor: "#10B981" }];
+  }, [stages, isAcompanhamento, isImplantacao, proximaPhase, phaseAtual?.nome]);
+
+  const contagensPorEtapa = useMemo<Record<string, number>>(() => {
+    if (isAcompanhamento || isImplantacao) return contagensDoQuadro;
+    const m: Record<string, number> = {};
+    for (const e of etapasDoQuadro) m[e.id] = (journeysByStage[e.id] ?? []).length;
+    return m;
+  }, [isAcompanhamento, isImplantacao, contagensDoQuadro, etapasDoQuadro, journeysByStage]);
+
+  /** Trocou de fase ou de pipeline: volta para a primeira etapa. Mantem a escolhida
+   *  quando ela continua existindo, senao a tela "pularia" a cada refetch.
+   *  `stages.length` na guarda, e nao `etapasDoQuadro`: enquanto as etapas carregam a
+   *  lista tem so a coluna virtual de concluido, e sem isso a tela abria nela. */
+  useEffect(() => {
+    if (!noCelular || stages.length === 0) return;
+    setEtapaSelId((atual) => (atual && etapasDoQuadro.some((e) => e.id === atual) ? atual : etapasDoQuadro[0].id));
+  }, [noCelular, stages.length, etapasDoQuadro]);
+
+  const etapaVisivelId = noCelular ? etapaSelId : null;
+  const idxEtapa = etapasDoQuadro.findIndex((e) => e.id === etapaVisivelId);
+  /** Ate 6 etapas as abas cabem deslizando pouco. Acima disso — a Look Sistemas tem
+   *  pipeline de 12 com nomes longos — a faixa vira o mesmo arrasta-arrasta que este
+   *  modo veio resolver, entao troca por um passo de cada vez. */
+  const etapasEmAbas = etapasDoQuadro.length <= 6;
+
   const loading = pipelinesQuery.isLoading || stagesQuery.isLoading || journeysQuery.isLoading;
   const totalFaseAtual = selectedPipelineId ? totalDoPipeline(selectedPipelineId, loading) : null;
 
@@ -900,7 +949,42 @@ export default function OnboardingPage() {
           {/* O nome do modulo ja esta na barra do app no telefone; repeti-lo aqui
               custava ~110px de uma linha que nao cabia. */}
           {!noCelular && <h1 className="text-lg font-semibold">Implantação</h1>}
-          {phases.length > 1 && (
+          {/* No telefone as duas faixas (fase e pipeline) viram dois seletores numa
+              linha so: e a linha que sobra que vira cartao na lista. */}
+          {noCelular ? (
+            <>
+              {phases.length > 1 && (
+                <Select value={phaseId ?? ""} onValueChange={(v) => setPhaseId(v)}>
+                  <SelectTrigger className="h-8 text-xs min-w-0 flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {phases.map((p) => (
+                      <SelectItem key={p.id} value={p.id} className="text-xs">{p.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {pipelines.length > 1 && (
+                <Select value={selectedPipelineId ?? ""} onValueChange={selectPipeline}>
+                  <SelectTrigger className="h-8 text-xs min-w-0 flex-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {pipelines.map((p) => {
+                      const total = totalDoPipeline(p.id, loading);
+                      return (
+                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                          {p.nome}{total === null ? "" : ` (${total})`}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+              {phases.length <= 1 && pipelines.length <= 1 && (
+                <span className="text-sm font-semibold truncate">
+                  {pipelines[0]?.nome ?? phaseAtual?.nome ?? "Implantação"}
+                </span>
+              )}
+            </>
+          ) : phases.length > 1 ? (
             <div className="inline-flex rounded-md border border-border p-0.5">
               {phases.map((p) => (
                 <button
@@ -912,7 +996,7 @@ export default function OnboardingPage() {
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
           {/* Com dois pipelines o total mora no badge de cada um. Com um só a barra de
               pipelines nem é renderizada, e sem isto a fase ficaria sem total nenhum. */}
           {/* No telefone o total de cada coluna ja aparece no cabecalho dela, e esta
@@ -958,7 +1042,7 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {pipelines.length > 1 && (
+      {!noCelular && pipelines.length > 1 && (
         <div className="flex flex-wrap items-center gap-1 px-4 py-2 border-b border-border bg-background">
           <div className="inline-flex rounded-md border border-border p-0.5 flex-wrap">
             {pipelines.map((p) => {
@@ -1140,7 +1224,82 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-
+      {/* ── Etapas no telefone ───────────────────────────────────────────────
+          O quadro deixa de rolar de lado: uma etapa por vez, escolhida aqui, e a
+          lista desce em largura cheia. Ate 6 etapas cabem como abas; acima disso
+          a faixa deslizante seria o mesmo problema de novo, entao vira um passo
+          por toque, dizendo em qual delas voce esta. */}
+      {noCelular && !loading && etapasDoQuadro.length > 0 && (
+        etapasEmAbas ? (
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border overflow-x-auto scrollbar-none shrink-0">
+            {etapasDoQuadro.map((e) => {
+              const ativa = e.id === etapaVisivelId;
+              const n = contagensPorEtapa[e.id] ?? 0;
+              return (
+                <button
+                  key={e.id}
+                  type="button"
+                  onClick={(ev) => {
+                    setEtapaSelId(e.id);
+                    // Sem isto, tocar numa aba da ponta deixa a escolhida meio escondida.
+                    ev.currentTarget.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+                  }}
+                  aria-current={ativa ? "true" : undefined}
+                  className={cn(
+                    "inline-flex items-center gap-2 shrink-0 rounded-full border px-3 py-1.5 text-xs whitespace-nowrap transition-colors",
+                    ativa
+                      ? "border-primary/60 bg-primary/15 text-primary font-medium"
+                      : "border-border text-muted-foreground"
+                  )}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ background: e.cor }} />
+                  {e.nome}
+                  <span
+                    className={cn(
+                      "rounded px-1.5 text-[10px] tabular-nums",
+                      ativa ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {n}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Etapa anterior"
+              disabled={idxEtapa <= 0}
+              onClick={() => setEtapaSelId(etapasDoQuadro[idxEtapa - 1]?.id ?? null)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0 flex-1 text-center">
+              <p className="truncate text-sm font-medium">{etapasDoQuadro[idxEtapa]?.nome ?? "—"}</p>
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                etapa {idxEtapa + 1} de {etapasDoQuadro.length}
+                {" · "}
+                {contagensPorEtapa[etapaVisivelId ?? ""] ?? 0}{" "}
+                {(contagensPorEtapa[etapaVisivelId ?? ""] ?? 0) === 1 ? "cartão" : "cartões"}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 shrink-0"
+              aria-label="Próxima etapa"
+              disabled={idxEtapa < 0 || idxEtapa >= etapasDoQuadro.length - 1}
+              onClick={() => setEtapaSelId(etapasDoQuadro[idxEtapa + 1]?.id ?? null)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center flex-1">
@@ -1157,6 +1316,8 @@ export default function OnboardingPage() {
           busca={busca}
           onOpenTicket={setAcompTicketId}
           onTotalChange={setTotalAcompanhamento}
+          etapaVisivelId={etapaVisivelId}
+          onContagemPorEtapa={receberContagens}
         />
       ) : isImplantacao ? (
         <ImplantacaoBoard
@@ -1171,11 +1332,13 @@ export default function OnboardingPage() {
             setDetailSubTicket(sub ?? null);
             setDetailId(id);
           }}
+          etapaVisivelId={agrupadoPorTicket ? null : etapaVisivelId}
+          onContagemPorEtapa={receberContagens}
         />
       ) : (
-        <div className="flex-1 overflow-x-auto p-4">
-          <div className="flex flex-row gap-3 min-h-full pb-2">
-            {stages.map((col) => {
+        <div className={etapaVisivelId ? "flex-1 overflow-y-auto p-3" : "flex-1 overflow-x-auto p-4"}>
+          <div className={etapaVisivelId ? "flex flex-col" : "flex flex-row gap-3 min-h-full pb-2"}>
+            {(etapaVisivelId ? stages.filter((s) => s.id === etapaVisivelId) : stages).map((col) => {
               const items = journeysByStage[col.id] ?? [];
               const isOver = dragOverCol === col.id;
               const color = col.cor || "#6B7280";
@@ -1194,17 +1357,20 @@ export default function OnboardingPage() {
                     if (jid) handleDrop(jid, col.id, from);
                     setDragOverCol(null);
                   }}
-                  className={`flex flex-col min-w-[280px] w-[280px] bg-muted/30 border border-border rounded-lg transition-all ${isOver ? "ring-2" : ""}`}
+                  className={`flex flex-col transition-all ${etapaVisivelId ? "w-full" : "min-w-[280px] w-[280px] bg-muted/30 border border-border rounded-lg"} ${isOver ? "ring-2" : ""}`}
                   style={isOver ? { boxShadow: `0 0 0 2px ${color}66` } : undefined}
                 >
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
-                    <span className="text-xs font-medium truncate">{col.nome}</span>
-                    <Badge variant="outline" className="ml-auto text-[10px]">
-                      {items.length}
-                    </Badge>
-                  </div>
-                  <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+                  {/* No telefone o nome da etapa ja esta na aba selecionada acima. */}
+                  {!etapaVisivelId && (
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: color }} />
+                      <span className="text-xs font-medium truncate">{col.nome}</span>
+                      <Badge variant="outline" className="ml-auto text-[10px]">
+                        {items.length}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className={`flex-1 space-y-2 ${etapaVisivelId ? "" : "p-2 overflow-y-auto max-h-[75vh]"}`}>
                     {items.length === 0 ? (
                       <div className="text-center text-[11px] text-muted-foreground/50 py-6">
                         Nenhuma jornada
@@ -1350,7 +1516,7 @@ export default function OnboardingPage() {
                 </div>
               );
             })}
-            {!!proximaPhase && (() => {
+            {!!proximaPhase && (!etapaVisivelId || etapaVisivelId === ONB_DONE_COL_ID) && (() => {
               const items = journeysByStage[ONB_DONE_COL_ID] ?? [];
               const doneColor = "#22C55E";
               return (
@@ -1368,18 +1534,20 @@ export default function OnboardingPage() {
                     if (jid) handleDrop(jid, ONB_DONE_COL_ID, from);
                     setDragOverCol(null);
                   }}
-                  className={`flex flex-col min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5 transition-all ${dragOverCol === ONB_DONE_COL_ID ? "ring-2 ring-emerald-500/60" : ""}`}
+                  className={`flex flex-col transition-all ${etapaVisivelId ? "w-full" : "min-w-[280px] w-[280px] rounded-lg border border-emerald-500/40 bg-emerald-500/5"} ${dragOverCol === ONB_DONE_COL_ID ? "ring-2 ring-emerald-500/60" : ""}`}
                 >
-                  <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
-                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: doneColor }} />
-                    <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
-                      {phaseAtual?.nome ?? "Jornada"} concluído
-                    </span>
-                    <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
-                      {items.length}
-                    </Badge>
-                  </div>
-                  <div className="flex-1 p-2 space-y-2 overflow-y-auto max-h-[75vh]">
+                  {!etapaVisivelId && (
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-emerald-500/30 bg-emerald-500/10 rounded-t-lg">
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: doneColor }} />
+                      <span className="text-xs font-medium truncate text-emerald-700 dark:text-emerald-400">
+                        {phaseAtual?.nome ?? "Jornada"} concluído
+                      </span>
+                      <Badge variant="outline" className="ml-auto text-[10px] border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+                        {items.length}
+                      </Badge>
+                    </div>
+                  )}
+                  <div className={`flex-1 space-y-2 ${etapaVisivelId ? "" : "p-2 overflow-y-auto max-h-[75vh]"}`}>
                     {items.length === 0 ? (
                       <div className="text-center text-[11px] text-muted-foreground/50 py-6">
                         Nenhuma jornada
