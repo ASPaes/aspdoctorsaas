@@ -584,7 +584,20 @@ Deno.serve(async (req) => {
         for (const [clienteId, lista] of porCliente) {
           const cliente = clientePor.get(clienteId);
           const conversa = conversaPor.get(clienteId);
-          const telefone = cliente?.telefone_whatsapp ?? null;
+          // ⚠️ O TELEFONE É O DA CONVERSA, não o do cadastro. Bug real,
+          // encontrado no primeiro teste de envio em 26/09/2026: o motor
+          // mandava para `clientes.telefone_whatsapp` e gravava a mensagem na
+          // conversa — que pode ser de outro número. Em produção isso significa
+          // cobrar um número e registrar no histórico de outro, e o cliente
+          // responderia num lugar onde ninguém veria a resposta.
+          //
+          // Medido antes: dos 490 clientes com contato vinculado, só 356 têm o
+          // número do cadastro igual ao da conversa. Um em cada quatro cairia
+          // nesse descompasso.
+          //
+          // Falar onde a conversa está é o desenho que já tínhamos escolhido
+          // para a instância; o telefone tem que seguir a mesma regra.
+          const telefone = conversa?.phone_number ?? cliente?.telefone_whatsapp ?? null;
           const chave = chaveTelefone(telefone);
           const total = lista.reduce((s, t) => s + Number(t.valor), 0);
           const nome = cliente?.nome_fantasia || cliente?.razao_social || '';
@@ -787,7 +800,19 @@ Deno.serve(async (req) => {
       // virou `bloqueado_portao` na decisão.
       const enviados: any[] = [];
       if (!simular) {
-        if (quiet === true) {
+        // ⚠️ A ÚNICA EXCEÇÃO ÀS QUIET HOURS, e o escopo dela é o que a torna
+        // aceitável: fora do horário só sai para quem está na LISTA DE TESTE e
+        // só com a régua DESLIGADA. As duas condições juntas.
+        //
+        // Quiet hours existem para proteger CLIENTE de cobrança à noite ou no
+        // fim de semana. Um número na lista de teste, com a régua desligada,
+        // por definição não é um cliente sendo protegido: é a pessoa que está
+        // testando o próprio sistema, no próprio celular.
+        //
+        // No instante em que a régua é liberada a lista para de filtrar — e
+        // esta exceção morre junto, porque ela exige `liberada = false`.
+        const soTeste = cfg?.fin_regua_liberada !== true;
+        if (quiet === true && !soTeste) {
           console.log(LOG, 'quiet hours: nada sai agora');
         } else {
           // Quantas já saíram hoje, para o teto diário valer de verdade entre
@@ -803,6 +828,11 @@ Deno.serve(async (req) => {
           const fila = candidatos
             .filter((c) => c.decisao === 'enviaria')
             .filter((c) => c.conversation_id && c.instance_id && c.telefone)
+            // Cinto e suspensório: com a régua desligada só telefone de teste
+            // vira `enviaria`, então este filtro é redundante. Fica porque o
+            // custo é zero e o que ele protege é mandar cobrança fora de hora
+            // para quem não pediu.
+            .filter((c) => (quiet !== true) || liberados.has(chaveTelefone(c.telefone)))
             .slice(0, Math.min(MAX_ENVIOS_RODADA, sobra));
 
           for (let i = 0; i < fila.length; i++) {
