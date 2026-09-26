@@ -495,6 +495,46 @@ export default function EmailsRecebidosTab() {
                     </span>
                   )}
                 </div>
+                {/* Os mesmos tres da linha do computador. O cartao inteiro ja abre o
+                    e-mail, mas sem um alvo visivel ninguem descobre que da para tocar —
+                    foi o retorno do Alexandre em 26/09: "nao aparece a opcao de
+                    visualizar". Abrir mostra o e-mail com responder, encaminhar e o
+                    resto; os outros dois agem sem sair da lista. */}
+                <div className="mt-2 flex items-center justify-end gap-1 border-t pt-2" onClick={(e) => e.stopPropagation()}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2 text-xs"
+                    onClick={() => setLendo(linha.id)}
+                    aria-label={`Abrir e-mail de ${linha.de_email}`}
+                  >
+                    <Eye className="h-4 w-4" />
+                    Abrir
+                  </Button>
+                  {!filtros.lixeira && (
+                    <MoverParaPasta
+                      pastaAtual={linha.pasta_id}
+                      onMover={(pastaId) => moverEmails([linha.id], pastaId)}
+                      desabilitado={mover.isPending}
+                    >
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Mover para pasta">
+                        <FolderInput className="h-4 w-4" />
+                      </Button>
+                    </MoverParaPasta>
+                  )}
+                  {!filtros.lixeira && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => arquivarEmails([linha.id], !linha.arquivado_em)}
+                      disabled={arquivar.isPending}
+                      aria-label={linha.arquivado_em ? "Tirar do arquivo" : "Arquivar"}
+                    >
+                      {linha.arquivado_em ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
                 {naTriagem && podeTriar && (
                   <div onClick={(e) => e.stopPropagation()}>
                     <CaixaTriagem linha={linha} setores={setores} />
