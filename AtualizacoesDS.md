@@ -19,6 +19,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **Ficha na Visão 360° fecha clicando fora e tem botão Fechar visível** — Em **Clientes › Visão 360° › Abrir ficha**, a janela da ficha agora fecha ao clicar fora dela ou apertar Esc, além do novo botão **Fechar** em destaque no canto superior. Se houver alteração não salva, o sistema pergunta antes de fechar.
+
+- 🔧 **Ficha do cliente pedia para descartar alterações sem ninguém ter mexido** — Ao abrir a ficha de um cliente e sair sem alterar nada, às vezes aparecia o aviso "Alterações não salvas". Os campos **Unidade base**, **Área de atuação** e **Segmento** registravam uma alteração sozinhos enquanto a lista de opções carregava. Agora a ficha só pergunta quando alguém realmente alterou algo.
+
 - 🆕 **No telefone, o kanban de Implantação vira uma etapa por vez** — Abrindo **Implantação** pelo celular, o quadro deixa de deslizar para o lado. As **etapas do pipeline** viram abas no alto da tela, cada uma com quantos cartões tem, e a lista daquela etapa desce em largura cheia: dá para ler cliente, SLA, data de abertura e go-live sem arrastar nada. As abas saem do próprio cadastro de etapas da empresa, então cada pipeline mostra as suas — **Novo Cliente**, **Conferência**, **Recolhimento Dados** e assim por diante. Pipelines com muitas etapas trocam as abas por **‹ nome da etapa ›**, que diz em qual você está (“etapa 2 de 12”) e anda uma por toque. A **jornada** e o **pipeline** passam a ser escolhidos em dois seletores no alto, no lugar das duas faixas de botões. Para mover uma jornada de etapa pelo telefone, abra o cartão e use o **Avançar**: arrastar o cartão continua sendo coisa de computador. No computador o quadro continua igual, com as etapas lado a lado.
 
 - ⬆️ **Títulos a receber mais enxutos na ficha do cliente** — Na ficha do cliente, o quadro **Títulos a receber** passa a abrir sempre recolhido, com só 3 títulos (os em aberto primeiro). O botão **Ver todos os títulos** mostra o restante do histórico, e **Recolher** volta ao resumo.

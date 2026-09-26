@@ -379,7 +379,11 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormField control={form.control} name="unidade_base_id" render={({ field, fieldState }) => (
           <FormItem data-field="unidade_base_id">
             <FormLabel>Unidade Base *</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+            {/* O Radix Select avisa "" quando o valor gravado ainda não está na lista
+                (unidades carregando). Não existe opção vazia aqui, então "" nunca é
+                escolha da pessoa: ignorar evita a ficha nascer "alterada" e a unidade
+                virar null sem ninguém mexer. */}
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => { if (v) field.onChange(Number(v)); }}>
               <FormControl>
                 <SelectTrigger className={fieldState.error ? "border-destructive focus:ring-destructive" : ""}>
                   <SelectValue placeholder="Selecione..." />
@@ -624,7 +628,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormField control={form.control} name="area_atuacao_id" render={({ field }) => (
           <FormItem>
             <FormLabel>Área de Atuação</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+            {/* Ignora o "" do Radix pelo mesmo motivo da Unidade base, acima. */}
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => { if (v) field.onChange(Number(v)); }}>
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
               <SelectContent>
                 {areasAtuacao.map((a) => (
@@ -639,7 +644,8 @@ export default function DadosClienteTab({ form, estados, cidades, areasAtuacao, 
         <FormField control={form.control} name="segmento_id" render={({ field }) => (
           <FormItem>
             <FormLabel>Segmento</FormLabel>
-            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => field.onChange(v ? Number(v) : null)}>
+            {/* Ignora o "" do Radix pelo mesmo motivo da Unidade base, acima. */}
+            <Select value={field.value?.toString() ?? ""} onValueChange={(v) => { if (v) field.onChange(Number(v)); }}>
               <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
               <SelectContent>
                 {segmentos.map((s) => (

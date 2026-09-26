@@ -215,6 +215,7 @@ export default function Visao360Tab() {
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
   const [novoTicket, setNovoTicket] = useState(false);
   const [fichaAberta, setFichaAberta] = useState(false);
+  const sairFichaRef = useRef<(() => void) | null>(null);
   const [segundaVia, setSegundaVia] = useState<{ aberto: boolean; titulo: string | null }>({ aberto: false, titulo: null });
 
   const cliente = useCliente360(clienteId);
@@ -682,19 +683,24 @@ export default function Visao360Tab() {
           preSelecionado={segundaVia.titulo}
         />
         )}
-        {/* A ficha de sempre, dentro de um modal. Fechar é só pelo Voltar, X ou
-            Cancelar da própria ficha: eles passam pela pergunta de alteração não
-            salva; Esc e clique fora não passariam, por isso estão desligados. */}
-        <Dialog open={fichaAberta && !!c} onOpenChange={() => { /* fecha só pela ficha */ }}>
+        {/* A ficha de sempre, dentro de um modal. Clique fora, Esc, Voltar, Fechar e
+            Cancelar passam todos pelo "sair" da ficha, que pergunta antes quando há
+            alteração não salva. O Radix fecharia direto, por isso o preventDefault. */}
+        <Dialog open={fichaAberta && !!c} onOpenChange={() => { /* quem fecha é o sair da ficha */ }}>
           <DialogContent
             className="w-[96vw] max-w-[1400px] h-[94vh] overflow-y-auto p-4 sm:p-6 [&>button.absolute]:hidden"
-            onEscapeKeyDown={(e) => e.preventDefault()}
-            onInteractOutside={(e) => e.preventDefault()}
+            onEscapeKeyDown={(e) => { e.preventDefault(); sairFichaRef.current?.(); }}
+            onInteractOutside={(e) => {
+              e.preventDefault();
+              // Clique num aviso (toast) não é "clicar fora" da ficha.
+              if ((e.target as HTMLElement | null)?.closest?.("[data-sonner-toaster]")) return;
+              sairFichaRef.current?.();
+            }}
           >
             <DialogTitle className="sr-only">Ficha do cliente</DialogTitle>
             {fichaAberta && c && (
               <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-                <ClienteForm clienteIdModal={c.id} onFechar={() => setFichaAberta(false)} />
+                <ClienteForm clienteIdModal={c.id} onFechar={() => setFichaAberta(false)} registrarSair={(fn) => { sairFichaRef.current = fn; }} />
               </Suspense>
             )}
           </DialogContent>

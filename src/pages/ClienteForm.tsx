@@ -318,7 +318,12 @@ function ContratoEventosHistorico({ clienteId }: { clienteId: string }) {
  * Ficha do cliente. Rota `/clientes/:id` e, com `clienteIdModal`, dentro do modal
  * da Visão 360° (mesma tela; muda só para onde "Voltar" e "Cancelar" levam).
  */
-export default function ClienteForm({ clienteIdModal, onFechar }: { clienteIdModal?: string; onFechar?: () => void } = {}) {
+export default function ClienteForm({ clienteIdModal, onFechar, registrarSair }: {
+  clienteIdModal?: string;
+  onFechar?: () => void;
+  /** Quem abriu o modal recebe o "sair" guardado, para o clique fora e o Esc passarem pela mesma pergunta. */
+  registrarSair?: (sair: () => void) => void;
+} = {}) {
   const params = useParams();
   const emModal = !!clienteIdModal;
   const id = clienteIdModal ?? params.id;
@@ -425,6 +430,7 @@ export default function ClienteForm({ clienteIdModal, onFechar }: { clienteIdMod
   const { isBlocked, confirmLeave, cancelLeave, guardedNavigate } = useUnsavedChangesGuard(isDirty, onFechar);
   // No modal, sair é fechar o modal (com a mesma pergunta de alteração não salva).
   const sair = () => guardedNavigate(emModal ? FECHAR_MODAL : "/clientes");
+  useEffect(() => { registrarSair?.(sair); });
 
   // Fetch MC% ponderada for auto-filling custo_operacao on new clients
   const mcPonderadaQuery = useQuery({
@@ -812,8 +818,8 @@ export default function ClienteForm({ clienteIdModal, onFechar }: { clienteIdMod
 
           {/* Prev/Next navigation */}
           {emModal && (
-            <Button variant="ghost" size="icon" onClick={sair} aria-label="Fechar ficha" title="Fechar">
-              <X className="h-5 w-5" />
+            <Button type="button" variant="outline" onClick={sair} aria-label="Fechar ficha" className="gap-1.5 border-foreground/25 font-semibold hover:border-foreground/50">
+              <X className="h-4 w-4" />Fechar
             </Button>
           )}
           {isEditing && navInfo && (
