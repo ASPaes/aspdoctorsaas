@@ -472,6 +472,13 @@ Deno.serve(async (req) => {
           await pararCriacao(x, `O OEM aceitou a licença (grupo ${grupo}, filial ${filial}), mas a ficha não foi atualizada: ${errA.message}`, resposta, http);
           continue;
         }
+        // A oem-licenca-criar conta as lojas do grupo depois de criar. Loja a
+        // mais é licença cobrando sem uso (foi o que aconteceu no 1º teste, em
+        // 26/09): a linha fica 'ok' — a certa está na ficha — mas o aviso fica
+        // escrito nela, na aba Fila.
+        if (typeof resposta?.alerta === "string" && resposta.alerta) {
+          await ds.from("oem_sync_fila").update({ ultimo_erro: resposta.alerta }).eq("id", x.id);
+        }
         okCount++;
         continue;
       }
