@@ -168,3 +168,67 @@ export function useApagarToque() {
     onError: (e: any) => toast.error(e?.message ?? 'Não consegui remover'),
   });
 }
+
+export interface InstanciaDisponivel {
+  id: string;
+  instance_name: string;
+  provider_type: string;
+  is_active: boolean;
+  status: string | null;
+  oficial: boolean;
+}
+
+/**
+ * Instâncias por onde a régua pode sair.
+ *
+ * Mostra as INATIVAS também, marcadas: esconder a instância que acabou de cair
+ * faria a cobrança parar sem ninguém entender por quê. Melhor ver que ela está
+ * lá e desconectada.
+ */
+export function useInstanciasDaRegua() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  return useQuery<InstanciaDisponivel[]>({
+    queryKey: ['fin-regua-instancias', tid],
+    enabled: !!tid,
+    queryFn: async () => {
+      const { data } = await (supabase.from('whatsapp_instances' as any) as any)
+        .select('id, instance_name, provider_type, is_active, status')
+        .eq('tenant_id', tid)
+        .order('is_active', { ascending: false })
+        .order('instance_name');
+      return (data ?? []).map((i: any) => ({
+        ...i,
+        // O número da Meta é uma instância como as outras aqui — só muda o
+        // provedor. Trocar de um para o outro é trocar a escolha, nada mais.
+        oficial: i.provider_type === 'meta_cloud',
+      }));
+    },
+  });
+}
+
+/**
+ * Troca o número por onde a régua envia.
+ *
+ * ⚠️ Só super admin consegue: o gatilho `fn_fin_protege_chaves_de_liberacao`
+ * barra no banco, não só na tela. Se a gravação falhar com "Só super admin",
+ * é essa trava falando, e ela está certa.
+ */
+export function useSalvarCanalDaRegua() {
+  const qc = useQueryClient();
+  const { effectiveTenantId } = useTenantFilter();
+
+  return useMutation({
+    mutationFn: async (instanceId: string | null) => {
+      const { error } = await (supabase.from('configuracoes' as any) as any)
+        .update({ fin_regua_instance_id: instanceId })
+        .eq('tenant_id', effectiveTenantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fin-regua-estado'] });
+      toast.success('Número da cobrança atualizado');
+    },
+    onError: (e: any) => toast.error(e?.message ?? 'Não consegui salvar o número'),
+  });
+}

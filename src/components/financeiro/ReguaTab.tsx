@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +22,8 @@ import {
   useApagarToque,
   useFinReguaEstado,
   useFinToques,
+  useInstanciasDaRegua,
+  useSalvarCanalDaRegua,
   useSalvarToque,
   type FinToque,
 } from '@/hooks/useFinRegua';
@@ -28,15 +31,20 @@ import {
 /**
  * Régua de cobrança — configuração e estado.
  *
- * ⚠️ A régua NÃO envia nada hoje. O motor só simula e a chave de liberação nasce
- * falsa em todo tenant. A tela abre dizendo exatamente isso, no topo, porque a
- * pergunta que alguém faz ao chegar aqui é "isso está mandando mensagem para
- * cliente?" — e a resposta não pode depender de ler o código.
+ * A tela abre pelo ESTADO, e isso é deliberado: a pergunta de quem chega aqui é
+ * "isso está mandando mensagem para cliente?", e a resposta não pode depender
+ * de ler o código. Parada é âmbar, liberada é esmeralda.
+ *
+ * Logo abaixo vem o número por onde a cobrança sai, que é a segunda pergunta.
+ * O número oficial da Meta é uma instância como as outras — trocar de um para
+ * o outro é trocar essa escolha, nada mais.
  */
 export default function ReguaTab() {
   const { data: estado, isLoading: carregandoEstado } = useFinReguaEstado();
   const { data: toques = [], isLoading: carregandoToques } = useFinToques();
   const salvar = useSalvarToque();
+  const { data: instancias = [], isLoading: carregandoInstancias } = useInstanciasDaRegua();
+  const salvarCanal = useSalvarCanalDaRegua();
   const apagar = useApagarToque();
 
   const [edicao, setEdicao] = useState<Partial<FinToque> | null>(null);
@@ -72,29 +80,46 @@ export default function ReguaTab() {
                   : 'Régua parada: nenhum cliente recebe cobrança automática'}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              O motor está em modo de simulação. Ele monta a fila do dia e mostra o que sairia, mas
-              não existe caminho de envio. Nada é enviado nem quando a chave é virada.
+              As mensagens saem pelo número escolhido abaixo, uma por vez e só em horário
+              comercial. Enquanto a régua está parada, nada é enviado.
             </p>
+
+            {/* O número por onde a cobrança sai.
+                Fica aqui, junto do estado, porque é a primeira pergunta de quem
+                vai ligar a régua: "sai por qual número?". O número oficial da
+                Meta é uma instância como as outras — trocar de um para o outro
+                é trocar esta escolha, nada mais. */}
+            <div className="mt-3 max-w-sm">
+              <Label htmlFor="regua-canal" className="text-xs text-muted-foreground">
+                Número da cobrança
+              </Label>
+              <Select
+                value={estado?.instance_id ?? 'nenhum'}
+                onValueChange={(v) => salvarCanal.mutate(v === 'nenhum' ? null : v)}
+                disabled={salvarCanal.isPending || carregandoInstancias}
+              >
+                <SelectTrigger id="regua-canal" className="mt-1 bg-background">
+                  <SelectValue placeholder="Escolha o número" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="nenhum">Nenhum — a régua não envia</SelectItem>
+                  {instancias.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.instance_name}
+                      {i.oficial ? ' · oficial (Meta)' : ''}
+                      {!i.is_active ? ' · inativa' : i.status !== 'connected' ? ' · desconectada' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A régua responde na conversa que o cliente já tem. Este número vale como padrão e
+                é o que define se ela manda texto livre ou template aprovado.
+              </p>
+            </div>
 
             {!carregandoEstado && (
               <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Número da cobrança: </span>
-                  {estado?.instancia_nome ? (
-                    <span className="font-medium">
-                      {estado.instancia_nome}
-                      {estado.instancia_modo === 'oficial' && (
-                        <Badge variant="secondary" className="ml-1.5 text-[10px]">
-                          oficial
-                        </Badge>
-                      )}
-                    </span>
-                  ) : (
-                    <span className="font-medium text-amber-700 dark:text-amber-500">
-                      não definido
-                    </span>
-                  )}
-                </div>
                 <div>
                   <span className="text-muted-foreground">Pediram para sair: </span>
                   <span className="font-medium">{estado?.opt_outs ?? 0}</span>
