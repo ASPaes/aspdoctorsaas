@@ -40,7 +40,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useReleasesNovidade } from "@/hooks/useReleasesNovidade";
+import { useEvolucaoDS } from "@/hooks/useEvolucaoDS";
 import { useRecebidosNaoLidos } from "@/components/emails/useNaoLidos";
 
 
@@ -64,7 +64,9 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const { signOut, profile, user, profileLoading } = useAuth();
   const [prefsOpen, setPrefsOpen] = useState(false);
-  const { temNovo, marcarVisto } = useReleasesNovidade();
+  // Evolução DS (novidades, melhorias e correções): pisca enquanto houver novidade
+  // ou melhoria não vista; correção só acende o número.
+  const { estado: evolucaoEstado, naoVistos: evolucaoNaoVistos } = useEvolucaoDS();
   // e-mail que chegou e ninguém abriu (DEM-0461); o RLS já recorta por pessoa
   const { data: emailsNaoLidos = 0 } = useRecebidosNaoLidos();
   const isSuperAdmin = profile?.is_super_admin === true;
@@ -161,30 +163,16 @@ export function AppSidebar() {
     }
   };
 
-  const handleOpenReleases = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-sso-token');
-      if (error) throw error;
-      const token = (data as { token?: string })?.token;
-      if (!token) throw new Error('Token não recebido');
-      window.open(`https://doctordev.lovable.app/sso?token=${encodeURIComponent(token)}&redirect=${encodeURIComponent('/releases')}`, '_blank', 'noopener,noreferrer');
-      void marcarVisto();
-    } catch (err) {
-      console.error('[Atualizações DS]', err);
-      toast.error('Não foi possível abrir as Atualizações DS.');
-    }
-  };
-
   useEffect(() => {
-    if (temNovo && !sessionStorage.getItem("ds_releases_toast_shown")) {
-      sessionStorage.setItem("ds_releases_toast_shown", "1");
-      toast("✨ Novidades no DoctorSaaS", {
-        description: "Tem atualização nova. Confira em Atualizações DS.",
-        action: { label: "Ver", onClick: () => handleOpenReleases() },
+    if (evolucaoEstado === "pisca" && !sessionStorage.getItem("ds_evolucao_toast_shown")) {
+      sessionStorage.setItem("ds_evolucao_toast_shown", "1");
+      toast("✨ Novidade no DoctorSaaS", {
+        description: "Veja o que mudou na Evolução DS.",
+        action: { label: "Ver", onClick: () => navigate("/evolucao") },
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [temNovo]);
+  }, [evolucaoEstado]);
 
 
   const financeiroMenu = canFinanceiro && (
@@ -554,25 +542,32 @@ export function AppSidebar() {
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="Atualizações DS"
-              onClick={handleOpenReleases}
+              asChild
+              tooltip={evolucaoNaoVistos > 0 ? `Evolução DS · ${evolucaoNaoVistos > 99 ? "99+" : evolucaoNaoVistos} novas` : "Evolução DS"}
+              className={evolucaoEstado === "pisca" ? "evo-pisca font-semibold" : "evo-aceso font-semibold"}
             >
-              <span className="relative inline-flex">
-                <Sparkles className="h-4 w-4" />
-                {temNovo && collapsed && (
-                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              <NavLink to="/evolucao">
+                <span className="relative inline-flex">
+                  <Sparkles className="h-4 w-4" />
+                  {evolucaoEstado === "numero" && collapsed && (
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-400" />
+                  )}
+                </span>
+                <span>Evolução DS</span>
+                {evolucaoNaoVistos > 0 && !collapsed && (
+                  <span
+                    className={
+                      evolucaoEstado === "pisca"
+                        ? "relative ml-auto rounded-full bg-white px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none text-green-900"
+                        : "ml-auto rounded-full bg-amber-200 px-1.5 py-0.5 font-mono text-[10px] font-bold leading-none text-amber-950"
+                    }
+                  >
+                    {evolucaoEstado === "pisca"
+                      ? `${evolucaoNaoVistos > 99 ? "99+" : evolucaoNaoVistos} ${evolucaoNaoVistos === 1 ? "nova" : "novas"}`
+                      : `+${evolucaoNaoVistos > 99 ? "99" : evolucaoNaoVistos}`}
                   </span>
                 )}
-              </span>
-              <span>Atualizações DS</span>
-              {temNovo && !collapsed && (
-                <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold leading-none text-primary-foreground animate-pulse">
-                  Novo
-                </span>
-              )}
-
+              </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>

@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 26/09
 
+- 🆕 **Evolução DS: as novidades do sistema agora ficam dentro do DoctorSaaS** — O item **Atualizações DS**, no rodapé do menu, virou **Evolução DS** e não abre mais outra aba. Ele mostra tudo que mudou no sistema: novidades, melhorias e correções, do mais recente para o mais antigo, com filtro por tipo, busca e um resumo do mês. O que foi pedido pela sua empresa ganha o selo **Sua empresa pediu isso**, e o que você ainda não viu aparece como **Novo para você**. Enquanto houver novidade ou melhoria que você não viu, a linha do menu fica verde e azul, pulsando, com o número de itens. Ao entrar e sair, ela para de pulsar e fica colorida. Correção só acende um número, sem pulsar.
+
 - ⬆️ **No telefone, o botão em destaque do e-mail aberto virou o Responder** — Ao abrir uma mensagem pelo celular, os botões empilhavam de baixo para cima: o **Fechar** ficava no topo, grande e verde, e o **Responder** ia para o fim da lista. Agora a ordem é a que se espera — **Responder**, **Responder a todos**, **Encaminhar**, **Mover para**, **Arquivar** e, por último, **Fechar** — com o Responder em destaque. No computador os botões continuam lado a lado como estavam.
 
 - ⬆️ **No telefone, cada e-mail da lista mostra o que dá para fazer com ele** — O cartão já abria o e-mail ao toque, mas nada na tela dizia isso. Agora cada um traz **Abrir**, **mover para pasta** e **arquivar**, os mesmos botões que a lista tem no computador. Abrir mostra a mensagem inteira com **Responder**, **Responder a todos**, **Encaminhar**, **Mover para** e **Arquivar**.

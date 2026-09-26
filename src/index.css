@@ -202,3 +202,48 @@
     display: none;
   }
 }
+
+/* Evolução DS no menu lateral.
+   pisca  = novidade/melhoria não vista: a linha inteira respira e um brilho passa.
+   aceso  = em dia (ou só correção pendente): parada, mas sempre colorida.
+   Respirar a ~0,6 vez por segundo fica bem abaixo do limite de 3 piscadas por
+   segundo da WCAG 2.3.1. Quem pediu "reduzir animações" vê a linha acesa. */
+@layer utilities {
+  [data-sidebar="menu-button"].evo-aceso {
+    background: linear-gradient(90deg, rgb(34 197 94 / 0.24), rgb(14 165 233 / 0.16));
+    box-shadow: inset 0 0 0 1px rgb(34 197 94 / 0.35);
+  }
+  [data-sidebar="menu-button"].evo-pisca {
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+    background: linear-gradient(90deg, #16a34a, #0ea5e9);
+    animation: evo-respira 1.6s ease-in-out infinite;
+  }
+  [data-sidebar="menu-button"].evo-pisca:hover {
+    color: #fff;
+    background: linear-gradient(90deg, #15803d, #0284c7);
+  }
+  .evo-pisca::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.5) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: evo-brilho 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-sidebar="menu-button"].evo-pisca, .evo-pisca::before { animation: none; }
+    [data-sidebar="menu-button"].evo-pisca { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.55); }
+  }
+}
+
+@keyframes evo-respira {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(34 197 94 / 0); filter: brightness(1); }
+  50% { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.45), 0 0 18px 1px rgb(34 197 94 / 0.5); filter: brightness(1.15); }
+}
+@keyframes evo-brilho {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(100%); }
+}

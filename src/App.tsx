@@ -35,6 +35,7 @@ const Cadastros = lazyWithReload(() => import("@/pages/Cadastros"));
 const Configuracoes = lazyWithReload(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazyWithReload(() => import("@/pages/CertificadosA1"));
 const Emails = lazyWithReload(() => import("@/pages/Emails"));
+const EvolucaoDS = lazyWithReload(() => import("@/pages/EvolucaoDS"));
 const Financeiro = lazyWithReload(() => import("@/pages/Financeiro"));
 import FinanceiroGuard from "@/components/financeiro/FinanceiroGuard";
 const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
@@ -143,6 +144,8 @@ const App = () => (
               
               <Route path="/tickets" element={<RequirePermission resource="tickets"><SupportTickets /></RequirePermission>} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />
+              {/* Evolução DS: novidades, melhorias e correções. Aberta a todos. */}
+              <Route path="/evolucao" element={<EvolucaoDS />} />
               <Route path="/painel-uso" element={<RequirePermission resource="nav.painel_uso"><PainelUso /></RequirePermission>} />
               <Route path="/admin/limpeza-uras" element={<LimpezaUras />} />
 
