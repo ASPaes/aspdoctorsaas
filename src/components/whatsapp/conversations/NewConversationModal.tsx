@@ -39,6 +39,11 @@ interface Props {
   initialPhone?: string;
   initialName?: string;
   initialInstanceId?: string;
+  /**
+   * Cliente já conhecido (aberto pela Visão 360°): esconde "Buscar cliente" e liga
+   * a conversa nova a ele, seja por contato ou por número avulso.
+   */
+  clienteFixo?: { id: string; nome: string };
 }
 
 function useCheckOpenConversation(phone: string, instanceId: string) {
@@ -73,7 +78,7 @@ function useCheckOpenConversation(phone: string, instanceId: string) {
   });
 }
 
-export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId }: Props) {
+export function NewConversationModal({ open, onOpenChange, onCreated, initialPhone, initialName, initialInstanceId, clienteFixo }: Props) {
   const { instances } = useWhatsAppInstances();
   const createConversation = useCreateConversation();
   const { selectedDepartmentId, selectedDepartment, departments, userDepartmentId } = useDepartmentFilter();
@@ -104,7 +109,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   const [phone, setPhone] = useState(initialPhone || "");
   const [waCheck, setWaCheck] = useState<'idle' | 'checking' | 'exists' | 'exists_corrected' | 'not_exists' | 'unsupported'>('idle');
   const [name, setName] = useState(initialName || "");
-  const [tab, setTab] = useState(initialPhone ? "avulso" : "cliente");
+  const [tab, setTab] = useState(initialPhone ? "avulso" : clienteFixo ? "contato" : "cliente");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCliente, setSelectedCliente] = useState<ClienteSearchResult | null>(null);
   const [selectedContactPhone, setSelectedContactPhone] = useState<string | null>(null);
@@ -252,7 +257,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
   };
 
   // Contato do diretório pode já estar vinculado a um cliente — não perder esse vínculo.
-  const clienteIdForCreate = selectedCliente?.id ?? selectedContact?.cliente_id ?? undefined;
+  // Com cliente fixo, a intenção de quem abriu vence o vínculo antigo do contato.
+  const clienteIdForCreate = clienteFixo?.id ?? selectedCliente?.id ?? selectedContact?.cliente_id ?? undefined;
 
   const handleCreate = async () => {
     if (!instanceId || !phone.trim()) {
@@ -413,6 +419,7 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nova Conversa</DialogTitle>
+          {clienteFixo && <p className="text-sm text-muted-foreground">Cliente: <b className="text-foreground">{clienteFixo.nome}</b></p>}
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -440,11 +447,13 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
               setSelectedContact(null);
             }}
           >
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className={cn("grid w-full", clienteFixo ? "grid-cols-2" : "grid-cols-3")}>
+              {!clienteFixo && (
               <TabsTrigger value="cliente" className="gap-1 text-xs px-2">
                 <Building2 className="h-3.5 w-3.5 shrink-0" />
                 <span className="hidden sm:inline">Buscar&nbsp;</span>Cliente
               </TabsTrigger>
+              )}
               <TabsTrigger value="contato" className="gap-1 text-xs px-2">
                 <Users className="h-3.5 w-3.5 shrink-0" />
                 <span className="hidden sm:inline">Buscar&nbsp;</span>Contato

@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 25/09
 
+- ⬆️ **Conversa aberta pela Visão 360° vai para uma nova aba, e dá para chamar em outro número** — Em **Clientes › Visão 360° › Abrir conversa**, clicar numa conversa do cliente abre o Chat numa nova aba do navegador, e a Visão 360° continua aberta onde estava. A nova opção **Nova conversa em outro número** abre a mesma janela "Nova Conversa" do Chat, para escolher a instância e buscar um contato ou digitar um número avulso; a conversa já nasce ligada ao cliente e também abre numa nova aba.
+
 - ⬆️ **Ficha na Visão 360° fecha clicando fora e tem botão Fechar visível** — Em **Clientes › Visão 360° › Abrir ficha**, a janela da ficha agora fecha ao clicar fora dela ou apertar Esc, além do novo botão **Fechar** em destaque no canto superior. Se houver alteração não salva, o sistema pergunta antes de fechar.
 
 - 🔧 **Ficha do cliente pedia para descartar alterações sem ninguém ter mexido** — Ao abrir a ficha de um cliente e sair sem alterar nada, às vezes aparecia o aviso "Alterações não salvas". Os campos **Unidade base**, **Área de atuação** e **Segmento** registravam uma alteração sozinhos enquanto a lista de opções carregava. Agora a ficha só pergunta quando alguém realmente alterou algo.

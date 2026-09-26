@@ -1,13 +1,14 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { endOfDay, formatDistanceStrict, parseISO, startOfDay, subDays, differenceInCalendarDays, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Search, MessageCircle, Ticket, FileText, MapPin, TrendingUp, Star, Clock, AlertTriangle,
-  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone, Lock,
+  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone, Lock, Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useEhAdmin, usePortao } from "@/hooks/usePortao";
 import { useAuth } from "@/contexts/AuthContext";
@@ -43,6 +44,10 @@ import { EnviarSegundaViaDialog } from "./EnviarSegundaViaDialog";
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 // A ficha inteira (1.100 linhas) só desce quando alguém abre.
 const ClienteForm = lazyWithReload(() => import("@/pages/ClienteForm"));
+// A janela "Nova Conversa" do Chat, reaproveitada; só desce quando alguém abre.
+const NewConversationModal = lazyWithReload(() =>
+  import("@/components/whatsapp/conversations/NewConversationModal").then((m) => ({ default: m.NewConversationModal })),
+);
 const CreateSupportTicketModal = lazyWithReload(() =>
   import("@/components/tickets/CreateSupportTicketModal").then((m) => ({ default: m.CreateSupportTicketModal })),
 );
@@ -189,7 +194,6 @@ function Recentes({ onEscolher, atual }: { onEscolher: (id: string) => void; atu
 /* ------------------------------------------------------------------ aba */
 
 export default function Visao360Tab() {
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const { effectiveTenantId: tid } = useTenantFilter();
   const [sp, setSp] = useSearchParams();
@@ -216,6 +220,20 @@ export default function Visao360Tab() {
   const [novoTicket, setNovoTicket] = useState(false);
   const [fichaAberta, setFichaAberta] = useState(false);
   const sairFichaRef = useRef<(() => void) | null>(null);
+  const [popConversaAberto, setPopConversaAberto] = useState(false);
+  const [novaConversa, setNovaConversa] = useState(false);
+  // O Chat abre em outra aba: quem está na Visão 360° não perde o lugar.
+  const abrirChatNovaAba = (caminho: string) => {
+    // Sem "noopener" na chamada: com ele o navegador devolve null mesmo abrindo,
+    // e o aviso de bloqueio apareceria sempre. O isolamento vem do opener = null.
+    const aba = window.open(caminho, "_blank");
+    if (aba) aba.opener = null;
+    if (!aba) {
+      toast.warning("O navegador bloqueou a nova aba.", {
+        action: { label: "Abrir o Chat", onClick: () => { const a = window.open(caminho, "_blank"); if (a) a.opener = null; } },
+      });
+    }
+  };
   const [segundaVia, setSegundaVia] = useState<{ aberto: boolean; titulo: string | null }>({ aberto: false, titulo: null });
 
   const cliente = useCliente360(clienteId);
@@ -398,7 +416,8 @@ export default function Visao360Tab() {
   const abrirConversaNova = () => {
     if (!c) return;
     const fone = (c.telefone_whatsapp || "").replace(/\D/g, "");
-    navigate(`/whatsapp?phone=${fone}&clienteId=${c.id}&clienteName=${encodeURIComponent(nome)}`);
+    setPopConversaAberto(false);
+    abrirChatNovaAba(`/whatsapp?phone=${fone}&clienteId=${c.id}&clienteName=${encodeURIComponent(nome)}`);
   };
 
   return (
@@ -483,7 +502,7 @@ export default function Visao360Tab() {
 
             <div className="flex flex-wrap gap-2">
               {podeChat && (
-                <Popover>
+                <Popover open={popConversaAberto} onOpenChange={setPopConversaAberto}>
                   <PopoverTrigger asChild>
                     <button type="button" className={cn("inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-[12.5px] font-bold text-emerald-950 transition-transform duration-300 hover:-translate-y-px", EASE)}>
                       <MessageCircle className="h-4 w-4" />Abrir conversa<ChevronDown className="h-3.5 w-3.5" />
@@ -496,7 +515,7 @@ export default function Visao360Tab() {
                       <button
                         key={cv.id}
                         type="button"
-                        onClick={() => navigate(`/whatsapp?conversation=${cv.id}`)}
+                        onClick={() => { setPopConversaAberto(false); abrirChatNovaAba(`/whatsapp?conversation=${cv.id}`); }}
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-muted"
                       >
                         <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-muted">
@@ -515,6 +534,9 @@ export default function Visao360Tab() {
                         Falar no WhatsApp da ficha ({c.telefone_whatsapp})
                       </button>
                     )}
+                    <button type="button" onClick={() => { setPopConversaAberto(false); setNovaConversa(true); }} className="mt-1 flex w-full items-center gap-2 rounded-md border-t px-2 py-2 text-left text-sm font-semibold hover:bg-muted">
+                      <Plus className="h-4 w-4" />Nova conversa em outro número
+                    </button>
                   </PopoverContent>
                 </Popover>
               )}
@@ -705,6 +727,18 @@ export default function Visao360Tab() {
             )}
           </DialogContent>
         </Dialog>
+        {novaConversa && c && (
+          <NewConversationModal
+            open={novaConversa}
+            onOpenChange={setNovaConversa}
+            clienteFixo={{ id: c.id, nome }}
+            onCreated={(conversationId) => {
+              setNovaConversa(false);
+              abrirChatNovaAba(`/whatsapp?conversation=${conversationId}`);
+              qc.invalidateQueries({ queryKey: ["visao360_atendimentos", clienteId] });
+            }}
+          />
+        )}
         {novoTicket && c && (
           <CreateSupportTicketModal
             open={novoTicket}
