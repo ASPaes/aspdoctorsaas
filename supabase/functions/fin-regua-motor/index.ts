@@ -120,13 +120,46 @@ async function enviarCobranca(
   tenantId: string,
   c: any,
 ): Promise<{ ok: boolean; motivo?: string }> {
+  // ── A conversa da instância configurada, aberta se não existir ────────────
+  //
+  // Acontece AQUI, e não na montagem da lista, por dois motivos: simular não
+  // pode criar conversa nenhuma, e abrir conversa para 293 clientes de uma vez
+  // encheria a lista de atendimento antes de uma única mensagem sair.
+  //
+  // Vem antes do registro em `fin_cobranca_envios` de propósito. Se a ordem
+  // fosse a inversa e a abertura falhasse, sobraria uma linha travada que
+  // impediria esse cliente de receber aquele toque para sempre. Uma conversa
+  // aberta sem mensagem é o dano menor, e é reversível.
+  const { data: conv, error: convErr } = await service.rpc('fn_fin_regua_conversa', {
+    p_tenant_id: tenantId,
+    p_instance_id: c.instance_id,
+    p_phone: c.telefone,
+    p_nome: c.cliente,
+    p_cliente_id: c.cliente_id,
+  });
+  if (convErr) {
+    console.error(LOG, 'não consegui abrir conversa para', c.cliente, convErr.message);
+    return { ok: false, motivo: `conversa: ${convErr.message}` };
+  }
+  if (conv?.status === 'inactive_contact') {
+    return { ok: false, motivo: 'contato desativado' };
+  }
+  if (!conv?.conversation_id) {
+    return { ok: false, motivo: 'conversa não resolvida' };
+  }
+  const conversationId = conv.conversation_id as string;
+  // Forma canônica do número, com DDI e com o nono dígito na forma em que o
+  // contato existe aqui. O cadastro guarda as duas formas e o provedor não
+  // adivinha qual delas o WhatsApp do cliente usa.
+  const telefone = (conv.phone as string) || c.telefone;
+
   const chaves = {
     tenant_id: tenantId,
     dias_offset: c.dias_offset,
     vencimento: c.vencimento,
     valor: c.valor,
-    telefone: c.telefone,
-    conversation_id: c.conversation_id,
+    telefone,
+    conversation_id: conversationId,
   };
 
   // Uma linha por TÍTULO, mesmo quando a mensagem é uma só: a trava de não
@@ -139,7 +172,18 @@ async function enviarCobranca(
   }));
   if (!linhas.length) return { ok: false, motivo: 'candidato sem título' };
 
-  const { error: insErr } = await service.from('fin_cobranca_envios').insert(linhas);
+  // ⚠️ ENSAIO NÃO GRAVA EM `fin_cobranca_envios`, e isso é deliberado: a trava
+  // de não cobrar duas vezes é (tenant, título, dias_offset), do TÍTULO REAL.
+  // Gravar o ensaio queimaria essa trava e o cliente de verdade nunca receberia
+  // aquele toque — um teste no meu número apagaria a cobrança dele.
+  //
+  // O preço é que dois ensaios seguidos mandam duas vezes. Como o destino é o
+  // número de quem está testando e saem no máximo 3 por rodada, é barato.
+  const ensaio = c.ensaio === true;
+
+  const { error: insErr } = ensaio
+    ? { error: null }
+    : await service.from('fin_cobranca_envios').insert(linhas);
   if (insErr) {
     // Violação da chave única é o caso ESPERADO quando duas rodadas se cruzam.
     // Não é erro: é a proteção funcionando.
@@ -153,21 +197,21 @@ async function enviarCobranca(
       .select('*')
       .eq('id', c.instance_id)
       .maybeSingle();
-    if (!instancia) throw new Error('instância da conversa não encontrada');
+    if (!instancia) throw new Error('número configurado para a régua não encontrado');
 
     const secrets = await getInstanceSecrets(service, c.instance_id);
     const adapter = getAdapter(instancia.provider_type || 'self_hosted');
     const envio = await adapter.send(secrets, instancia, {
-      to: c.telefone,
+      to: telefone,
       messageType: 'text',
       content: c.mensagem,
     });
 
     await service.from('whatsapp_messages').insert({
       tenant_id: tenantId,
-      conversation_id: c.conversation_id,
+      conversation_id: conversationId,
       message_id: envio.messageId,
-      remote_jid: c.telefone,
+      remote_jid: telefone,
       content: c.mensagem,
       message_type: 'text',
       status: 'pending',
@@ -177,15 +221,22 @@ async function enviarCobranca(
       sender_name: 'Cobrança automática',
       // A mesma marca da 2ª via: se o cliente responder qualquer coisa, o motor
       // leva a conversa direto ao Financeiro, sem passar pela URA.
-      metadata: { source: 'billing_automation', kind: 'cobranca', origem: 'fin_regua' },
+      metadata: {
+        source: 'billing_automation',
+        kind: 'cobranca',
+        origem: 'fin_regua',
+        // Ensaio fica marcado no histórico: a bolha existe, mas ninguém deve ler
+        // essa mensagem como cobrança que o cliente recebeu.
+        ...(ensaio ? { ensaio: true, cliente: c.cliente, telefone_real: c.telefone_real ?? null } : {}),
+      },
     });
 
     await service
       .from('whatsapp_conversations')
       .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', c.conversation_id);
+      .eq('id', conversationId);
 
-    await service
+    if (!ensaio) await service
       .from('fin_cobranca_envios')
       .update({ status: 'enviado', motivo: null, message_id: envio.messageId })
       .eq('tenant_id', tenantId)
@@ -196,7 +247,7 @@ async function enviarCobranca(
   } catch (e) {
     const msg = (e as Error)?.message ?? String(e);
     console.error(LOG, 'envio falhou para', c.cliente, msg);
-    await service
+    if (!ensaio) await service
       .from('fin_cobranca_envios')
       .update({ status: 'erro', motivo: msg.slice(0, 200) })
       .eq('tenant_id', tenantId)
@@ -339,6 +390,26 @@ Deno.serve(async (req) => {
     ? Math.max(1, Number(body.teto_diario))
     : TETO_DIARIO_INICIAL;
 
+  // ── Ensaio: a cobrança de um cliente real, entregue no seu próprio número ──
+  //
+  // Existe porque a alternativa era pior. Desde que o destino passou a ser o
+  // "WhatsApp Financeiro" do cadastro, testar a mensagem exigiria apontar o
+  // cadastro de um cliente para o número de quem testa — e esse campo propaga
+  // para o Omie. Ninguém deveria precisar editar o cadastro de um cliente para
+  // conferir um texto.
+  //
+  // O ensaio troca só o DESTINO. Cliente, valor, vencimento, toque e texto são
+  // os de verdade, porque é isso que se quer conferir.
+  //
+  // As duas travas continuam sendo as mesmas do envio normal, e ele não afrouxa
+  // nenhuma: só vale com a régua DESLIGADA e só para número que está na lista
+  // de teste. Pedir ensaio para um número fora da lista é erro, não é um envio
+  // "quase certo" — responder 400 aqui é o que impede um dígito trocado de
+  // virar cobrança para um desconhecido.
+  const redirecionarPara: string = typeof body?.redirecionar_para === 'string'
+    ? body.redirecionar_para.trim()
+    : '';
+
   try {
     const { data: quiet } = await service.rpc('is_wa_quiet_hours', { p_now: new Date().toISOString() });
 
@@ -399,6 +470,28 @@ Deno.serve(async (req) => {
       const liberados = new Set(
         (cfg?.fin_regua_telefones_teste ?? []).map((t: string) => chaveTelefone(t)).filter(Boolean),
       );
+
+      // Ensaio (ver `redirecionar_para` acima). Validado por tenant, porque a
+      // lista de teste e o portão são por tenant.
+      const chaveEnsaio = chaveTelefone(redirecionarPara);
+      const ensaio = redirecionarPara !== '';
+      if (ensaio) {
+        if (!chaveEnsaio) {
+          return json({ ok: false, error: 'redirecionar_para não é um telefone válido' }, 400);
+        }
+        if (cfg?.fin_regua_liberada === true) {
+          return json({
+            ok: false,
+            error: 'ensaio só com a régua desligada — com ela ligada o envio é o real',
+          }, 400);
+        }
+        if (!liberados.has(chaveEnsaio)) {
+          return json({
+            ok: false,
+            error: 'redirecionar_para precisa estar na lista de números de teste do tenant',
+          }, 400);
+        }
+      }
 
       // Quem pediu para sair. Carregado uma vez por tenant, e não por título:
       // é lista curta e consultar por cliente dentro do laço seria uma ida ao
@@ -528,30 +621,20 @@ Deno.serve(async (req) => {
           if (k) contagemTelefone.set(k, (contagemTelefone.get(k) ?? 0) + 1);
         }
 
-        // Conversa existente do cliente. Sem ela não há para onde mandar: a
-        // `dispatch-scheduled-messages`, que é o envio programado que já existe
-        // no projeto, também exige conversa pronta e não cria nenhuma.
-        const contatos = await buscarPorIds(
-          (bloco) =>
-            service
-              .from('whatsapp_contacts')
-              .select('id, cliente_id, phone_number, whatsapp_conversations(id, is_group, status, instance_id)')
-              .in('cliente_id', bloco),
-          clienteIds as string[],
-        );
-
-        const conversaPor = new Map<string, any>();
-        for (const ct of contatos) {
-          const convs = (ct.whatsapp_conversations ?? []).filter((c: any) => !c.is_group);
-          if (convs.length && !conversaPor.has(ct.cliente_id)) {
-            conversaPor.set(ct.cliente_id, {
-              conversation_id: convs[0].id,
-              contact_id: ct.id,
-              instance_id: convs[0].instance_id,
-              phone_number: ct.phone_number,
-            });
-          }
-        }
+        // ⚠️ NÃO SE PROCURA CONVERSA AQUI, e isto é a regra do Alexandre de
+        // 26/09/2026: a cobrança vai para o número do cadastro ("WhatsApp
+        // Financeiro") e sai pela instância configurada na tela — sempre, para
+        // todo cliente que a regra alcançar. A conversa é consequência disso,
+        // não condição: quando não existe naquele número, ela é aberta no
+        // momento do envio, por `fn_fin_regua_conversa`.
+        //
+        // A versão anterior fazia o contrário: procurava a conversa do cliente e
+        // mandava por onde ela estivesse. Dois defeitos, os dois medidos no
+        // primeiro teste real: a mensagem saiu pelo 9922 com o 9944 configurado,
+        // e a escolha entre as conversas do contato era `convs[0]`, sem ordem
+        // nenhuma. Além disso o alcance ficava preso a quem já tinha conversa —
+        // dos 366 clientes com fatura aberta, 366 têm WhatsApp Financeiro
+        // preenchido e só 10 já falaram no 9944.
 
         // ── Uma mensagem por CLIENTE, não por título ──
         //
@@ -583,21 +666,12 @@ Deno.serve(async (req) => {
 
         for (const [clienteId, lista] of porCliente) {
           const cliente = clientePor.get(clienteId);
-          const conversa = conversaPor.get(clienteId);
-          // ⚠️ O TELEFONE É O DA CONVERSA, não o do cadastro. Bug real,
-          // encontrado no primeiro teste de envio em 26/09/2026: o motor
-          // mandava para `clientes.telefone_whatsapp` e gravava a mensagem na
-          // conversa — que pode ser de outro número. Em produção isso significa
-          // cobrar um número e registrar no histórico de outro, e o cliente
-          // responderia num lugar onde ninguém veria a resposta.
-          //
-          // Medido antes: dos 490 clientes com contato vinculado, só 356 têm o
-          // número do cadastro igual ao da conversa. Um em cada quatro cairia
-          // nesse descompasso.
-          //
-          // Falar onde a conversa está é o desenho que já tínhamos escolhido
-          // para a instância; o telefone tem que seguir a mesma regra.
-          const telefone = conversa?.phone_number ?? cliente?.telefone_whatsapp ?? null;
+          // ⚠️ O DESTINO É O "WHATSAPP FINANCEIRO" DO CADASTRO, e só ele.
+          // `clientes.telefone_whatsapp` é o campo que a tela de cadastro mostra
+          // com esse nome, e é obrigatório lá. Cobrança não vai para o contato
+          // operacional nem para o número de onde o cliente escreveu por último:
+          // vai para quem paga.
+          const telefone = cliente?.telefone_whatsapp ?? null;
           const chave = chaveTelefone(telefone);
           const total = lista.reduce((s, t) => s + Number(t.valor), 0);
           const nome = cliente?.nome_fantasia || cliente?.razao_social || '';
@@ -621,13 +695,16 @@ Deno.serve(async (req) => {
           } else if ((contagemTelefone.get(chave) ?? 0) > 1) {
             decisao = 'suprimido';
             motivo = 'telefone compartilhado com outro cliente';
-          } else if (!conversa) {
-            decisao = 'sem_conversa';
-            motivo = 'cliente nunca conversou por aqui';
-          } else if (!cfg?.fin_regua_liberada && !liberados.has(chave)) {
+          } else if (!ensaio && !cfg?.fin_regua_liberada && !liberados.has(chave)) {
             decisao = 'bloqueado_portao';
             motivo = 'régua não liberada e telefone fora da lista de teste';
           }
+
+          // O ensaio troca o destino DEPOIS de todas as supressões, e a ordem é
+          // o ponto: opt-out e telefone compartilhado são avaliados no número
+          // REAL do cliente, senão o ensaio mostraria saindo uma mensagem que
+          // na hora do envio de verdade seria suprimida.
+          const destino = ensaio ? redirecionarPara : telefone;
 
           // O texto do toque continua sendo o do Alexandre; a itemização é
           // acrescentada só quando há mais de uma fatura. Assim ele não precisa
@@ -662,7 +739,11 @@ Deno.serve(async (req) => {
             decisao,
             motivo,
             cliente: nome || null,
-            telefone,
+            cliente_id: clienteId,
+            telefone: destino,
+            // Para a lista dizer que aquela linha foi ensaio, e para quem recebe
+            // saber de quem era a cobrança que chegou no número dele.
+            ...(ensaio ? { ensaio: true, telefone_real: telefone } : {}),
             vencimento: lista[0].vencimento,
             valor: total,
             faturas: lista.length,
@@ -675,16 +756,22 @@ Deno.serve(async (req) => {
             // codigo do Omie, nao pelo nosso uuid.
             origem_conta_id: lista[0].origem_conta_id ?? null,
             origem_ids: lista.map((t) => Number(t.origem_id)).filter(Number.isFinite),
-            conversation_id: conversa?.conversation_id ?? null,
-            // ⚠️ A instância é a DA CONVERSA, não a configurada no tenant.
-            // Medido em 25/09/2026 na Digi Office: das conversas dos clientes
-            // com título em aberto, 595 estão no número oficial, 323 no 9922 e
-            // apenas 11 no 9944. Cobrar por um número com quem o cliente nunca
-            // falou é exatamente o que parece spam, e é onde mora o risco de
-            // banimento. Continuar a conversa que já existe é melhor para ele e
-            // mais seguro para o número.
-            instance_id: conversa?.instance_id ?? null,
-            contact_id: conversa?.contact_id ?? null,
+            // ⚠️ A INSTÂNCIA É A CONFIGURADA NA TELA, sempre. Regra do
+            // Alexandre em 26/09/2026, depois de a primeira cobrança de teste
+            // sair pelo 9922 com o 9944 escolhido: a cobrança é um canal, não
+            // uma resposta. Quem escolheu o número decidiu por onde a empresa
+            // cobra, e o motor não tem voto nisso.
+            //
+            // O risco que o desenho anterior tentava evitar (número não
+            // aquecido falando com quem nunca falou com ele) continua real e
+            // continua tratado — mas por onde ele se trata de verdade: teto
+            // diário, intervalo sorteado e uma mensagem por vez.
+            instance_id: canal?.id ?? null,
+            // A conversa é resolvida no ENVIO, não aqui: numa simulação de 293
+            // clientes, abrir conversa para todos criaria 293 conversas sem uma
+            // mensagem sequer ter saído.
+            conversation_id: null,
+            contact_id: null,
             mensagem,
           });
         }
@@ -827,7 +914,7 @@ Deno.serve(async (req) => {
           const sobra = Math.max(0, tetoDiario - (hojeJaForam ?? 0));
           const fila = candidatos
             .filter((c) => c.decisao === 'enviaria')
-            .filter((c) => c.conversation_id && c.instance_id && c.telefone)
+            .filter((c) => c.instance_id && c.telefone)
             // Cinto e suspensório: com a régua desligada só telefone de teste
             // vira `enviaria`, então este filtro é redundante. Fica porque o
             // custo é zero e o que ele protege é mandar cobrança fora de hora
