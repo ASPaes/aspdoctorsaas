@@ -415,8 +415,8 @@ Deno.serve(async (req) => {
     // RETENTATIVA. Uma chamada que o OEM gravou e respondeu com erro, repetida,
     // criaria uma segunda licença cobrada. Falhou, a linha para em 'invalido'
     // com o motivo, e o Reprocessar manual é seguro: a oem-licenca-criar
-    // recusa a mesma loja duas vezes no mesmo grupo e devolve o código da que
-    // já existe (409 `ja_existe`), que aqui vira sucesso.
+    // recusa a mesma loja duas vezes no mesmo grupo (409 `ja_existe`), e isso
+    // aqui PARA a linha dizendo qual loja é — não liga a ficha a ela.
     // ===================================================================
     const criacoes = fila.filter((x) => x.acao === "criar_licenca");
     fila = fila.filter((x) => x.acao !== "criar_licenca");
@@ -464,7 +464,22 @@ Deno.serve(async (req) => {
       const criou = http === 200 && resposta?.ok === true;
       const jaExistia = http === 409 && resposta?.ja_existe === true;
 
-      if ((criou || jaExistia) && grupo && filial) {
+      // ⚠️ "JÁ EXISTE" NÃO É SUCESSO (26/09/2026).
+      // A primeira versão ligava a ficha à loja que já existia e gravava
+      // "Licença criada" no histórico. No 2º teste isso religou em silêncio uma
+      // licença que tinha acabado de ser solta, e registrou uma criação que não
+      // houve. Mesma loja no mesmo grupo pode ser o reenvio de um pedido que já
+      // gravou, OU outra venda com o mesmo nome — só gente distingue. Para aqui,
+      // não liga nada, e diz qual é a loja.
+      if (jaExistia) {
+        await pararCriacao(x,
+          `Nada foi criado: já existe no OEM a loja ${grupo ?? "?"}/${filial ?? "?"} `
+          + "com o mesmo nome e CNPJ. Se for ela, vincule pela ficha do cliente. "
+          + "Se for uma loja nova, peça de novo com outro nome de loja.", resposta, http);
+        continue;
+      }
+
+      if (criou && grupo && filial) {
         const { error: errA } = await ds.rpc("fn_oem_licenca_criada", {
           p_fila_id: x.id, p_grupo: grupo, p_filial: filial, p_resposta: resposta,
         });
