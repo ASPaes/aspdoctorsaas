@@ -7,7 +7,13 @@ import { useOemIntegracaoAtiva } from "@/hooks/useOemIntegracaoAtiva";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeftRight, Cpu, Link2, Lock, TrendingDown } from "lucide-react";
+import { ArrowLeftRight, Cpu, Link2, Lock, TrendingDown, Unlink } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import OemLicencaEstadoBotoes from "./OemLicencaEstadoBotoes";
 import EscolherLicencaOemDialog, { type LicencaOem } from "@/components/configuracoes/EscolherLicencaOemDialog";
 
@@ -158,18 +164,22 @@ export function useOemDoCliente(clienteId: string) {
   // grupo se repete, ele aponta todas as filiais para o mesmo cadastro. O que
   // vale é o par grupo+filial gravado em cliente_produtos, que só é escrito
   // quando não há dúvida.
-  const { data: codigos = [], isSuccess: codigosLidos } = useQuery({
+  const { data: pares = [], isSuccess: codigosLidos } = useQuery({
     queryKey: ["oem-codigos-cliente", tid, clienteId],
     enabled: !!tid && !!clienteId && temConta === true,
     queryFn: async () => {
       const { data, error } = await (supabase.from("cliente_produtos" as any) as any)
-        .select("oem_codigo_filial")
+        .select("oem_codigo_filial, oem_codigo_grupo")
         .eq("cliente_id", clienteId)
         .not("oem_codigo_filial", "is", null);
       if (error) throw error;
-      return (data ?? []).map((r: any) => String(r.oem_codigo_filial));
+      return (data ?? []).map((r: any) => ({
+        filial: String(r.oem_codigo_filial),
+        grupo: r.oem_codigo_grupo != null ? String(r.oem_codigo_grupo) : null,
+      })) as { filial: string; grupo: string | null }[];
     },
   });
+  const codigos = pares.map((p) => p.filial);
 
   // AS LICENÇAS QUE APONTAM PARA ESTE CLIENTE, tenham ou não código na ficha.
   //
@@ -203,7 +213,7 @@ export function useOemDoCliente(clienteId: string) {
   });
   const pendentes = apontam.length;
 
-  const { data: licencas = [] } = useQuery({
+  const { data: licencas = [], isSuccess: licencasLidas } = useQuery({
     queryKey: ["oem-licencas-cliente", tid, clienteId, codigos.join(",")],
     enabled: !!tid && !!clienteId && temConta === true && codigos.length > 0,
     queryFn: async () => {
@@ -264,16 +274,28 @@ export function useOemDoCliente(clienteId: string) {
         (l) => l.status_usuario === "vinculado" && !codigos.includes(String(l.filial_codigo)))
     : [];
 
+  // CÓDIGO NA FICHA QUE A LEITURA DO OEM AINDA NÃO TROUXE.
+  //
+  // Desde 25/09/2026 o DoctorSaaS cria licença no OEM e grava o código na hora,
+  // mas `reconciliacao_oem` só recebe a filial na próxima carga (de 6 em 6
+  // horas). Sem isto a seção inteira sumia — licenças lidas = 0, e com código
+  // na ficha não é "sem licença" nem "indefinido" — e com ela o único jeito de
+  // soltar o vínculo. Foi o que aconteceu no 1º teste (33430/40570, 26/09).
+  const aguardando = licencasLidas
+    ? pares.filter((p) => !(licencas as Licenca[]).some((l) => String(l.filial_codigo) === p.filial))
+    : [];
+
   return {
     licencas: licencas as Licenca[],
     pendentes,
     indefinido,
     orfas,
     codigos,
+    aguardando,
     lidoEm,
     podeDecidir,
     semLicenca,
-    visivel: ativo && (licencas.length > 0 || indefinido || semLicenca),
+    visivel: ativo && (licencas.length > 0 || indefinido || semLicenca || aguardando.length > 0),
   };
 }
 
@@ -345,7 +367,7 @@ function TrocarLicencaOem({
   return (
     <>
       {/* Mesmo desenho de Desativar/Bloquear, que ficam do lado: é decisão sobre a licença, não consulta como o Reler. */}
-      <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 text-muted-foreground"
+      <Button type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 text-muted-foreground"
         onClick={() => setAberto(true)}>
         {icone}
         {rotulo}
@@ -364,9 +386,94 @@ function TrocarLicencaOem({
   );
 }
 
+/**
+ * Licença com código na ficha que a leitura do OEM ainda não trouxe — tipicamente
+ * a que o DoctorSaaS acabou de criar. Sem leitura não há custo, status nem troca
+ * pelo diálogo (ele trabalha em cima da linha da leitura), mas soltar o vínculo
+ * precisa existir desde já: o código pode estar errado.
+ *
+ * Soltar usa `oem_remover_codigo_filial`, a mesma de Configurações › OEM, que
+ * deixa registro com Desfazer. Portão no banco: admin/head (`pode_decidir_oem`).
+ */
+function AguardandoLeitura({
+  clienteId, itens,
+}: {
+  clienteId: string;
+  itens: { filial: string; grupo: string | null }[];
+}) {
+  const qc = useQueryClient();
+  const { profile } = useAuth();
+  const podeSoltar = profile?.is_super_admin === true || profile?.role === "admin" || profile?.role === "head";
+  const [soltar, setSoltar] = useState<{ filial: string; grupo: string | null } | null>(null);
+  const [soltando, setSoltando] = useState(false);
+
+  const confirmar = async () => {
+    if (!soltar) return;
+    setSoltando(true);
+    try {
+      const { error } = await (supabase as any).rpc("oem_remover_codigo_filial", {
+        p_cliente_id: clienteId, p_filial: soltar.filial,
+      });
+      if (error) throw error;
+      toast({ title: "Vínculo solto", description: `A filial ${soltar.filial} não está mais ligada a este cliente.` });
+      for (const k of ["oem-codigos-cliente", "oem-licencas-cliente", "oem-apontam-cliente", "cliente_produtos", "oem-licenca-contexto"]) {
+        void qc.invalidateQueries({ queryKey: [k] });
+      }
+      setSoltar(null);
+    } catch (e: any) {
+      toast({ title: "Não foi possível soltar", description: e?.message ?? String(e), variant: "destructive" });
+    } finally {
+      setSoltando(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-md border border-sky-500/40 bg-sky-500/5 divide-y divide-sky-500/20">
+      {itens.map((p) => (
+        <div key={p.filial} className="flex flex-wrap items-center gap-3 px-3 py-2 text-sm">
+          <div className="min-w-0 flex-1">
+            <p className="tabular-nums">filial {p.filial}{p.grupo ? ` · grupo ${p.grupo}` : ""}</p>
+            <p className="text-xs text-muted-foreground">
+              Aguardando a leitura do OEM. Custo, status e módulos aparecem aqui depois da próxima
+              atualização, que roda de 6 em 6 horas.
+            </p>
+          </div>
+          {podeSoltar && (
+            // type="button": a seção fica dentro do <form> da ficha, e o padrão
+            // "submit" salvava o cliente junto com o clique.
+            <Button type="button" size="sm" variant="outline" className="h-7 px-2.5 text-xs gap-1.5 text-muted-foreground"
+              onClick={() => setSoltar(p)}>
+              <Unlink className="h-3.5 w-3.5" /> Soltar
+            </Button>
+          )}
+        </div>
+      ))}
+
+      <AlertDialog open={!!soltar} onOpenChange={(o) => !o && !soltando && setSoltar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Soltar a filial {soltar?.filial}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O código sai da ficha deste cliente. A licença continua existindo no OEM: se ela não
+              deve mais cobrar, desative no portal do parceiro. Dá para desfazer em
+              Configurações › Integrações › OEM › Histórico.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={soltando}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); void confirmar(); }} disabled={soltando}>
+              {soltando ? "Soltando…" : "Soltar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
 export default function IntegracaoOemSection({ clienteId }: { clienteId: string }) {
   const {
-    licencas, pendentes, indefinido, orfas, codigos, lidoEm, podeDecidir, semLicenca, visivel,
+    licencas, pendentes, indefinido, orfas, codigos, aguardando, lidoEm, podeDecidir, semLicenca, visivel,
   } = useOemDoCliente(clienteId);
 
   if (!visivel) return null;
@@ -435,6 +542,21 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
           Pendências</strong>, nenhuma delas é dada como deste cliente, e nenhum custo é
           atribuído a ele aqui.
         </p>
+      </section>
+    );
+  }
+
+  // Só licença recém-criada, ainda sem leitura: nada de custo nem margem, que
+  // sairiam zerados e pareceriam medidos.
+  if (licencas.length === 0 && aguardando.length > 0) {
+    return (
+      <section className="px-6 py-4">
+        {cabecalho(
+          <Badge variant="outline" className="text-sky-600 dark:text-sky-400 border-sky-500/40">
+            aguardando leitura
+          </Badge>,
+        )}
+        <AguardandoLeitura clienteId={clienteId} itens={aguardando} />
       </section>
     );
   }
@@ -576,6 +698,9 @@ export default function IntegracaoOemSection({ clienteId }: { clienteId: string 
           );
         })}
       </div>
+
+      {/* A licença nova de um segundo produto, ainda sem leitura. */}
+      {aguardando.length > 0 && <AguardandoLeitura clienteId={clienteId} itens={aguardando} />}
 
       {/* Linha 4: a licença que é deste cliente e não coube na ficha.
 

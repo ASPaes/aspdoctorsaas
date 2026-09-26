@@ -255,7 +255,10 @@ export default function OemLicencaEstadoBotoes({
       <div className="flex items-center gap-1.5">
         {/* Ativar/Desativar. `null` é o OEM não ter respondido esta filial na
             última leitura: sem saber o estado, não há inverso para oferecer. */}
+        {/* type="button" nos três: a ficha é um <form>, e o padrão "submit"
+            salvava o cliente a cada clique aqui. */}
         <Button
+          type="button"
           size="sm"
           variant="outline"
           className={
@@ -279,6 +282,7 @@ export default function OemLicencaEstadoBotoes({
         </Button>
 
         <Button
+          type="button"
           size="sm"
           variant="outline"
           className={
@@ -297,6 +301,7 @@ export default function OemLicencaEstadoBotoes({
             é justamente aí que reler é o que resolve, e é o único botão dos três
             que não depende de saber o estado atual. */}
         <Button
+          type="button"
           size="sm"
           variant="ghost"
           className="h-7 px-2 text-xs gap-1.5 text-muted-foreground"
