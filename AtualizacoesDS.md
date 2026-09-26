@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 26/09
 
+- ⬆️ **No telefone, o botão em destaque do e-mail aberto virou o Responder** — Ao abrir uma mensagem pelo celular, os botões empilhavam de baixo para cima: o **Fechar** ficava no topo, grande e verde, e o **Responder** ia para o fim da lista. Agora a ordem é a que se espera — **Responder**, **Responder a todos**, **Encaminhar**, **Mover para**, **Arquivar** e, por último, **Fechar** — com o Responder em destaque. No computador os botões continuam lado a lado como estavam.
+
 - ⬆️ **No telefone, cada e-mail da lista mostra o que dá para fazer com ele** — O cartão já abria o e-mail ao toque, mas nada na tela dizia isso. Agora cada um traz **Abrir**, **mover para pasta** e **arquivar**, os mesmos botões que a lista tem no computador. Abrir mostra a mensagem inteira com **Responder**, **Responder a todos**, **Encaminhar**, **Mover para** e **Arquivar**.
 
 - 🔧 **No celular, os números da tela inicial mostravam o movimento da empresa inteira** — Os cartões de **Chat**, **Tickets**, **Implantação** e **E-mails** contavam tudo do tenant: aparecia 99+ em Tickets e 7 em Chat para quem não tinha nenhum dos dois no próprio nome. Agora cada número é a sua carteira: os atendimentos **atribuídos a você**, os tickets e as jornadas em que **você é o responsável**, e os e-mails por ler dos **setores de que você participa**. Quem não tem nada em aberto vê o cartão sem número.

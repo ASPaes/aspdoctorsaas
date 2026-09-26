@@ -14,6 +14,9 @@ import { useMoverParaPasta } from "./usePastasEmail";
 import { useMarcarEmailLido } from "./useNaoLidos";
 import { EscreverEmailDialog, type PedidoEscrita } from "./EscreverEmailDialog";
 import type { ModoEscrita } from "./respostaEmail";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { isChatHost } from "@/lib/chatHost";
+import { cn } from "@/lib/utils";
 
 /**
  * Abre o e-mail inteiro a partir da lista (pedido do Alexandre, 15/09/2026:
@@ -76,6 +79,7 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
   const mover = useMoverParaPasta(tipo === "enviado" ? "enviados" : "recebidos");
   const marcarLido = useMarcarEmailLido();
   const [escrevendo, setEscrevendo] = useState<PedidoEscrita | null>(null);
+  const noCelular = useIsMobile() || isChatHost();
 
   /** monta o original que a tela de escrever usa para o assunto, o Para e a citação */
   const abrirEscrita = (modo: ModoEscrita) => {
@@ -260,10 +264,15 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
           </>
         )}
 
-        <DialogFooter className="flex-wrap gap-2 sm:justify-start sm:gap-2">
+        <DialogFooter
+          className={cn(
+            "flex-wrap gap-2 sm:justify-start sm:gap-2",
+            noCelular && "max-sm:[flex-direction:column]",
+          )}
+        >
           {email && !email.deleted_at && (
             <>
-              <Button variant="outline" onClick={() => abrirEscrita("responder")}>
+              <Button variant={noCelular ? "default" : "outline"} onClick={() => abrirEscrita("responder")}>
                 <Reply className="mr-2 h-4 w-4" />
                 Responder
               </Button>
@@ -312,7 +321,11 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
               {estaArquivado ? "Tirar do arquivo" : "Arquivar"}
             </Button>
           )}
-          <Button onClick={() => onOpenChange(false)} className="sm:ml-auto">
+          <Button
+            variant={noCelular ? "outline" : "default"}
+            onClick={() => onOpenChange(false)}
+            className="sm:ml-auto"
+          >
             Fechar
           </Button>
         </DialogFooter>
