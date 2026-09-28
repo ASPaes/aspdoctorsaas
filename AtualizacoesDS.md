@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- 🔧 **Mensagem marcada para responder passava para outro chat** — No **Chat**, quem clicava em **Responder** numa mensagem e trocava de conversa sem enviar continuava vendo aquela mensagem marcada no chat seguinte, e a resposta podia sair citando a conversa errada. Agora, ao trocar de conversa, a marcação é desfeita.
+
 - 🔧 **Movimentos MRR mostrava outra unidade sem o nome do cliente** — Em **Clientes › Movimentos MRR**, quem filtrava por uma unidade (ex.: só Digi Up) via também os movimentos das outras unidades, sem o nome do cliente. Em setembro, eram 155 linhas quando deviam ser 11. Agora aparecem só os movimentos da unidade escolhida, todos com o nome do cliente, e os cards de totais e o Exportar XLSX seguem o mesmo filtro.
 
 - 🔧 **Número estranho ao lado de "Conversas"** — No **Chat**, quem não tem limite de conversas simultâneas via o contador **0/2147483647** ao lado de **Conversas**. Agora, sem limite, o contador não aparece. Quem tem limite continua vendo o contador normal (ex.: 3/5).

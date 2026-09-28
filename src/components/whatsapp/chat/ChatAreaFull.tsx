@@ -83,7 +83,10 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
   // `?.` obrigatório: o ChatAreaFull monta com conversation = null para desenhar
   // a tela vazia do chat, e a lista de dependências é lida durante o render.
   // Com `conversation.id` a página inteira do chat caía (11/09, pego no local).
-  useEffect(() => { setAgendadasAbertas(false); }, [conversation?.id]);
+  // DEM-0480: a mensagem marcada para responder também é da conversa. Sem limpar,
+  // o "Respondendo a" do chat A aparecia no chat B e a resposta saía citando
+  // uma mensagem de outra conversa.
+  useEffect(() => { setAgendadasAbertas(false); setReplyTo(null); }, [conversation?.id]);
   const agendadaAcoes = useMemo(() => ({
     editar: (a: ScheduledMessage) => chatInputRef.current?.editarAgendada(a),
     pedir: (tipo: "cancelar" | "enviar", a: ScheduledMessage) => chatInputRef.current?.pedirAcaoAgendada(tipo, a),
