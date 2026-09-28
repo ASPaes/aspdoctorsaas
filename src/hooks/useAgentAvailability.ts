@@ -14,6 +14,8 @@ export interface AgentAvailability {
   isLoading: boolean;
 }
 
+const SEM_LIMITE = 2147483647;
+
 export function useAgentAvailability(): AgentAvailability {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
@@ -45,8 +47,13 @@ export function useAgentAvailability(): AgentAvailability {
 
       const current = Number(currentRes.data ?? 0);
       const rawLimit = limitRes.data;
+      // fn_effective_chat_limit devolve o int max como "sem limite" (limite 0
+      // configurado, decisao de 23/09/2026). Na tela isso vira null, senao o
+      // cracha mostra "0/2147483647".
       const limit: number | null =
-        rawLimit === null || rawLimit === undefined ? null : Number(rawLimit);
+        rawLimit === null || rawLimit === undefined || Number(rawLimit) >= SEM_LIMITE
+          ? null
+          : Number(rawLimit);
 
       return { current, limit };
     },

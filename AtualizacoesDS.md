@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- 🔧 **Número estranho ao lado de "Conversas"** — No **Chat**, quem não tem limite de conversas simultâneas via o contador **0/2147483647** ao lado de **Conversas**. Agora, sem limite, o contador não aparece. Quem tem limite continua vendo o contador normal (ex.: 3/5).
+
 - 🔧 **Administrador e gestor não conseguiam iniciar o expediente** — No **Chat**, quem é administrador ou gestor e nunca tinha iniciado expediente não via o botão de status ao lado de **Equipe**, e por isso não tinha como começar. Essas pessoas também não apareciam na lista da **Equipe**, mesmo estando online. Agora o botão aparece como **Offline**, com a opção **Iniciar expediente**. Depois de iniciar, a pessoa passa a aparecer na Equipe.
 
 - 🔧 **Empresa nova já nasce com as permissões por grupos** — Empresa cadastrada depois de 20/09 ficava sem os grupos **Administrador**, **Gestor** e **Operador** em **Configurações › Permissões**, e as pessoas dela ficavam sem grupo. Agora toda empresa nova já nasce com os grupos, e toda pessoa cadastrada ou que muda de papel entra no grupo certo sozinha.
