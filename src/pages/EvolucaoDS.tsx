@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Sparkles, Star, RefreshCw } from "lucide-react";
+import { Search, Sparkles, Star, RefreshCw, PlayCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
   useEvolucaoFeed,
@@ -78,7 +79,89 @@ function SeloEmpresa() {
   );
 }
 
-function CartaoItem({ item, novo }: { item: ItemEvolucao; novo: boolean }) {
+/** Vídeo e/ou passo a passo gravados pelo /novidade. */
+function temConteudo(i: ItemEvolucao) {
+  return !!i.video_url || !!i.passo_a_passo?.length;
+}
+
+function BotaoComoFunciona({ item, onAbrir }: { item: ItemEvolucao; onAbrir: () => void }) {
+  const partes = [item.video_url ? "vídeo" : null, item.passo_a_passo?.length ? `${item.passo_a_passo.length} passos` : null]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <Button size="sm" onClick={onAbrir} className="bg-green-600 text-white hover:bg-green-700">
+      <PlayCircle className="mr-2 h-4 w-4" />
+      Ver como funciona
+      <span className="ml-2 text-xs font-normal opacity-80">{partes}</span>
+    </Button>
+  );
+}
+
+function DetalheNovidade({ item, onFechar }: { item: ItemEvolucao | null; onFechar: () => void }) {
+  return (
+    <Sheet open={!!item} onOpenChange={(o) => !o && onFechar()}>
+      <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-2xl">
+        {item && (
+          <div className="space-y-5">
+            <SheetHeader className="space-y-2 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <ChipTipo tipo={item.tipo} />
+                {item.modulo && <span className="text-xs text-muted-foreground">{item.modulo}</span>}
+              </div>
+              <SheetTitle className="text-2xl">{item.titulo}</SheetTitle>
+              {item.resumo && <SheetDescription className="text-base">{item.resumo}</SheetDescription>}
+            </SheetHeader>
+
+            {item.video_url && (
+              <video
+                src={item.video_url}
+                controls
+                playsInline
+                preload="metadata"
+                className="w-full rounded-xl border bg-slate-950"
+              />
+            )}
+
+            {!!item.para_que_serve?.length && (
+              <section className="rounded-xl bg-muted/60 p-4">
+                <h4 className="font-semibold">Para que serve</h4>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                  {item.para_que_serve.map((x, k) => (
+                    <li key={k}>{x}</li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {!!item.passo_a_passo?.length && (
+              <section className="space-y-3">
+                <h4 className="font-semibold">Passo a passo</h4>
+                <ol className="space-y-4">
+                  {item.passo_a_passo.map((p) => (
+                    <li key={p.passo} className="overflow-hidden rounded-xl border">
+                      <div className="flex items-center gap-3 p-3 text-sm font-medium">
+                        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-green-500 font-mono text-xs font-bold text-green-950">
+                          {p.passo}
+                        </span>
+                        {p.legenda}
+                      </div>
+                      {/* Print de tela inteira fica pequeno no painel: o clique abre em tamanho real. */}
+                      <a href={p.imagem_url} target="_blank" rel="noopener noreferrer" title="Abrir em tamanho real">
+                        <img src={p.imagem_url} alt={`Passo ${p.passo}: ${p.legenda}`} loading="lazy" className="block w-full cursor-zoom-in border-t" />
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function CartaoItem({ item, novo, onAbrir }: { item: ItemEvolucao; novo: boolean; onAbrir: () => void }) {
   return (
     <article
       className={cn(
@@ -98,9 +181,10 @@ function CartaoItem({ item, novo }: { item: ItemEvolucao; novo: boolean }) {
       </div>
       <h3 className="mt-2 text-base font-semibold leading-snug">{item.titulo}</h3>
       {item.resumo && <p className="mt-1 text-sm text-muted-foreground">{item.resumo}</p>}
-      {item.pedido_pela_sua_empresa && (
-        <div className="mt-3">
-          <SeloEmpresa />
+      {(item.pedido_pela_sua_empresa || temConteudo(item)) && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {temConteudo(item) && <BotaoComoFunciona item={item} onAbrir={onAbrir} />}
+          {item.pedido_pela_sua_empresa && <SeloEmpresa />}
         </div>
       )}
     </article>
@@ -141,6 +225,7 @@ export default function EvolucaoDS() {
   const [filtro, setFiltro] = useState<Filtro>("tudo");
   const [busca, setBusca] = useState("");
   const [dias, setDias] = useState(DIAS_POR_PAGINA);
+  const [aberto, setAberto] = useState<ItemEvolucao | null>(null);
 
   // Guarda o "visto" de ANTES de entrar e só então marca como visto agora.
   const vistoAntesRef = useRef<string | null | undefined>(undefined);
@@ -161,6 +246,15 @@ export default function EvolucaoDS() {
   }, [itens]);
 
   const temPedidoDaEmpresa = itens.some((i) => i.pedido_pela_sua_empresa);
+
+  // Destaque do topo: a novidade marcada como destaque no /novidade, por 14 dias.
+  const emDestaque = useMemo(
+    () =>
+      itens.find(
+        (i) => i.destaque && temConteudo(i) && Date.now() - new Date(i.publicado_em).getTime() < 14 * 86400000,
+      ) ?? null,
+    [itens],
+  );
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -219,6 +313,34 @@ export default function EvolucaoDS() {
           )}
         </div>
       </header>
+
+      {emDestaque && (
+        <section className="grid overflow-hidden rounded-2xl border bg-card md:grid-cols-[1.1fr_1fr]">
+          {emDestaque.video_url ? (
+            <video
+              src={emDestaque.video_url}
+              controls
+              playsInline
+              preload="metadata"
+              className="aspect-video h-full w-full bg-slate-950 object-contain"
+            />
+          ) : (
+            <img src={emDestaque.passo_a_passo?.[0]?.imagem_url} alt="" className="h-full w-full object-cover" />
+          )}
+          <div className="flex flex-col gap-2 p-5">
+            <span className="inline-flex w-max items-center gap-1.5 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-950 dark:text-green-300">
+              <Sparkles className="h-3 w-3" />
+              Em destaque
+            </span>
+            <h2 className="text-xl font-bold leading-snug">{emDestaque.titulo}</h2>
+            <p className="text-sm text-muted-foreground">{emDestaque.resumo}</p>
+            {emDestaque.pedido_pela_sua_empresa && <SeloEmpresa />}
+            <div className="mt-auto pt-2">
+              <BotaoComoFunciona item={emDestaque} onAbrir={() => setAberto(emDestaque)} />
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {filtros.map((f) => (
@@ -286,7 +408,7 @@ export default function EvolucaoDS() {
               {rotuloDia(dia)}
             </h2>
             {destaques.map((i) => (
-              <CartaoItem key={i.id} item={i} novo={naoVisto(i, vistoAntes)} />
+              <CartaoItem key={i.id} item={i} novo={naoVisto(i, vistoAntes)} onAbrir={() => setAberto(i)} />
             ))}
             {correcoes.length > 0 && <BlocoCorrecoes itens={correcoes} vistoAntes={vistoAntes} />}
           </section>
@@ -300,6 +422,8 @@ export default function EvolucaoDS() {
           </Button>
         </div>
       )}
+
+      <DetalheNovidade item={aberto} onFechar={() => setAberto(null)} />
     </div>
   );
 }

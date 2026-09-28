@@ -27,6 +27,11 @@ export interface ItemEvolucao {
   modulo: string | null;
   publicado_em: string;
   pedido_pela_sua_empresa: boolean;
+  /** Conteúdo gravado pelo /novidade. Só algumas releases têm. */
+  video_url?: string | null;
+  passo_a_passo?: { passo: number; legenda: string; imagem_url: string }[] | null;
+  para_que_serve?: string[] | null;
+  destaque?: boolean;
 }
 
 /** pisca = novidade/melhoria não vista há menos de 3 dias; numero = só correção
