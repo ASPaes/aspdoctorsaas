@@ -316,182 +316,204 @@ export default function WhatsAppGroupsTab() {
           )}
 
           {selectedInstanceId && !groupsLoading && groups && groups.length > 0 && (
-            <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
-              <span className="text-xs text-muted-foreground px-1">
-                Em lote — {markedIds.length > 0 ? `${markedIds.length} marcado(s)` : "nada marcado, vale para todos"}
-              </span>
-              <div className="flex flex-wrap items-center gap-2 ml-auto">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  disabled={bulkMutation.isPending || targetIds.length === 0}
-                  onClick={() => bulkMutation.mutate({ kind: "enable", ids: targetIds })}
-                >
-                  {bulkBusy("enable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                  Ativar {targetLabel}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  disabled={bulkMutation.isPending || targetIds.length === 0}
-                  onClick={() => bulkMutation.mutate({ kind: "disable", ids: targetIds })}
-                >
-                  {bulkBusy("disable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                  Desativar {targetLabel}
-                </Button>
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="bulk-retention" className="text-xs text-muted-foreground whitespace-nowrap">
-                    Retenção
-                  </label>
-                  <Input
-                    id="bulk-retention"
-                    type="number"
-                    min={RETENTION_MIN}
-                    max={RETENTION_MAX}
-                    step={1}
-                    placeholder="dias"
-                    value={bulkRetention}
-                    onChange={(e) => setBulkRetention(e.target.value)}
-                    className="w-20 h-8 text-xs"
+            <div className="rounded-lg border overflow-hidden">
+              {/* Barra de lote: sem nada marcado, as ações valem para todos da instância */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b bg-muted/30 px-4 py-2.5">
+                <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
+                  <Checkbox
+                    checked={allMarked ? true : markedIds.length > 0 ? "indeterminate" : false}
+                    onCheckedChange={(c) => setSelectedIds(c === true ? new Set(allIds) : new Set())}
+                    aria-label="Selecionar todos"
                   />
+                  {markedIds.length > 0 ? (
+                    <span className="font-medium">{markedIds.length} marcado(s)</span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      Nenhum marcado — ações valem para <strong className="font-medium text-foreground">todos ({allIds.length})</strong>
+                    </span>
+                  )}
+                </label>
+                {markedIds.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                    onClick={() => setSelectedIds(new Set())}
+                  >
+                    Limpar
+                  </button>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                   <Button
                     size="sm"
                     variant="outline"
                     className="h-8"
-                    disabled={bulkMutation.isPending || !bulkRetentionValid || targetIds.length === 0}
-                    title={bulkRetentionValid ? undefined : `Inteiro entre ${RETENTION_MIN} e ${RETENTION_MAX}`}
-                    onClick={() =>
-                      bulkMutation.mutate(
-                        { kind: "retention", ids: targetIds, days: bulkRetentionDays },
-                        { onSuccess: () => setBulkRetention("") },
-                      )
-                    }
+                    disabled={bulkMutation.isPending}
+                    onClick={() => bulkMutation.mutate({ kind: "enable", ids: targetIds })}
+                    title={`Ativar ${targetLabel}`}
                   >
-                    {bulkBusy("retention") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
-                    Aplicar a {targetLabel}
+                    {bulkBusy("enable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                    Ativar
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={bulkMutation.isPending}
+                    onClick={() => bulkMutation.mutate({ kind: "disable", ids: targetIds })}
+                    title={`Desativar ${targetLabel}`}
+                  >
+                    {bulkBusy("disable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                    Desativar
+                  </Button>
+                  <div className="hidden sm:block h-5 w-px bg-border mx-1" />
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      aria-label="Retenção em dias para aplicar em lote"
+                      type="number"
+                      min={RETENTION_MIN}
+                      max={RETENTION_MAX}
+                      step={1}
+                      placeholder="dias"
+                      value={bulkRetention}
+                      onChange={(e) => setBulkRetention(e.target.value)}
+                      className="w-20 h-8 text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      disabled={bulkMutation.isPending || !bulkRetentionValid}
+                      title={
+                        bulkRetentionValid
+                          ? `Aplicar ${bulkRetentionDays} dia(s) a ${targetLabel}`
+                          : `Informe um número inteiro entre ${RETENTION_MIN} e ${RETENTION_MAX}`
+                      }
+                      onClick={() =>
+                        bulkMutation.mutate(
+                          { kind: "retention", ids: targetIds, days: bulkRetentionDays },
+                          { onSuccess: () => setBulkRetention("") },
+                        )
+                      }
+                    >
+                      {bulkBusy("retention") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                      Aplicar retenção
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="divide-y divide-border rounded-lg border">
-              <label className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground cursor-pointer">
-                <Checkbox
-                  checked={allMarked ? true : markedIds.length > 0 ? "indeterminate" : false}
-                  onCheckedChange={(c) => setSelectedIds(c === true ? new Set(allIds) : new Set())}
-                />
-                Selecionar todos
-              </label>
-              {groups.map((group) => {
-                const isEnabled = group.enabled;
-                return (
-                  <div key={group.id} className="flex items-start sm:items-center gap-3 pl-4">
-                  <Checkbox
-                    className="mt-4 sm:mt-0"
-                    checked={selectedIds.has(group.id)}
-                    onCheckedChange={(c) => toggleMarked(group.id, c === true)}
-                    aria-label={`Marcar ${group.group_name || group.group_jid}`}
-                  />
-                  <div
-                    className={`flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-3 py-4 pr-4 ${
-                      !isEnabled ? "opacity-50" : ""
-                    }`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {group.group_name || group.group_jid}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        {typeof group.participant_count === "number" && (
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {group.participant_count} participante(s)
-                          </span>
-                        )}
-                        {group.last_synced_at && (
-                          <span className="inline-flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatDateLabel(group.last_synced_at, timezone)}
-                          </span>
+              <ul className="divide-y divide-border">
+                {groups.map((group) => {
+                  const isEnabled = group.enabled;
+                  const nome = group.group_name || group.group_jid;
+                  return (
+                    <li key={group.id} className="flex items-start gap-3 px-4 py-3">
+                      <Checkbox
+                        className="mt-0.5"
+                        checked={selectedIds.has(group.id)}
+                        onCheckedChange={(c) => toggleMarked(group.id, c === true)}
+                        aria-label={`Marcar ${nome}`}
+                      />
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className={`text-sm truncate ${isEnabled ? "font-medium" : "text-muted-foreground"}`}
+                              title={nome}
+                            >
+                              {nome}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-0.5 text-xs text-muted-foreground">
+                              {typeof group.participant_count === "number" && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {group.participant_count} participante(s)
+                                </span>
+                              )}
+                              {group.last_synced_at && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {formatDateLabel(group.last_synced_at, timezone)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <label className="flex items-center gap-2 shrink-0 cursor-pointer">
+                            <span className="text-xs text-muted-foreground">Ativo</span>
+                            <Switch
+                              checked={isEnabled}
+                              onCheckedChange={(checked) =>
+                                toggleEnabledMutation.mutate({ groupId: group.id, enabled: checked })
+                              }
+                              disabled={toggleEnabledMutation.isPending}
+                            />
+                          </label>
+                        </div>
+
+                        {isEnabled && (
+                          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-2.5">
+                            <div className="flex items-center gap-2">
+                              <label className="text-xs text-muted-foreground whitespace-nowrap">Setor</label>
+                              <Select
+                                value={group.department_id ?? NO_DEPARTMENT}
+                                onValueChange={(v) =>
+                                  updateDepartmentMutation.mutate({
+                                    groupId: group.id,
+                                    departmentId: v === NO_DEPARTMENT ? null : v,
+                                  })
+                                }
+                                disabled={
+                                  departmentsLoading ||
+                                  (updateDepartmentMutation.isPending &&
+                                    updateDepartmentMutation.variables?.groupId === group.id)
+                                }
+                              >
+                                <SelectTrigger className="w-48 h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={NO_DEPARTMENT}>Todos os setores</SelectItem>
+                                  {departments?.map((d) => (
+                                    <SelectItem key={d.id} value={d.id}>
+                                      {d.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <label
+                                htmlFor={`retention-${group.id}`}
+                                className="text-xs text-muted-foreground whitespace-nowrap"
+                              >
+                                Retenção
+                              </label>
+                              <Input
+                                // key com o valor: defaultValue só vale na montagem, e a
+                                // retenção em lote precisa aparecer na linha.
+                                key={`${group.id}-${group.retention_days ?? 2}`}
+                                id={`retention-${group.id}`}
+                                type="number"
+                                min={RETENTION_MIN}
+                                max={RETENTION_MAX}
+                                defaultValue={group.retention_days ?? 2}
+                                className="w-16 h-8 text-xs"
+                                onBlur={(e) => handleRetentionBlur(e, group.id, group.retention_days)}
+                                onKeyDown={(e) => handleRetentionKeyDown(e, group.id, group.retention_days)}
+                              />
+                              <span className="text-xs text-muted-foreground">dias</span>
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4">
-                      {isEnabled && (
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-muted-foreground whitespace-nowrap">
-                            Setor
-                          </label>
-                          <Select
-                            value={group.department_id ?? NO_DEPARTMENT}
-                            onValueChange={(v) =>
-                              updateDepartmentMutation.mutate({
-                                groupId: group.id,
-                                departmentId: v === NO_DEPARTMENT ? null : v,
-                              })
-                            }
-                            disabled={
-                              departmentsLoading ||
-                              (updateDepartmentMutation.isPending &&
-                                updateDepartmentMutation.variables?.groupId === group.id)
-                            }
-                          >
-                            <SelectTrigger className="w-44 h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NO_DEPARTMENT}>Todos os setores</SelectItem>
-                              {departments?.map((d) => (
-                                <SelectItem key={d.id} value={d.id}>
-                                  {d.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {isEnabled && (
-                        <div className="flex items-center gap-2">
-                          <label htmlFor={`retention-${group.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                            Retenção (dias)
-                          </label>
-                          <Input
-                            // key com o valor: defaultValue só vale na montagem, e a
-                            // retenção em lote precisa aparecer na linha.
-                            key={`${group.id}-${group.retention_days ?? 2}`}
-                            id={`retention-${group.id}`}
-                            type="number"
-                            min={1}
-                            max={90}
-                            defaultValue={group.retention_days ?? 2}
-                            className="w-20 h-8 text-xs"
-                            onBlur={(e) => handleRetentionBlur(e, group.id, group.retention_days)}
-                            onKeyDown={(e) => handleRetentionKeyDown(e, group.id, group.retention_days)}
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Ativo</span>
-                        <Switch
-                          checked={isEnabled}
-                          onCheckedChange={(checked) =>
-                            toggleEnabledMutation.mutate({ groupId: group.id, enabled: checked })
-                          }
-                          disabled={toggleEnabledMutation.isPending}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  </div>
-                );
-              })}
-            </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
         </CardContent>

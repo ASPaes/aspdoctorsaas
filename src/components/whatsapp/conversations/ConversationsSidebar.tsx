@@ -778,6 +778,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
           onSearchChange={handleSearchChange}
           onAbrirBuscaMensagens={() => setShowMessageSearch(true)}
           onNovaConversa={() => setShowNewModal(true)}
+          onSincronizarGrupos={isGroupsPill && podeGerenciarGrupos ? () => setShowGroupsModal(true) : undefined}
           filters={filters}
           onFiltersChange={setFilters}
           showGroupByAgent={activePill === "in_progress"}

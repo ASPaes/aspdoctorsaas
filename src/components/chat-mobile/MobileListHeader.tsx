@@ -1,4 +1,4 @@
-import { ArrowUpDown, CheckCheck, FileSearch, Plus, Search, Users } from "lucide-react";
+import { ArrowUpDown, CheckCheck, FileSearch, Plus, RefreshCw, Search, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ interface Props {
   onSearchChange: (v: string) => void;
   onAbrirBuscaMensagens: () => void;
   onNovaConversa: () => void;
+  /** Só vem preenchido na pill Grupos e para quem pode gerenciar grupos. */
+  onSincronizarGrupos?: () => void;
 
   filters: FiltersState;
   onFiltersChange: (f: FiltersState) => void;
@@ -44,6 +46,7 @@ export function MobileListHeader({
   onSearchChange,
   onAbrirBuscaMensagens,
   onNovaConversa,
+  onSincronizarGrupos,
   filters,
   onFiltersChange,
   showGroupByAgent,
@@ -87,6 +90,18 @@ export function MobileListHeader({
               aqui do lado para ninguém atender achando que via outro setor. */}
           <MobileSetorSheet compacto />
         </div>
+
+        {onSincronizarGrupos && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9"
+            aria-label="Sincronizar grupos"
+            onClick={onSincronizarGrupos}
+          >
+            <RefreshCw className="h-[18px] w-[18px]" />
+          </Button>
+        )}
 
         <Button
           variant="ghost"

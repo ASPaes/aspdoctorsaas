@@ -19,7 +19,7 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
-- 🆕 **Escolher os grupos do WhatsApp direto do Chat** — No **Chat**, com a aba **Grupos** aberta, há um botão novo ao lado de Contatos que sincroniza os grupos do WhatsApp e permite escolher, instância por instância, quais aparecem no sistema, sem precisar ir às Configurações. O grupo ligado já aparece na lista na hora. Disponível para quem tem acesso a **Configurações › Operação**.
+- 🆕 **Escolher os grupos do WhatsApp direto do Chat** — No **Chat**, com a aba **Grupos** aberta, há um botão novo ao lado de Contatos que sincroniza os grupos do WhatsApp e permite escolher, instância por instância, quais aparecem no sistema, sem precisar ir às Configurações. Dá para buscar o grupo e filtrar entre os que estão no chat e os ocultos, e o grupo ligado já aparece na lista na hora. Funciona também no celular. Disponível para quem tem acesso a **Configurações › Operação**.
 
 - ⬆️ **Ativar, desativar e definir retenção de grupos em lote** — Em **Configurações › Operação › Grupos**, dá para marcar vários grupos (ou nenhum, para valer para todos da instância) e ativar, desativar ou aplicar a mesma retenção de uma vez, em vez de mexer em um por um.
 
