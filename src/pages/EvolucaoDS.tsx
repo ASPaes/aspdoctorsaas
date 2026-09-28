@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Sparkles, Star, RefreshCw, PlayCircle } from "lucide-react";
+import { Search, Sparkles, Star, RefreshCw, PlayCircle, Wrench } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -200,31 +200,49 @@ function BlocoCorrecoes({
   vistoAntes: string | null;
   onAbrir: (i: ItemEvolucao) => void;
 }) {
+  const algumNovo = itens.some((i) => naoVisto(i, vistoAntes));
+  // Mesmo cartão das novidades e melhorias: as correções do dia ficam juntas
+  // para não encher a lista, mas com o mesmo peso visual.
   return (
-    <div className="rounded-xl border border-dashed bg-muted/40 p-4">
-      <div className="flex items-center gap-2">
+    <article
+      className={cn(
+        "rounded-xl border bg-card p-4 transition-shadow hover:shadow-md",
+        algumNovo && "border-l-4 border-l-green-500",
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2">
         <ChipTipo tipo="correcao" plural={itens.length > 1} />
-        <span className="text-xs text-muted-foreground">{itens.length}</span>
+        <span className="text-xs text-muted-foreground">
+          {itens.length} {itens.length === 1 ? "ajuste" : "ajustes"} neste dia
+        </span>
+        {algumNovo && (
+          <span className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-green-700 dark:text-green-400">
+            <span className="h-2 w-2 rounded-full bg-green-500" />
+            Novo para você
+          </span>
+        )}
       </div>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-2 divide-y">
         {itens.map((i) => (
-          <li key={i.id} className="text-sm">
-            <span className="font-medium">
-              {naoVisto(i, vistoAntes) && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle" />}
-              {i.titulo}
+          <li key={i.id} className="flex gap-3 py-3 last:pb-0">
+            <span className="mt-0.5 grid h-8 w-8 flex-none place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              <Wrench className="h-4 w-4" />
             </span>
-            {i.resumo && <span className="block text-muted-foreground line-clamp-2">{i.resumo}</span>}
-            {/* Correção só leva vídeo/prints quando pedido no /novidade, e aí ganha o botão. */}
-            {(i.pedido_pela_sua_empresa || temConteudo(i)) && (
-              <span className="mt-2 flex flex-wrap items-center gap-3">
-                {temConteudo(i) && <BotaoComoFunciona item={i} onAbrir={() => onAbrir(i)} />}
-                {i.pedido_pela_sua_empresa && <SeloEmpresa />}
-              </span>
-            )}
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-semibold leading-snug">{i.titulo}</h3>
+              {i.resumo && <p className="mt-1 text-sm text-muted-foreground">{i.resumo}</p>}
+              {/* Correção só leva vídeo/prints quando pedido no /novidade, e aí ganha o botão. */}
+              {(i.pedido_pela_sua_empresa || temConteudo(i)) && (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  {temConteudo(i) && <BotaoComoFunciona item={i} onAbrir={() => onAbrir(i)} />}
+                  {i.pedido_pela_sua_empresa && <SeloEmpresa />}
+                </div>
+              )}
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </article>
   );
 }
 
