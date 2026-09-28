@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RefreshCw, Users, Calendar, Loader2, Ticket, PowerOff } from "lucide-react";
+import { RefreshCw, Users, Calendar, Loader2, Ticket, PowerOff, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
   useGroupsAdminInstances,
@@ -93,17 +94,44 @@ export default function WhatsAppGroupsTab() {
   const toggleEnabledMutation = useToggleGroupEnabled(selectedInstanceId, groups);
   const bulkMutation = useBulkGroupsUpdate(selectedInstanceId, groups);
 
-  // Lote: age sobre os marcados; sem nada marcado, sobre todos da instância.
+  // Filtro da lista: é por ele que se pega "só os inativos" para ativar em lote.
+  const [filtroStatus, setFiltroStatus] = useState<"todos" | "ativos" | "inativos">("todos");
+  const [busca, setBusca] = useState("");
+
+  // Lote: age sobre os marcados; sem nada marcado, sobre todos os EXIBIDOS.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkRetention, setBulkRetention] = useState("");
-  useEffect(() => setSelectedIds(new Set()), [selectedInstanceId]);
+  useEffect(() => {
+    setSelectedIds(new Set());
+    setFiltroStatus("todos");
+    setBusca("");
+  }, [selectedInstanceId]);
 
-  const allIds = useMemo(() => (groups ?? []).map((g) => g.id), [groups]);
-  // Marcação de grupo que sumiu na sincronização não conta.
+  const ativosCount = (groups ?? []).filter((g) => g.enabled).length;
+  const visibleGroups = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return (groups ?? []).filter(
+      (g) =>
+        (filtroStatus === "todos" || (filtroStatus === "ativos" ? g.enabled : !g.enabled)) &&
+        (!termo || (g.group_name || g.group_jid).toLowerCase().includes(termo)),
+    );
+  }, [groups, filtroStatus, busca]);
+  const filtrado = filtroStatus !== "todos" || busca.trim() !== "";
+
+  const allIds = useMemo(() => visibleGroups.map((g) => g.id), [visibleGroups]);
+  // Só conta marcação do que está na tela: grupo marcado e escondido pelo
+  // filtro (ou que sumiu na sincronização) nunca é alterado sem ser visto.
   const markedIds = allIds.filter((id) => selectedIds.has(id));
   const targetIds = markedIds.length > 0 ? markedIds : allIds;
-  const targetLabel = markedIds.length > 0 ? `marcados (${markedIds.length})` : `todos (${allIds.length})`;
+  const todosLabel = filtrado ? `todos os exibidos (${allIds.length})` : `todos (${allIds.length})`;
+  const targetLabel = markedIds.length > 0 ? `marcados (${markedIds.length})` : todosLabel;
   const allMarked = allIds.length > 0 && markedIds.length === allIds.length;
+
+  const filtros = [
+    { value: "todos" as const, label: "Todos", count: groups?.length ?? 0 },
+    { value: "ativos" as const, label: "Ativos", count: ativosCount },
+    { value: "inativos" as const, label: "Inativos", count: (groups?.length ?? 0) - ativosCount },
+  ];
 
   const toggleMarked = (id: string, checked: boolean) =>
     setSelectedIds((prev) => {
@@ -316,8 +344,41 @@ export default function WhatsAppGroupsTab() {
           )}
 
           {selectedInstanceId && !groupsLoading && groups && groups.length > 0 && (
+            <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="relative flex-1 min-w-0 sm:max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar grupo..."
+                  className="pl-9 h-9"
+                />
+              </div>
+              <div className="inline-flex self-start sm:self-auto shrink-0 rounded-lg bg-muted p-0.5" role="tablist" aria-label="Filtrar grupos">
+                {filtros.map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    role="tab"
+                    aria-selected={filtroStatus === f.value}
+                    onClick={() => setFiltroStatus(f.value)}
+                    className={cn(
+                      "h-8 px-3 rounded-md text-xs font-medium whitespace-nowrap transition-colors",
+                      filtroStatus === f.value
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {f.label}
+                    <span className="ml-1 tabular-nums opacity-60">{f.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="rounded-lg border overflow-hidden">
-              {/* Barra de lote: sem nada marcado, as ações valem para todos da instância */}
+              {/* Barra de lote: sem nada marcado, as ações valem para todos os exibidos */}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b bg-muted/30 px-4 py-2.5">
                 <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
                   <Checkbox
@@ -329,7 +390,7 @@ export default function WhatsAppGroupsTab() {
                     <span className="font-medium">{markedIds.length} marcado(s)</span>
                   ) : (
                     <span className="text-muted-foreground">
-                      Nenhum marcado — ações valem para <strong className="font-medium text-foreground">todos ({allIds.length})</strong>
+                      Nenhum marcado — ações valem para <strong className="font-medium text-foreground">{todosLabel}</strong>
                     </span>
                   )}
                 </label>
@@ -348,7 +409,7 @@ export default function WhatsAppGroupsTab() {
                     size="sm"
                     variant="outline"
                     className="h-8"
-                    disabled={bulkMutation.isPending}
+                    disabled={bulkMutation.isPending || targetIds.length === 0}
                     onClick={() => bulkMutation.mutate({ kind: "enable", ids: targetIds })}
                     title={`Ativar ${targetLabel}`}
                   >
@@ -359,7 +420,7 @@ export default function WhatsAppGroupsTab() {
                     size="sm"
                     variant="outline"
                     className="h-8"
-                    disabled={bulkMutation.isPending}
+                    disabled={bulkMutation.isPending || targetIds.length === 0}
                     onClick={() => bulkMutation.mutate({ kind: "disable", ids: targetIds })}
                     title={`Desativar ${targetLabel}`}
                   >
@@ -383,7 +444,7 @@ export default function WhatsAppGroupsTab() {
                       size="sm"
                       variant="outline"
                       className="h-8"
-                      disabled={bulkMutation.isPending || !bulkRetentionValid}
+                      disabled={bulkMutation.isPending || !bulkRetentionValid || targetIds.length === 0}
                       title={
                         bulkRetentionValid
                           ? `Aplicar ${bulkRetentionDays} dia(s) a ${targetLabel}`
@@ -404,7 +465,12 @@ export default function WhatsAppGroupsTab() {
               </div>
 
               <ul className="divide-y divide-border">
-                {groups.map((group) => {
+                {visibleGroups.length === 0 && (
+                  <li className="px-4 py-10 text-center text-sm text-muted-foreground">
+                    Nenhum grupo neste filtro.
+                  </li>
+                )}
+                {visibleGroups.map((group) => {
                   const isEnabled = group.enabled;
                   const nome = group.group_name || group.group_jid;
                   return (
@@ -514,6 +580,7 @@ export default function WhatsAppGroupsTab() {
                   );
                 })}
               </ul>
+            </div>
             </div>
           )}
         </CardContent>
