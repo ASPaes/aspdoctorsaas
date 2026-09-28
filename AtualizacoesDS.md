@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- 🔧 **Movimentos MRR mostrava outra unidade sem o nome do cliente** — Em **Clientes › Movimentos MRR**, quem filtrava por uma unidade (ex.: só Digi Up) via também os movimentos das outras unidades, sem o nome do cliente. Em setembro, eram 155 linhas quando deviam ser 11. Agora aparecem só os movimentos da unidade escolhida, todos com o nome do cliente, e os cards de totais e o Exportar XLSX seguem o mesmo filtro.
+
 - 🔧 **Número estranho ao lado de "Conversas"** — No **Chat**, quem não tem limite de conversas simultâneas via o contador **0/2147483647** ao lado de **Conversas**. Agora, sem limite, o contador não aparece. Quem tem limite continua vendo o contador normal (ex.: 3/5).
 
 - 🔧 **Administrador e gestor não conseguiam iniciar o expediente** — No **Chat**, quem é administrador ou gestor e nunca tinha iniciado expediente não via o botão de status ao lado de **Equipe**, e por isso não tinha como começar. Essas pessoas também não apareciam na lista da **Equipe**, mesmo estando online. Agora o botão aparece como **Offline**, com a opção **Iniciar expediente**. Depois de iniciar, a pessoa passa a aparecer na Equipe.
