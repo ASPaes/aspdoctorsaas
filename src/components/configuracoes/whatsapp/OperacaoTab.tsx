@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePortao } from "@/hooks/usePortao";
 import AtendimentoCsatTab from "./AtendimentoCsatTab";
@@ -9,9 +10,12 @@ import RiscoChurnSettings from "./RiscoChurnSettings";
 export default function OperacaoTab() {
   // Hoje qualquer pessoa que abre Configuracoes > Operacao ve Macros.
   const podeVerMacros = usePortao("atend.macros");
+  // ?sub=grupos abre direto na subaba (atalho do modal de grupos do chat).
+  const [searchParams] = useSearchParams();
+  const sub = searchParams.get("sub");
 
   return (
-    <Tabs defaultValue="atendimento">
+    <Tabs defaultValue={sub === "grupos" ? "grupos" : "atendimento"}>
       <TabsList className="flex-wrap h-auto gap-1">
         <TabsTrigger value="atendimento">Atendimento / CSAT</TabsTrigger>
         <TabsTrigger value="pausas">Pausas</TabsTrigger>

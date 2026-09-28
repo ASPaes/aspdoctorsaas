@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -21,28 +22,15 @@ import {
 } from "@/components/ui/select";
 import { RefreshCw, Users, Calendar, Loader2, Ticket, PowerOff } from "lucide-react";
 import { toast } from "sonner";
-
-interface WhatsAppInstance {
-  id: string;
-  instance_name: string;
-  provider_type: string;
-  display_name?: string | null;
-  status?: string | null;
-}
-
-interface WhatsAppGroup {
-  id: string;
-  group_jid: string;
-  group_name: string;
-  group_picture_url?: string | null;
-  participant_count?: number | null;
-  enabled: boolean;
-  retention_days?: number | null;
-  last_synced_at?: string | null;
-  disabled_by?: string | null;
-  disabled_at?: string | null;
-  department_id?: string | null;
-}
+import {
+  useGroupsAdminInstances,
+  useGroupsAdminGroups,
+  useSyncGroups,
+  useToggleGroupEnabled,
+  useBulkGroupsUpdate,
+  RETENTION_MIN,
+  RETENTION_MAX,
+} from "@/components/whatsapp/hooks/useWhatsAppGroupsAdmin";
 
 interface GroupAttendanceConfig {
   group_require_ticket_on_close?: boolean;
@@ -60,38 +48,12 @@ export default function WhatsAppGroupsTab() {
   const queryClient = useQueryClient();
   const [selectedInstanceId, setSelectedInstanceId] = useState<string>("");
 
-  const { data: instances, isLoading: instancesLoading } = useQuery<WhatsAppInstance[]>({
-    queryKey: ["whatsapp-instances-for-groups", tid],
-    enabled: !!tid,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("whatsapp_instances")
-        .select("id, instance_name, provider_type, display_name, status")
-        .eq("tenant_id", tid)
-        .eq("is_active", true)
-        .order("instance_name");
-      if (error) throw error;
-      return (data ?? []) as WhatsAppInstance[];
-    },
-  });
+  const { data: instances, isLoading: instancesLoading } = useGroupsAdminInstances();
 
   const selectedInstance = instances?.find((i) => i.id === selectedInstanceId);
   const isMetaCloud = selectedInstance?.provider_type === "meta_cloud";
 
-  const { data: groups, isLoading: groupsLoading } = useQuery<WhatsAppGroup[]>({
-    queryKey: ["whatsapp-groups", selectedInstanceId, tid],
-    enabled: !!tid && !!selectedInstanceId,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("whatsapp_groups")
-        .select("id, group_jid, group_name, group_picture_url, participant_count, enabled, retention_days, last_synced_at, disabled_by, disabled_at, department_id")
-        .eq("tenant_id", tid)
-        .eq("instance_id", selectedInstanceId)
-        .order("group_name");
-      if (error) throw error;
-      return (data ?? []) as WhatsAppGroup[];
-    },
-  });
+  const { data: groups, isLoading: groupsLoading } = useGroupsAdminGroups(selectedInstanceId);
 
   const { data: departments, isLoading: departmentsLoading } = useSupportDepartments();
 
@@ -127,105 +89,37 @@ export default function WhatsAppGroupsTab() {
   const isSavingConfig = (field: GroupConfigField) =>
     updateGroupConfigMutation.isPending && updateGroupConfigMutation.variables?.field === field;
 
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedInstanceId) throw new Error("Selecione uma instância");
-      const { data, error } = await supabase.functions.invoke("sync-whatsapp-groups", {
-        body: { instance_id: selectedInstanceId },
-      });
-      if (error) throw error;
-      return data as { synced?: number; groups?: any[]; message?: string; unsupported?: boolean };
-    },
-    onSuccess: (data) => {
-      if (data?.unsupported) {
-        toast.info(data.message || "Esta instância não suporta sincronização de grupos.");
-      } else {
-        const count = data?.synced ?? data?.groups?.length ?? 0;
-        toast.success(`${count} grupo(s) sincronizado(s)`);
-      }
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", selectedInstanceId, tid] });
-    },
-    onError: (err: any) => {
-      toast.error(err?.message || "Erro ao sincronizar grupos");
-    },
-  });
+  const syncMutation = useSyncGroups(selectedInstanceId);
+  const toggleEnabledMutation = useToggleGroupEnabled(selectedInstanceId, groups);
+  const bulkMutation = useBulkGroupsUpdate(selectedInstanceId, groups);
 
-  const toggleEnabledMutation = useMutation({
-    mutationFn: async ({ groupId, enabled }: { groupId: string; enabled: boolean }) => {
-      const { error } = await (supabase as any)
-        .from("whatsapp_groups")
-        .update({ enabled, updated_at: new Date().toISOString() })
-        .eq("id", groupId)
-        .eq("tenant_id", tid);
-      if (error) throw error;
+  // Lote: age sobre os marcados; sem nada marcado, sobre todos da instância.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRetention, setBulkRetention] = useState("");
+  useEffect(() => setSelectedIds(new Set()), [selectedInstanceId]);
 
-      // Ao habilitar: criar contato + conversa pra grupo aparecer imediatamente no chat
-      if (enabled) {
-        const group = groups?.find((g) => g.id === groupId);
-        if (!group || !selectedInstanceId || !tid) return;
+  const allIds = useMemo(() => (groups ?? []).map((g) => g.id), [groups]);
+  // Marcação de grupo que sumiu na sincronização não conta.
+  const markedIds = allIds.filter((id) => selectedIds.has(id));
+  const targetIds = markedIds.length > 0 ? markedIds : allIds;
+  const targetLabel = markedIds.length > 0 ? `marcados (${markedIds.length})` : `todos (${allIds.length})`;
+  const allMarked = allIds.length > 0 && markedIds.length === allIds.length;
 
-        const phoneNumber = group.group_jid.replace("@g.us", "");
+  const toggleMarked = (id: string, checked: boolean) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
 
-        // Upsert contato de grupo
-        const { data: existingContact } = await (supabase as any)
-          .from("whatsapp_contacts")
-          .select("id")
-          .eq("tenant_id", tid)
-          .eq("instance_id", selectedInstanceId)
-          .eq("phone_number", phoneNumber)
-          .maybeSingle();
-
-        let contactId = existingContact?.id;
-        if (!contactId) {
-          const { data: newContact } = await (supabase as any)
-            .from("whatsapp_contacts")
-            .insert({
-              tenant_id: tid,
-              instance_id: selectedInstanceId,
-              phone_number: phoneNumber,
-              name: group.group_name || phoneNumber,
-              is_group: true,
-            })
-            .select("id")
-            .single();
-          contactId = newContact?.id;
-        }
-
-        if (!contactId) return;
-
-        // Verificar se já existe conversa
-        const { data: existingConv } = await (supabase as any)
-          .from("whatsapp_conversations")
-          .select("id")
-          .eq("tenant_id", tid)
-          .eq("instance_id", selectedInstanceId)
-          .eq("is_group", true)
-          .eq("group_jid", group.group_jid)
-          .maybeSingle();
-
-        if (!existingConv) {
-          await (supabase as any)
-            .from("whatsapp_conversations")
-            .insert({
-              tenant_id: tid,
-              instance_id: selectedInstanceId,
-              contact_id: contactId,
-              status: "active",
-              is_group: true,
-              group_jid: group.group_jid,
-              last_message_at: new Date().toISOString(),
-              last_message_preview: "Grupo habilitado",
-            });
-        }
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["whatsapp-groups", selectedInstanceId, tid] });
-    },
-    onError: (err: any) => {
-      toast.error(err?.message || "Erro ao atualizar grupo");
-    },
-  });
+  const bulkRetentionDays = Number(bulkRetention);
+  const bulkRetentionValid =
+    bulkRetention.trim() !== "" &&
+    Number.isInteger(bulkRetentionDays) &&
+    bulkRetentionDays >= RETENTION_MIN &&
+    bulkRetentionDays <= RETENTION_MAX;
+  const bulkBusy = (kind: string) => bulkMutation.isPending && bulkMutation.variables?.kind === kind;
 
   // Setor do grupo: define quem enxerga a conversa no chat e quem recebe notificacao.
   // A conversa herda esse setor no banco (trg_zz_group_department) e a troca propaga
@@ -422,13 +316,87 @@ export default function WhatsAppGroupsTab() {
           )}
 
           {selectedInstanceId && !groupsLoading && groups && groups.length > 0 && (
+            <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2">
+              <span className="text-xs text-muted-foreground px-1">
+                Em lote — {markedIds.length > 0 ? `${markedIds.length} marcado(s)` : "nada marcado, vale para todos"}
+              </span>
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={bulkMutation.isPending || targetIds.length === 0}
+                  onClick={() => bulkMutation.mutate({ kind: "enable", ids: targetIds })}
+                >
+                  {bulkBusy("enable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                  Ativar {targetLabel}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8"
+                  disabled={bulkMutation.isPending || targetIds.length === 0}
+                  onClick={() => bulkMutation.mutate({ kind: "disable", ids: targetIds })}
+                >
+                  {bulkBusy("disable") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                  Desativar {targetLabel}
+                </Button>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="bulk-retention" className="text-xs text-muted-foreground whitespace-nowrap">
+                    Retenção
+                  </label>
+                  <Input
+                    id="bulk-retention"
+                    type="number"
+                    min={RETENTION_MIN}
+                    max={RETENTION_MAX}
+                    step={1}
+                    placeholder="dias"
+                    value={bulkRetention}
+                    onChange={(e) => setBulkRetention(e.target.value)}
+                    className="w-20 h-8 text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8"
+                    disabled={bulkMutation.isPending || !bulkRetentionValid || targetIds.length === 0}
+                    title={bulkRetentionValid ? undefined : `Inteiro entre ${RETENTION_MIN} e ${RETENTION_MAX}`}
+                    onClick={() =>
+                      bulkMutation.mutate(
+                        { kind: "retention", ids: targetIds, days: bulkRetentionDays },
+                        { onSuccess: () => setBulkRetention("") },
+                      )
+                    }
+                  >
+                    {bulkBusy("retention") && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                    Aplicar a {targetLabel}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             <div className="divide-y divide-border rounded-lg border">
+              <label className="flex items-center gap-3 px-4 py-2 text-xs text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={allMarked ? true : markedIds.length > 0 ? "indeterminate" : false}
+                  onCheckedChange={(c) => setSelectedIds(c === true ? new Set(allIds) : new Set())}
+                />
+                Selecionar todos
+              </label>
               {groups.map((group) => {
                 const isEnabled = group.enabled;
                 return (
+                  <div key={group.id} className="flex items-start sm:items-center gap-3 pl-4">
+                  <Checkbox
+                    className="mt-4 sm:mt-0"
+                    checked={selectedIds.has(group.id)}
+                    onCheckedChange={(c) => toggleMarked(group.id, c === true)}
+                    aria-label={`Marcar ${group.group_name || group.group_jid}`}
+                  />
                   <div
-                    key={group.id}
-                    className={`flex flex-col sm:flex-row sm:items-center gap-3 p-4 ${
+                    className={`flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-3 py-4 pr-4 ${
                       !isEnabled ? "opacity-50" : ""
                     }`}
                   >
@@ -493,6 +461,9 @@ export default function WhatsAppGroupsTab() {
                             Retenção (dias)
                           </label>
                           <Input
+                            // key com o valor: defaultValue só vale na montagem, e a
+                            // retenção em lote precisa aparecer na linha.
+                            key={`${group.id}-${group.retention_days ?? 2}`}
                             id={`retention-${group.id}`}
                             type="number"
                             min={1}
@@ -517,8 +488,10 @@ export default function WhatsAppGroupsTab() {
                       </div>
                     </div>
                   </div>
+                  </div>
                 );
               })}
+            </div>
             </div>
           )}
         </CardContent>

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2 } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2, RefreshCw } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 import { toast } from "sonner";
 import {
@@ -40,6 +40,7 @@ import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
 import { QuickPills } from "./QuickPills";
 import { NewConversationModal } from "./NewConversationModal";
+import { GroupsSyncModal } from "./GroupsSyncModal";
 import { DepartmentSelector } from "./DepartmentSelector";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,6 +108,13 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
   // antes: sem restrição — agenda de contatos e busca nas mensagens abertas a todos.
   const podeContatos = usePortao("atend.contatos");
   const podeBuscar = usePortao("atend.busca");
+  // Mesmo portão de Configurações > Operação (onde mora a tela de grupos):
+  // sem RBAC, só admin — ligar grupo muda o chat da empresa inteira.
+  const podeGerenciarGrupos = usePortao(
+    "cfg.operacao",
+    profile?.role === "admin" || !!profile?.is_super_admin,
+  );
+  const [showGroupsModal, setShowGroupsModal] = useState(false);
   const STORAGE_KEY = user?.id ? `whatsapp-chat-filters:${user.id}` : null;
 
   const loadSaved = () => {
@@ -812,6 +820,16 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
           </div>
           <div className="flex items-center gap-1">
             {/* antes: sem restrição */}
+            {isGroupsPill && podeGerenciarGrupos && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowGroupsModal(true)}>
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Sincronizar grupos</TooltipContent>
+              </Tooltip>
+            )}
             {podeContatos && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1083,6 +1101,10 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
         onOpenChange={setShowMessageSearch}
         onSelectMessage={handleMessageSelect}
       />
+
+      {podeGerenciarGrupos && (
+        <GroupsSyncModal open={showGroupsModal} onOpenChange={setShowGroupsModal} />
+      )}
 
       <NewConversationModal
         open={showNewModal}
