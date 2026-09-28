@@ -191,7 +191,15 @@ function CartaoItem({ item, novo, onAbrir }: { item: ItemEvolucao; novo: boolean
   );
 }
 
-function BlocoCorrecoes({ itens, vistoAntes }: { itens: ItemEvolucao[]; vistoAntes: string | null }) {
+function BlocoCorrecoes({
+  itens,
+  vistoAntes,
+  onAbrir,
+}: {
+  itens: ItemEvolucao[];
+  vistoAntes: string | null;
+  onAbrir: (i: ItemEvolucao) => void;
+}) {
   return (
     <div className="rounded-xl border border-dashed bg-muted/40 p-4">
       <div className="flex items-center gap-2">
@@ -206,9 +214,11 @@ function BlocoCorrecoes({ itens, vistoAntes }: { itens: ItemEvolucao[]; vistoAnt
               {i.titulo}
             </span>
             {i.resumo && <span className="block text-muted-foreground line-clamp-2">{i.resumo}</span>}
-            {i.pedido_pela_sua_empresa && (
-              <span className="mt-1 block">
-                <SeloEmpresa />
+            {/* Correção só leva vídeo/prints quando pedido no /novidade, e aí ganha o botão. */}
+            {(i.pedido_pela_sua_empresa || temConteudo(i)) && (
+              <span className="mt-2 flex flex-wrap items-center gap-3">
+                {temConteudo(i) && <BotaoComoFunciona item={i} onAbrir={() => onAbrir(i)} />}
+                {i.pedido_pela_sua_empresa && <SeloEmpresa />}
               </span>
             )}
           </li>
@@ -410,7 +420,7 @@ export default function EvolucaoDS() {
             {destaques.map((i) => (
               <CartaoItem key={i.id} item={i} novo={naoVisto(i, vistoAntes)} onAbrir={() => setAberto(i)} />
             ))}
-            {correcoes.length > 0 && <BlocoCorrecoes itens={correcoes} vistoAntes={vistoAntes} />}
+            {correcoes.length > 0 && <BlocoCorrecoes itens={correcoes} vistoAntes={vistoAntes} onAbrir={setAberto} />}
           </section>
         );
       })}

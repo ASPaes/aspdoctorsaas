@@ -3,10 +3,11 @@
 // release da demanda. A partir daí a Evolução DS de todos os clientes mostra o
 // botão "Ver como funciona" (e o destaque do topo, com --destaque).
 //
-//   node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--simular]
+//   node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--sem-video] [--simular]
 //
 // <pasta>       saída do gravar.mjs (resultado.json, passo-N.png, video.webm)
 // <texto.json>  o mesmo do previa.mjs: titulo, resumo, para_que_serve
+// --sem-video   publica só o passo a passo com os prints (o vídeo gravado é ignorado)
 // --simular     mostra o que faria, sem gravar nada
 //
 // ESCREVE EM PRODUÇÃO (DoctorDev): só rode depois do OK do Alexandre na prévia.
@@ -23,12 +24,14 @@ const BUCKET = "novidades";
 const args = process.argv.slice(2);
 const simular = args.includes("--simular");
 const destaque = args.includes("--destaque");
+const semVideo = args.includes("--sem-video");
 const [pasta, textoPath, demanda] = args.filter((a) => !a.startsWith("--"));
 if (!pasta || !textoPath || !/^DEM-\d+$/.test(demanda ?? "")) {
-  console.error("uso: node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--simular]");
+  console.error("uso: node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--sem-video] [--simular]");
   process.exit(2);
 }
 const resultado = JSON.parse(fs.readFileSync(path.join(pasta, "resultado.json"), "utf8"));
+if (semVideo) resultado.video = null;
 const texto = JSON.parse(fs.readFileSync(textoPath, "utf8"));
 
 function chaveServico() {

@@ -5,7 +5,7 @@
 //
 //   node scripts/novidade/previa.mjs <pasta-de-saida> <texto.json>
 //
-// texto.json: { "tipo": "nova_funcionalidade" | "melhoria", "titulo": "...",
+// texto.json: { "tipo": "nova_funcionalidade" | "melhoria" | "correcao", "titulo": "...",
 //               "resumo": "...", "para_que_serve": ["...", "..."], "modulo": "...",
 //               "demanda": "DEM-0472" }
 import fs from "node:fs";
@@ -19,7 +19,7 @@ if (!pasta || !textoPath) {
 const r = JSON.parse(fs.readFileSync(path.join(pasta, "resultado.json"), "utf8"));
 const t = JSON.parse(fs.readFileSync(textoPath, "utf8"));
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-const rotulo = t.tipo === "nova_funcionalidade" ? "Novidade" : "Melhoria";
+const rotulo = { nova_funcionalidade: "Novidade", melhoria: "Melhoria", correcao: "Correção" }[t.tipo] ?? "Melhoria";
 
 const html = `<title>${esc(t.titulo)}</title>
 <style>

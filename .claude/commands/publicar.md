@@ -152,4 +152,4 @@ estado da Action. Sem relatório longo.
 
 Se a entrada foi 🆕 Novidade ou ⬆️ Melhoria, termine perguntando: **"Subir para a Evolução DS
 com vídeo e passo a passo?"** Se ele disser que sim, siga o `/novidade` com o código da demanda.
-Correção não leva vídeo, então não pergunte.
+Em correção não pergunte; mas se ele pedir, o `/novidade` também grava correção.
