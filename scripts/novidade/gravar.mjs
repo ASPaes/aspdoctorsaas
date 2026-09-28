@@ -18,12 +18,23 @@
 //   "passos": [
 //     { "ir": "/dashboard", "legenda": "...", "destacar": "a[href='/evolucao']" },
 //     { "clicar": "a[href='/evolucao']", "legenda": "...", "destacar": "h1" },
-//     { "digitar": { "seletor": "#busca", "texto": "e-mail" }, "legenda": "..." }
+//     { "digitar": { "seletor": "#busca", "texto": "e-mail", "limpar": true }, "legenda": "..." }
 //   ]
 // }
-// Cada passo aceita: ir (rota), clicar (seletor), digitar, destacar (seletor),
+// Cada passo aceita: ir (rota), clicar (seletor), digitar, arrastar ({ seletor, dx, dy }:
+// segura o elemento e arrasta, ex.: o canto de redimensionar), tecla (ex.: "Escape"),
+// destacar (seletor), opcional (true: pula o passo se `clicar` não aparecer em 3s,
+// ex.: "Iniciar expediente", que só existe quando o expediente ainda não começou),
 // legenda (texto do passo), espera (ms depois da ação, padrão 1800) e
 // print (false para só aparecer no vídeo). Passo sem legenda não é numerado.
+//
+// "abaDoNavegador": true no roteiro desenha uma aba de navegador no topo com o
+// document.title da tela. O print headless não mostra a barra do navegador, e
+// sem isso não há como mostrar o nome da aba.
+//
+// "simular": [{ "url": "**/functions/v1/<nome>", "resposta": {...} }] responde no lugar de
+// uma edge function que não roda no local (IA sem chave, WhatsApp). Só para o que
+// a tela precisa para abrir; o resultado mostrado deve vir do banco local.
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -66,6 +77,17 @@ const context = await browser.newContext({
   recordVideo: { dir: path.join(saida, ".video"), size: { width: W, height: H } },
 });
 const page = await context.newPage();
+for (const sim of roteiro.simular ?? []) {
+  await context.route(sim.url, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" },
+      body: route.request().method() === "OPTIONS" ? "" : JSON.stringify(sim.resposta),
+    }),
+  );
+}
+if (roteiro.abaDoNavegador) await page.addInitScript(() => { window.__dsnAba = true; });
 // O vídeo começa no login; guardamos o instante da abertura para cortar o início.
 const t0 = Date.now();
 let cortarEm = 0;
@@ -88,6 +110,10 @@ const CAMADA = () => {
     #dsn-legenda{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);max-width:min(900px,90vw);display:flex;gap:14px;align-items:center;background:rgba(11,18,32,.92);color:#fff;border-radius:14px;padding:14px 20px;font-size:20px;line-height:1.35;box-shadow:0 10px 30px rgba(0,0,0,.35);opacity:0;transition:opacity .4s}
     #dsn-legenda b{flex:none;width:34px;height:34px;border-radius:50%;background:#22C55E;color:#052e16;display:grid;place-items:center;font-size:16px}
     #dsn-abertura{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:10px;color:#fff;background:radial-gradient(700px 400px at 20% 10%,rgba(34,197,94,.35),transparent 70%),radial-gradient(600px 400px at 90% 90%,rgba(14,165,233,.35),transparent 70%),#0B1220;transition:opacity .7s}
+    #dsn-aba{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#DEE1E6;color:#202124;border-radius:10px 10px 0 0;padding:9px 18px 9px 14px;font-size:15px;min-width:280px;box-shadow:0 6px 24px rgba(0,0,0,.35);border:2px solid #22C55E}
+    #dsn-aba i{width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#22C55E,#0EA5E9);flex:none}
+    #dsn-aba span{font-weight:600}
+    #dsn-aba small{margin-left:auto;padding-left:18px;color:#5f6368}
     #dsn-abertura small{font-size:16px;letter-spacing:.14em;text-transform:uppercase;color:#86EFAC}
     #dsn-abertura h1{font-size:56px;margin:0;font-weight:800}
     #dsn-abertura p{font-size:24px;margin:0;color:#CBD5E1}`;
@@ -95,12 +121,19 @@ const CAMADA = () => {
   c.id = "dsn-camada";
   c.innerHTML = `<div id="dsn-caixa"></div><div id="dsn-onda"></div>
     <div id="dsn-cursor"><svg width="22" height="22" viewBox="0 0 24 24"><path d="M3 2l7 19 2.5-7.5L20 11z" fill="#fff" stroke="#0B1220" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
-    <div id="dsn-legenda"><b></b><span></span></div>`;
+    <div id="dsn-legenda"><b></b><span></span></div>` +
+    (window.__dsnAba ? `<div id="dsn-aba"><i></i><span></span><small>×</small></div>` : "");
   document.documentElement.append(css, c);
 };
 
 async function camada() {
   await page.evaluate(CAMADA);
+  if (roteiro.abaDoNavegador) {
+    await page.evaluate(() => {
+      const a = document.getElementById("dsn-aba");
+      if (a) a.querySelector("span").textContent = document.title;
+    });
+  }
 }
 
 async function centro(seletor) {
@@ -176,6 +209,10 @@ const resultado = [];
 let n = 0;
 for (const p of roteiro.passos) {
   // Passo sem legenda (ex.: só abrir a tela inicial) não conta nem gera print.
+  if (p.opcional && p.clicar && !(await page.locator(p.clicar).first().isVisible({ timeout: 3000 }).catch(() => false))) {
+    const vis = await page.locator(p.clicar).first().waitFor({ state: "visible", timeout: 3000 }).then(() => true, () => false);
+    if (!vis) continue;
+  }
   if (p.legenda) n++;
   if (p.ir) {
     await page.goto(`${base}${p.ir}`);
@@ -200,14 +237,41 @@ for (const p of roteiro.passos) {
     await el.click();
     await page.evaluate(() => document.getElementById("dsn-cursor")?.classList.remove("clique"));
   }
+  if (p.tecla) {
+    await page.keyboard.press(p.tecla);
+    await page.waitForTimeout(500);
+  }
+  if (p.arrastar) {
+    const { b } = await centro(p.arrastar.seletor);
+    const x = b.x + b.width / 2, y = b.y + b.height / 2;
+    await moverCursor(b);
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    const passos = 30;
+    for (let k = 1; k <= passos; k++) {
+      const nx = x + (p.arrastar.dx * k) / passos, ny = y + (p.arrastar.dy * k) / passos;
+      await page.mouse.move(nx, ny);
+      await page.evaluate(({ nx, ny }) => {
+        const c = document.getElementById("dsn-cursor");
+        c.style.transition = "none"; c.style.left = `${nx}px`; c.style.top = `${ny}px`;
+      }, { nx, ny });
+      await page.waitForTimeout(40);
+    }
+    await page.mouse.up();
+    await page.evaluate(() => (document.getElementById("dsn-cursor").style.transition = ""));
+  }
   if (p.digitar) {
     const { el, b } = await centro(p.digitar.seletor);
     await moverCursor(b);
     await el.click();
+    if (p.digitar.limpar) {
+      await page.keyboard.press("Control+A");
+      await page.keyboard.press("Backspace");
+    }
     await el.pressSequentially(p.digitar.texto, { delay: 90 });
   }
   await page.waitForTimeout(p.espera ?? 1800);
-  await camada();
+  await camada(); // também atualiza o nome da aba desenhada, quando ligada
   await legenda(n, p.legenda);
   if (p.destacar) {
     const { b } = await centro(p.destacar);
@@ -238,7 +302,7 @@ const bruto = await video.path();
 const ffmpeg = [path.join(process.env.LOCALAPPDATA ?? "", "ms-playwright", "ffmpeg-1011", "ffmpeg-win64.exe"), process.env.FFMPEG_PATH]
   .filter(Boolean).find((f) => fs.existsSync(f));
 if (ffmpeg) {
-  execSync(`"${ffmpeg}" -hide_banner -loglevel error -y -ss ${cortarEm.toFixed(2)} -i "${bruto}" -c:v libvpx -b:v 1500k -an "${path.join(saida, "video.webm")}"`);
+  execSync(`"${ffmpeg}" -hide_banner -loglevel error -y -ss ${cortarEm.toFixed(2)} -i "${bruto}" -c:v libvpx -b:v 700k -an "${path.join(saida, "video.webm")}"`);
 } else {
   console.warn("ffmpeg não encontrado: vídeo sai sem cortar o login");
   fs.renameSync(bruto, path.join(saida, "video.webm"));

@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- ⬆️ **Novidades com vídeo e passo a passo na Evolução DS** — Na **Evolução DS**, as novidades e melhorias mais importantes agora têm o botão **Ver como funciona**, que abre um vídeo curto e o passo a passo com a tela do sistema, mostrando onde clicar. A novidade em destaque aparece no topo da aba. As primeiras a ganhar vídeo foram o **Resumo automático de mensagens do grupo com IA** (em destaque), a **Edição do valor MRR do módulo**, a **Identificação de abas do navegador** e o **Ajuste de tamanho ao abrir novo ticket**.
+
 - 🆕 **Escolher os grupos do WhatsApp direto do Chat** — No **Chat**, com a aba **Grupos** aberta, há um botão novo ao lado de Contatos que sincroniza os grupos do WhatsApp e permite escolher, instância por instância, quais aparecem no sistema, sem precisar ir às Configurações. Dá para buscar o grupo e filtrar entre os que estão no chat e os ocultos, e o grupo ligado já aparece na lista na hora. Funciona também no celular. Disponível para quem tem acesso a **Configurações › Operação**.
 
 - ⬆️ **Ativar, desativar e definir retenção de grupos em lote** — Em **Configurações › Operação › Grupos**, dá para buscar e filtrar entre grupos **Ativos** e **Inativos**, marcar vários (ou nenhum, para valer para todos os exibidos) e ativar, desativar ou aplicar a mesma retenção de uma vez, em vez de mexer em um por um. Ex.: filtrar **Inativos**, selecionar todos e ativar.

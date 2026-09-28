@@ -56,7 +56,7 @@ async function rest(caminho, init = {}) {
 // 1. A release da demanda precisa existir: quem cria é o "Incluir nas Releases?" do DoctorDev.
 const [dem] = await rest(`demandas?codigo=eq.${demanda}&select=id,titulo`);
 if (!dem) throw new Error(`${demanda} não existe no DoctorDev`);
-const [rel] = await rest(`releases?demanda_id=eq.${dem.id}&select=id,titulo,published_at`);
+const [rel] = await rest(`releases?demanda_id=eq.${dem.id}&select=id,titulo,resumo,published_at`);
 if (!rel) {
   console.error(`BLOQUEADO: ${demanda} ainda não tem release no DoctorDev. Entregue a demanda e responda "Incluir nas Releases?" antes.`);
   process.exit(1);
@@ -73,9 +73,15 @@ const arquivos = [
   ...(resultado.video ? [{ nome: resultado.video, tipo: "video/webm" }] : []),
 ];
 
+// Release publicada tem título e resumo travados no DoctorDev (gatilho
+// prevent_release_edit_after_publish): o cliente já leu aquele texto. Nesse caso
+// só entra a mídia, e o texto no ar continua o mesmo.
+const textoTravado = !!rel.published_at;
+if (textoTravado && (texto.titulo !== rel.titulo || texto.resumo !== rel.resumo)) {
+  console.log(`aviso: release publicada, título e resumo ficam os de hoje ("${rel.titulo}")`);
+}
 const campos = {
-  titulo: texto.titulo,
-  resumo: texto.resumo,
+  ...(textoTravado ? {} : { titulo: texto.titulo, resumo: texto.resumo }),
   para_que_serve: texto.para_que_serve?.length ? texto.para_que_serve : null,
   passo_a_passo: resultado.passos.map((p) => ({ passo: p.passo, legenda: p.legenda, imagem_url: publica(p.print) })),
   video_url: resultado.video ? publica(resultado.video) : null,
