@@ -19,6 +19,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- 🆕 **Escolher os grupos do WhatsApp direto do Chat** — No **Chat**, com a aba **Grupos** aberta, há um botão novo ao lado de Contatos que sincroniza os grupos do WhatsApp e permite escolher, instância por instância, quais aparecem no sistema, sem precisar ir às Configurações. O grupo ligado já aparece na lista na hora. Disponível para quem tem acesso a **Configurações › Operação**.
+
+- ⬆️ **Ativar, desativar e definir retenção de grupos em lote** — Em **Configurações › Operação › Grupos**, dá para marcar vários grupos (ou nenhum, para valer para todos da instância) e ativar, desativar ou aplicar a mesma retenção de uma vez, em vez de mexer em um por um.
+
 - 🔧 **Mensagem marcada para responder passava para outro chat** — No **Chat**, quem clicava em **Responder** numa mensagem e trocava de conversa sem enviar continuava vendo aquela mensagem marcada no chat seguinte, e a resposta podia sair citando a conversa errada. Agora, ao trocar de conversa, a marcação é desfeita.
 
 - 🔧 **Movimentos MRR mostrava outra unidade sem o nome do cliente** — Em **Clientes › Movimentos MRR**, quem filtrava por uma unidade (ex.: só Digi Up) via também os movimentos das outras unidades, sem o nome do cliente. Em setembro, eram 155 linhas quando deviam ser 11. Agora aparecem só os movimentos da unidade escolhida, todos com o nome do cliente, e os cards de totais e o Exportar XLSX seguem o mesmo filtro.
