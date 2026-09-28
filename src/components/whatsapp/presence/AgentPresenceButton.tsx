@@ -134,7 +134,13 @@ export default function AgentPresenceButton() {
     }
   }, [setPaused, pauseReasons]);
 
-  if (presenceLoading || !presence) return null;
+  // Sem linha de presença = nunca iniciou expediente → mostra "Offline" com
+  // "Iniciar expediente". Esconder aqui travava admin/gestor para sempre: a
+  // linha só nasce pelo agent_presence_set_active e só o operador tem o
+  // overlay que chama a RPC (Conta Hábil, 28/09/2026).
+  // `undefined` = consulta não rodou (carregando, ou super admin em "Todas" sem
+  // empresa) → esconde. `null` = consultou e não há linha → mostra.
+  if (presenceLoading || presence === undefined) return null;
 
   const pauseLabel = status === "paused"
     ? timerExpired
