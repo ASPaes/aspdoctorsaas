@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { useLookups } from "@/hooks/useLookups";
@@ -94,6 +95,9 @@ export default function MovimentosMrrTab() {
   const lookups = useLookups();
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq("tenant_id", tid) : q;
+  // O recorte por unidade é feito pelo RLS de `clientes` dentro da view
+  // (DEM-0489); aqui só amarramos o cache à seleção e esperamos ela sincronizar.
+  const { viewKey, unidadeFilterReady } = useUnidadeFilter();
 
   // Ordenado para a queryKey não invalidar só porque o usuário clicou em outra ordem.
   const fornecedorSel = useMemo(
@@ -102,7 +106,8 @@ export default function MovimentosMrrTab() {
   );
 
   const { data: movimentos, isLoading } = useQuery({
-    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, fornecedorSel, tid],
+    queryKey: ["movimentos_mrr_list", periodo, tipoFilter, funcionarioFilter, fornecedorSel, tid, viewKey],
+    enabled: unidadeFilterReady,
     queryFn: async () => {
       const data = await fetchAllRows<any>(() => {
         let q = supabase
@@ -138,7 +143,7 @@ export default function MovimentosMrrTab() {
   });
 
   const { data: fornecedores } = useQuery({
-    queryKey: ["movimentos_mrr_fornecedores_efetivo", tid],
+    queryKey: ["movimentos_mrr_fornecedores_efetivo", tid, viewKey],
     queryFn: async () => {
       if (!tid) return [];
       const { data: idsRaw } = await supabase
@@ -156,7 +161,7 @@ export default function MovimentosMrrTab() {
         .order("nome", { ascending: true });
       return data || [];
     },
-    enabled: !!tid,
+    enabled: !!tid && unidadeFilterReady,
   });
 
   const clienteIds = useMemo(() => {
