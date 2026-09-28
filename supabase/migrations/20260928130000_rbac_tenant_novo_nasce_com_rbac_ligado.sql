@@ -1,0 +1,15 @@
+-- ============================================================================
+-- Empresa nova nasce com rbac_enabled=true (decisão do Alexandre, 28/09/2026).
+--
+-- Com a flag desligada, get_my_permissions devolve "pode tudo" antes de olhar
+-- grupo — os grupos criados por rbac_provisionar_tenant (20260928120000)
+-- ficariam inertes até alguém ligar à mão.
+--
+-- Empresa nova não tem tenant_role_permissions, então vale o padrão global
+-- (role_permissions), conferido em 28/09: Administrador 135/137 (fora
+-- dash.valores_financeiros e nav.financeiro, iguais às demais empresas),
+-- Gestor 111/137, Operador 55/137.
+--
+-- Só muda o DEFAULT: nenhuma empresa existente é tocada.
+-- ============================================================================
+alter table public.tenants alter column rbac_enabled set default true;
