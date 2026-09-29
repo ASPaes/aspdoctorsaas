@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Archive, ArchiveRestore, FolderInput, Forward, Loader2, Mail, Paperclip, Reply, ReplyAll } from "lucide-react";
+import { Archive, ArchiveRestore, FolderInput, Forward, Loader2, Mail, Paperclip, Reply, ReplyAll, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +17,22 @@ import type { ModoEscrita } from "./respostaEmail";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
 import { cn } from "@/lib/utils";
+
+/**
+ * Rodape do e-mail no telefone: Responder sozinho na primeira linha, dois na
+ * segunda, tres na terceira. Cada linha e uma div que vira `display:contents` a
+ * partir de sm — no computador os botoes voltam a ser irmaos diretos do rodape e
+ * o desenho de uma linha so continua igual.
+ *
+ * Abaixo de 390px os tres da ultima linha nao cabem com o nome ao lado do icone
+ * (medido: "Mover para" ja corta em 98px, num aparelho de 360). Ali o nome desce
+ * para baixo do icone, que de quebra aumenta o alvo de toque, e a segunda linha
+ * dispensa o icone para o rotulo caber inteiro.
+ */
+const LINHA_DO_RODAPE = "max-sm:flex max-sm:w-full max-sm:gap-2 sm:contents";
+const BOTAO_DA_SEGUNDA = "max-sm:min-w-0 max-sm:flex-1 max-sm:overflow-hidden max-sm:px-1.5 max-sm:text-xs";
+const BOTAO_DA_TERCEIRA = "max-sm:min-w-0 max-sm:flex-1 max-sm:overflow-hidden max-sm:px-1 max-sm:text-xs max-[389px]:h-auto max-[389px]:flex-col max-[389px]:gap-0.5 max-[389px]:py-1.5 max-[389px]:text-[11px]";
+const ICONE_DA_TERCEIRA = "max-sm:mr-1 max-[389px]:mr-0";
 
 /**
  * Abre o e-mail inteiro a partir da lista (pedido do Alexandre, 15/09/2026:
@@ -162,7 +178,7 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
     <Dialog open={!!id} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle className="flex items-start gap-2 pr-6 text-base">
+          <DialogTitle className="flex items-start gap-2 pr-12 text-base sm:pr-6">
             <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0">{email?.assunto || (isLoading ? "Abrindo..." : "E-mail sem assunto")}</span>
           </DialogTitle>
@@ -272,20 +288,37 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
         >
           {email && !email.deleted_at && (
             <>
-              <Button variant={noCelular ? "default" : "outline"} onClick={() => abrirEscrita("responder")}>
-                <Reply className="mr-2 h-4 w-4" />
-                Responder
-              </Button>
-              <Button variant="outline" onClick={() => abrirEscrita("responder_todos")}>
-                <ReplyAll className="mr-2 h-4 w-4" />
-                Responder a todos
-              </Button>
-              <Button variant="outline" onClick={() => abrirEscrita("encaminhar")}>
-                <Forward className="mr-2 h-4 w-4" />
-                Encaminhar
-              </Button>
+              <div className={LINHA_DO_RODAPE}>
+                <Button
+                  variant={noCelular ? "default" : "outline"}
+                  onClick={() => abrirEscrita("responder")}
+                  className="max-sm:flex-1"
+                >
+                  <Reply className="mr-2 h-4 w-4" />
+                  Responder
+                </Button>
+              </div>
+              <div className={LINHA_DO_RODAPE}>
+                <Button
+                  variant="outline"
+                  onClick={() => abrirEscrita("responder_todos")}
+                  className={BOTAO_DA_SEGUNDA}
+                >
+                  <ReplyAll className="mr-2 h-4 w-4 shrink-0 max-sm:mr-1.5 max-[389px]:hidden" />
+                  <span className="truncate">Responder a todos</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => abrirEscrita("encaminhar")}
+                  className={BOTAO_DA_SEGUNDA}
+                >
+                  <Forward className="mr-2 h-4 w-4 shrink-0 max-sm:mr-1.5 max-[389px]:hidden" />
+                  <span className="truncate">Encaminhar</span>
+                </Button>
+              </div>
             </>
           )}
+          <div className={LINHA_DO_RODAPE}>
           {email && !email.deleted_at && (
             <MoverParaPasta
               pastaAtual={email.pasta_id ?? null}
@@ -303,31 +336,44 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
                 )
               }
             >
-              <Button variant="outline" disabled={mover.isPending}>
-                {mover.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderInput className="mr-2 h-4 w-4" />}
-                Mover para
+              <Button variant="outline" disabled={mover.isPending} className={BOTAO_DA_TERCEIRA}>
+                {mover.isPending ? (
+                  <Loader2 className={cn("mr-2 h-4 w-4 shrink-0 animate-spin", ICONE_DA_TERCEIRA)} />
+                ) : (
+                  <FolderInput className={cn("mr-2 h-4 w-4 shrink-0", ICONE_DA_TERCEIRA)} />
+                )}
+                <span className="truncate">Mover para</span>
               </Button>
             </MoverParaPasta>
           )}
           {email && !email.deleted_at && (
-            <Button variant="outline" onClick={alternarArquivo} disabled={arquivar.isPending}>
+            <Button
+              variant="outline"
+              onClick={alternarArquivo}
+              disabled={arquivar.isPending}
+              className={BOTAO_DA_TERCEIRA}
+            >
               {arquivar.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className={cn("mr-2 h-4 w-4 shrink-0 animate-spin", ICONE_DA_TERCEIRA)} />
               ) : estaArquivado ? (
-                <ArchiveRestore className="mr-2 h-4 w-4" />
+                <ArchiveRestore className={cn("mr-2 h-4 w-4 shrink-0", ICONE_DA_TERCEIRA)} />
               ) : (
-                <Archive className="mr-2 h-4 w-4" />
+                <Archive className={cn("mr-2 h-4 w-4 shrink-0", ICONE_DA_TERCEIRA)} />
               )}
-              {estaArquivado ? "Tirar do arquivo" : "Arquivar"}
+              <span className="truncate">{estaArquivado ? "Tirar do arquivo" : "Arquivar"}</span>
             </Button>
           )}
           <Button
             variant={noCelular ? "outline" : "default"}
             onClick={() => onOpenChange(false)}
-            className="sm:ml-auto"
+            className={cn(BOTAO_DA_TERCEIRA, "sm:ml-auto")}
           >
-            Fechar
+            {/* So no telefone: e o que deixa os tres da linha com o mesmo desenho
+                quando o nome desce para baixo do icone. */}
+            <X className={cn("mr-1.5 hidden h-4 w-4 shrink-0 max-sm:block", ICONE_DA_TERCEIRA)} />
+            <span className="truncate">Fechar</span>
           </Button>
+          </div>
         </DialogFooter>
 
         <EscreverEmailDialog
