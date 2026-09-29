@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- 🔧 **TME e 1ª Resposta contavam a madrugada como espera** — Em **Atendimento › Dashboard › Velocidade**, a mensagem que o cliente mandava antes do setor abrir entrava inteira no tempo: quem escrevia às 06:59 e era atendido às 09:00, com o Suporte abrindo às 09:00, aparecia com 2h de espera. Agora TME, 1ª Resposta e a espera dentro do TMR contam só o horário de atendimento de cada setor (com feriados e exceções), e esse mesmo caso passa a valer 24 segundos. Na lista de atendimentos, quando o tempo no relógio é diferente, ele aparece embaixo ("2h 1m no relógio"). A coluna 1ª resposta em **Atendimento › Dashboard › Agentes** segue a mesma regra. Os cartões de % dentro do SLA não mudaram.
+
 - ⬆️ **O convite de instalar no telefone fala do sistema, não só do chat** — A faixa que aparece no celular dizia "Instale o chat na tela do telefone", de quando o endereço abria só o atendimento. Agora diz **"Instale o DoctorSaaS na tela do telefone"**, que é o que você leva ao instalar: chat, tickets, implantação, e-mails e a Evolução DS.
 
 - ⬆️ **Operador vê os atendimentos do seu setor** — Em **Tickets › Atendimentos - Chats**, o operador só enxergava os atendimentos que ele mesmo tinha feito; o histórico de um cliente atendido por um colega ficava escondido. Agora ele vê todos os atendimentos do seu setor, de qualquer agente, e os cartões de TME, TMA e CSAT contam o mesmo conjunto da lista. Quem tem permissão para ver todos os setores continua vendo tudo, e o filtro por agente segue disponível para ver só os próprios.
