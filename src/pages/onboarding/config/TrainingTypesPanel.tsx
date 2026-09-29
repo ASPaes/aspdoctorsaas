@@ -79,7 +79,7 @@ function SortableRow({
       </div>
       <div
         className="flex items-center gap-1.5 text-xs"
-        title="Ao encerrar a implantação, um treino concluído deste tipo abre o ticket de acompanhamento de uso do cliente."
+        title="Quando um treino deste tipo é concluído, o ticket de acompanhamento de uso do cliente abre na hora, sem esperar o Go-live."
       >
         <span className="text-muted-foreground whitespace-nowrap">Acompanhamento</span>
         <Switch checked={item.pede_acompanhamento} onCheckedChange={(v) => onToggleAcomp(item.id, v)} />
@@ -216,9 +216,9 @@ export function TrainingTypesPanel() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Digite o nome e clique em Adicionar (ou tecle Enter). <strong>Acompanhamento</strong>: ao
-          encerrar a implantação, um treino concluído deste tipo abre o ticket de acompanhamento de
-          uso do cliente.
+          Digite o nome e clique em Adicionar (ou tecle Enter). <strong>Acompanhamento</strong>: quando
+          um treino deste tipo é concluído, o ticket de acompanhamento de uso do cliente abre na hora,
+          sem esperar o Go-live.
         </p>
       </div>
 
