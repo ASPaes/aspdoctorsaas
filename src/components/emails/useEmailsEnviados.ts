@@ -73,6 +73,7 @@ export const ROTULO_ORIGEM: Record<string, string> = {
   onboarding: "Ticket O",
   teste: "Teste",
   manual: "Manual",
+  avulso: "Avulso",
   resposta: "Resposta",
   encaminho: "Encaminhado",
   ticket_email: "Aviso de ticket",

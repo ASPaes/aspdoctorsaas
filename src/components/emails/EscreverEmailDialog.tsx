@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Reply, Send } from "lucide-react";
+import { Loader2, Mail, Reply, Send } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,6 +23,8 @@ import {
 } from "@/components/whatsapp/chat/email/travaEnvioEmail";
 import { buscarAnexo } from "./AnexosDoEmail";
 import { useOpcoesFiltro } from "./useEmailsEnviados";
+import { useEmailsDoCliente } from "./useEmailsDoCliente";
+import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { uploadAnexoEmail } from "@/components/whatsapp/chat/email/uploadAnexoEmail";
 import {
   ORIGEM_DO_MODO,
@@ -53,10 +56,14 @@ export interface EmailOriginal {
   anexos?: { nome: string; mime: string; tamanho: number; caminho: string }[];
 }
 
-export interface PedidoEscrita {
-  modo: ModoEscrita;
-  original: EmailOriginal;
-}
+/**
+ * Responder/encaminhar partem de um e-mail; "novo" (botão "Escrever e-mail" da
+ * tela E-mails, 29/09/2026) parte do zero e pode puxar os e-mails de um cliente.
+ * `id` só distingue uma abertura da outra.
+ */
+export type PedidoEscrita =
+  | { modo: ModoEscrita; original: EmailOriginal }
+  | { modo: "novo"; id: string };
 
 /**
  * Anexos do original já prontos para o encaminhamento: nada sobe de novo, o
@@ -143,10 +150,59 @@ export function EscreverEmailDialog({
    */
   const [preparado, setPreparado] = useState<string | null>(null);
 
-  const original = pedido?.original;
-  const modo = pedido?.modo ?? "responder";
+  const novo = pedido?.modo === "novo";
+  const original = pedido && pedido.modo !== "novo" ? pedido.original : undefined;
+  const modo: ModoEscrita = pedido && pedido.modo !== "novo" ? pedido.modo : "responder";
   const anexando = anexos.some((a) => a.status === "enviando");
-  const chaveAtual = pedido && original ? `${pedido.modo}:${original.id}` : null;
+  const chaveAtual = !pedido ? null : pedido.modo === "novo" ? `novo:${pedido.id}` : `${pedido.modo}:${pedido.original.id}`;
+
+  // ── e-mail novo: cliente opcional, que puxa os e-mails dele ──
+  const [cliente, setCliente] = useState<SelectedCliente | null>(null);
+  const emailsDoCliente = useEmailsDoCliente(tid, novo ? (cliente?.id ?? null) : null);
+  const sugestoes = cliente ? (emailsDoCliente.data ?? []) : [];
+  /** e-mails que vieram do cliente atual: saem dos campos se ele for trocado ou tirado */
+  const vindosDoCliente = useRef<{ clienteId: string | null; emails: string[] }>({ clienteId: null, emails: [] });
+
+  // o setor de quem envia vai no registro: é por ele que a tela E-mails filtra
+  const setorDeQuemEnvia = useQuery({
+    queryKey: ["email-avulso-setor", tid, user?.id],
+    enabled: aberto && novo && !!tid && !!user?.id,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const { data } = await (supabase.from("support_department_members" as any) as any)
+        .select("department_id")
+        .eq("tenant_id", tid)
+        .eq("user_id", user!.id)
+        .eq("is_active", true)
+        .limit(1)
+        .maybeSingle();
+      return ((data as any)?.department_id as string | undefined) ?? null;
+    },
+  });
+
+  const trocarCliente = (proximo: SelectedCliente | null) => {
+    const sair = new Set(vindosDoCliente.current.emails);
+    if (sair.size) {
+      setPara((l) => l.filter((e) => !sair.has(e)));
+      setCc((l) => l.filter((e) => !sair.has(e)));
+      setCco((l) => l.filter((e) => !sair.has(e)));
+    }
+    vindosDoCliente.current = { clienteId: null, emails: [] };
+    setCliente(proximo);
+  };
+
+  // chegaram os e-mails do cliente escolhido: o do cadastro entra no Destinatário
+  useEffect(() => {
+    if (!novo || !cliente || !emailsDoCliente.data) return;
+    if (vindosDoCliente.current.clienteId === cliente.id) return;
+    const lista = emailsDoCliente.data.map((s) => s.email);
+    vindosDoCliente.current = { clienteId: cliente.id, emails: lista };
+    if (lista.length === 0) {
+      toast.info("Este cliente não tem e-mail no cadastro nem nos contatos. Digite o endereço no Destinatário.");
+      return;
+    }
+    setPara((l) => (l.includes(lista[0]) ? l : [lista[0], ...l]));
+  }, [novo, cliente, emailsDoCliente.data]);
 
   // fechou: a próxima abertura prepara tudo de novo, mesmo sendo o mesmo e-mail
   useEffect(() => {
@@ -155,13 +211,32 @@ export function EscreverEmailDialog({
     setPreparado(null);
   }, [pedido]);
 
-  // cada abertura monta destinatários, assunto e citação a partir do original
+  // cada abertura monta destinatários, assunto e citação a partir do original;
+  // o e-mail novo abre em branco
   useEffect(() => {
-    if (!pedido || !original) return;
-    const atual = `${pedido.modo}:${original.id}`;
-    if (chave.current === atual) return;
-    chave.current = atual;
-    setPreparado(atual);
+    if (!pedido || !chaveAtual) return;
+    if (chave.current === chaveAtual) return;
+    chave.current = chaveAtual;
+    setPreparado(chaveAtual);
+
+    if (pedido.modo === "novo") {
+      setCliente(null);
+      vindosDoCliente.current = { clienteId: null, emails: [] };
+      setPara([]);
+      setCc([]);
+      setMostrarCc(false);
+      setCco([]);
+      setMostrarCco(false);
+      setAssunto("");
+      setCorpoHtml("");
+      setCorpoTexto("");
+      setVersaoCorpo((v) => v + 1);
+      setAnexos([]);
+      setEnviando(false);
+      setContaId(contas.length === 1 ? contas[0].id : "");
+      return;
+    }
+    const original = pedido.original;
 
     const destinos = destinatariosDaResposta({
       modo: pedido.modo,
@@ -197,7 +272,7 @@ export function EscreverEmailDialog({
     }
     setEnviando(false);
     setContaId(contas.length === 1 ? contas[0].id : "");
-  }, [pedido, original, contas, contasDoTenant]);
+  }, [pedido, chaveAtual, contas, contasDoTenant]);
 
   const adicionarAnexos = (arquivos: File[]) => {
     const recusados: string[] = [];
@@ -240,7 +315,7 @@ export function EscreverEmailDialog({
   };
 
   const enviar = async () => {
-    if (enviando || !original || !tid) return;
+    if (enviando || !pedido || !tid) return;
     if (anexando) {
       toast.error("Espere os arquivos terminarem de anexar antes de enviar.");
       return;
@@ -271,10 +346,11 @@ export function EscreverEmailDialog({
           subject: assunto.trim(),
           text: corpoTexto.trim(),
           html: htmlParaEmail(corpoHtml),
-          origem: ORIGEM_DO_MODO[modo],
-          referencia_id: original.referenciaId ?? null,
-          cliente_id: original.clienteId ?? null,
-          department_id: original.departmentId ?? null,
+          // 'avulso' entra na conferência de conta liberada da send-email, como o chat
+          origem: novo ? "avulso" : ORIGEM_DO_MODO[modo],
+          referencia_id: original?.referenciaId ?? null,
+          cliente_id: novo ? (cliente?.id ?? null) : (original?.clienteId ?? null),
+          department_id: novo ? (setorDeQuemEnvia.data ?? null) : (original?.departmentId ?? null),
           anexos: anexos
             .filter((a) => a.status === "pronto" && a.path)
             .map((a) => ({ path: a.path!, nome: a.nome, mime: a.mime, bucket: a.bucket ?? "whatsapp-media" })),
@@ -313,11 +389,15 @@ export function EscreverEmailDialog({
       <DialogContent className="sm:max-w-2xl max-h-[92vh] p-0 gap-0 flex flex-col overflow-hidden">
         <DialogHeader className="static m-0 space-y-1 border-b border-border px-6 pb-4 pr-12 pt-5 text-left">
           <DialogTitle className="flex items-center gap-2 text-base">
-            <Reply className="h-4 w-4" />
-            {ROTULO_MODO[modo]}
+            {novo ? <Mail className="h-4 w-4" /> : <Reply className="h-4 w-4" />}
+            {novo ? "Novo e-mail" : ROTULO_MODO[modo]}
           </DialogTitle>
           <DialogDescription className="text-xs">
-            {original?.assunto ? `Sobre: ${original.assunto}` : "E-mail sem assunto"}
+            {novo
+              ? "Escolha um cliente para puxar os e-mails dele, ou digite o endereço direto."
+              : original?.assunto
+                ? `Sobre: ${original.assunto}`
+                : "E-mail sem assunto"}
           </DialogDescription>
         </DialogHeader>
 
@@ -346,13 +426,39 @@ export function EscreverEmailDialog({
             </Select>
           </div>
 
+          {novo && (
+            <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-start sm:gap-3">
+              <Label htmlFor="escrever-cliente" className="font-normal text-muted-foreground sm:pt-2.5">Cliente</Label>
+              <div className="min-w-0 space-y-1">
+                <ClienteSearchSelect
+                  inputId="escrever-cliente"
+                  value={cliente}
+                  onChange={trocarCliente}
+                  includeCancelados
+                  placeholder="Buscar cliente por nome, CNPJ ou código (opcional)"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {!cliente
+                    ? "Sem cliente, o e-mail sai avulso e não entra no histórico de nenhum cliente."
+                    : emailsDoCliente.isLoading
+                      ? "Buscando os e-mails do cliente..."
+                      : sugestoes.length > 1
+                        ? `${sugestoes.length} e-mails deste cliente aparecem como sugestão nos campos abaixo.`
+                        : sugestoes.length === 1
+                          ? "Este cliente só tem o e-mail do cadastro."
+                          : "Este cliente não tem e-mail cadastrado."}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
             <Label htmlFor="escrever-para" className="font-normal text-muted-foreground">Destinatário</Label>
             <CampoEmails
               id="escrever-para"
               valores={para}
               onChange={setPara}
-              sugestoes={[]}
+              sugestoes={sugestoes}
               placeholder="Adicionar destinatário"
               extra={
                 <span className="ml-auto flex shrink-0 gap-0.5">
@@ -382,13 +488,13 @@ export function EscreverEmailDialog({
           {mostrarCc && (
             <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
               <Label htmlFor="escrever-cc" className="font-normal text-muted-foreground">Cc</Label>
-              <CampoEmails id="escrever-cc" valores={cc} onChange={setCc} sugestoes={[]} placeholder="Com cópia" />
+              <CampoEmails id="escrever-cc" valores={cc} onChange={setCc} sugestoes={sugestoes} placeholder="Com cópia" />
             </div>
           )}
           {mostrarCco && (
             <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
               <Label htmlFor="escrever-cco" className="font-normal text-muted-foreground">Cco</Label>
-              <CampoEmails id="escrever-cco" valores={cco} onChange={setCco} sugestoes={[]} placeholder="Com cópia oculta" />
+              <CampoEmails id="escrever-cco" valores={cco} onChange={setCco} sugestoes={sugestoes} placeholder="Com cópia oculta" />
             </div>
           )}
 
@@ -417,7 +523,7 @@ export function EscreverEmailDialog({
                   setCorpoTexto(c.vazio ? "" : c.texto);
                 }}
                 desabilitado={enviando}
-                placeholder="Escreva a resposta"
+                placeholder={novo ? "Escreva o e-mail" : "Escreva a resposta"}
                 acaoAnexar={<BotaoAnexar desabilitado={enviando} onEscolher={adicionarAnexos} />}
                 rodape={
                   <p className="mb-1 mt-3 text-xs text-muted-foreground">

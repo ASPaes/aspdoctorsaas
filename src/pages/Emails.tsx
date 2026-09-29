@@ -1,9 +1,14 @@
+import { useState } from "react";
+import { PenSquare } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import EmailsEnviadosTab from "@/components/emails/EmailsEnviadosTab";
 import EmailsRecebidosTab from "@/components/emails/EmailsRecebidosTab";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
+import { EscreverEmailDialog, type PedidoEscrita } from "@/components/emails/EscreverEmailDialog";
 
 /**
  * E-mails: tudo que a operação enviou e recebeu dos clientes.
@@ -18,6 +23,9 @@ export default function Emails() {
   // explica por que a lista do operador é menor que a do gestor.
   const soOsProprios = profile?.role === "user" && profile?.is_super_admin !== true;
   const noCelular = useIsMobile() || isChatHost();
+  const queryClient = useQueryClient();
+  // e-mail avulso (29/09/2026): fora de chat, ticket ou jornada
+  const [escrita, setEscrita] = useState<PedidoEscrita | null>(null);
 
   return (
     <div className="space-y-4">
@@ -35,10 +43,16 @@ export default function Emails() {
       )}
 
       <Tabs defaultValue="enviados">
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="enviados">Enviados</TabsTrigger>
-          <TabsTrigger value="recebidos">Recebidos</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="enviados">Enviados</TabsTrigger>
+            <TabsTrigger value="recebidos">Recebidos</TabsTrigger>
+          </TabsList>
+          <Button className="gap-2" onClick={() => setEscrita({ modo: "novo", id: crypto.randomUUID() })}>
+            <PenSquare className="h-4 w-4" />
+            Escrever e-mail
+          </Button>
+        </div>
 
         <TabsContent value="enviados" className="mt-4">
           <EmailsEnviadosTab />
@@ -48,6 +62,12 @@ export default function Emails() {
           <EmailsRecebidosTab />
         </TabsContent>
       </Tabs>
+
+      <EscreverEmailDialog
+        pedido={escrita}
+        onOpenChange={(aberto) => !aberto && setEscrita(null)}
+        onEnviou={() => queryClient.invalidateQueries({ queryKey: ["emails_enviados"] })}
+      />
     </div>
   );
 }

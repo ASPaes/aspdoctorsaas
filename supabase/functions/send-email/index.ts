@@ -209,7 +209,8 @@ Deno.serve(async (req) => {
   // super admin é bypass: não é membro dos setores do tenant que está simulando
   // 17/09/2026: 'ticket' e 'onboarding' (e-mail pelo chamado e pela jornada)
   // entraram na regra; antes só a tela filtrava as contas desses dois.
-  if (['chat', 'resposta', 'encaminho', 'ticket', 'onboarding'].includes(origem) && enviadoPor && !chamadaInterna && !superAdmin) {
+  // 29/09/2026: 'avulso' (botão "Escrever e-mail" da tela E-mails) também.
+  if (['chat', 'resposta', 'encaminho', 'ticket', 'onboarding', 'avulso'].includes(origem) && enviadoPor && !chamadaInterna && !superAdmin) {
     const [ativas, doUsuario, membros] = await Promise.all([
       supabase.from('email_accounts').select('id').eq('tenant_id', tenantId).eq('ativo', true),
       supabase.from('email_account_usuarios').select('account_id').eq('tenant_id', tenantId).eq('user_id', enviadoPor),

@@ -40,6 +40,7 @@ const ORIGENS = [
   { id: "onboarding", label: "Ticket de onboarding" },
   { id: "teste", label: "Teste" },
   { id: "manual", label: "Manual" },
+  { id: "avulso", label: "Avulso" },
   { id: "ticket_email", label: "Aviso de ticket aberto" },
 ];
 

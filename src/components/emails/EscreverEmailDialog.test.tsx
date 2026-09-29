@@ -16,7 +16,26 @@ vi.mock("./useEmailsEnviados", () => ({ useOpcoesFiltro: () => ({ contas: [{ id:
 vi.mock("@/components/whatsapp/chat/email/useEmailChatDados", () => ({
   useContasDeEnvio: () => ({ data: { contas: [{ id: "c1", email: "suporte@x.com", rotulo: "Suporte" }] }, isLoading: false }),
 }));
+// e-mail novo: a busca de cliente vira dois botões, e os e-mails de cada cliente são fixos
+const EMAILS_DO_CLIENTE: Record<string, { email: string; rotulo: string }[]> = {
+  a: [{ email: "fin@a.com", rotulo: "Cadastro do cliente" }, { email: "socia@a.com", rotulo: "Sócia" }],
+  b: [{ email: "adm@b.com", rotulo: "Cadastro do cliente" }],
+};
+vi.mock("./useEmailsDoCliente", () => ({
+  useEmailsDoCliente: (_t: string | null, id: string | null) => ({ data: id ? EMAILS_DO_CLIENTE[id] : undefined, isLoading: false }),
+}));
+vi.mock("@/components/whatsapp/contatos/ClienteSearchSelect", () => ({
+  ClienteSearchSelect: ({ value, onChange }: any) => (
+    <div>
+      <span data-testid="cliente">{value?.label ?? ""}</span>
+      <button onClick={() => onChange({ id: "a", label: "Cliente A" })}>escolher-a</button>
+      <button onClick={() => onChange({ id: "b", label: "Cliente B" })}>escolher-b</button>
+      <button onClick={() => onChange(null)}>tirar</button>
+    </div>
+  ),
+}));
 
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { EscreverEmailDialog, type PedidoEscrita } from "./EscreverEmailDialog";
 
 const pedido: PedidoEscrita = {
@@ -38,8 +57,23 @@ let definir: (p: PedidoEscrita | null) => void = () => {};
 function Pai() {
   const [p, setP] = useState<PedidoEscrita | null>(null);
   definir = setP;
-  return <EscreverEmailDialog pedido={p} onOpenChange={(a) => !a && setP(null)} />;
+  return (
+    <QueryClientProvider client={new QueryClient()}>
+      <EscreverEmailDialog pedido={p} onOpenChange={(a) => !a && setP(null)} />
+    </QueryClientProvider>
+  );
 }
+
+const clicar = (texto: string) =>
+  act(async () => {
+    const botao = [...document.body.querySelectorAll("button")].find((b) => b.textContent === texto);
+    if (!botao) throw new Error(`botão ${texto} não achado`);
+    botao.click();
+  });
+
+/** chips do campo Destinatário */
+const destinatarios = () =>
+  (document.body.querySelector("#escrever-para")?.parentElement?.textContent ?? "").replace(/Cco|Cc/g, "");
 
 const textoDoEditor = () => document.body.querySelector(".ProseMirror")?.textContent ?? "";
 
@@ -72,5 +106,40 @@ describe("tela de encaminhar", () => {
     await act(async () => definir(pedido));
     await esperar(() => textoDoEditor().includes("Texto do original"));
     expect(textoDoEditor()).toContain("Texto do original");
+  }, 15_000);
+});
+
+describe("e-mail novo (botão Escrever e-mail)", () => {
+  it("abre em branco, o cliente puxa o e-mail dele e trocar de cliente tira só o que veio do anterior", async () => {
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    // fecha a janela que o teste anterior deixou aberta
+    await act(async () => definir(null));
+    await esperar(() => !document.body.querySelector(".ProseMirror"));
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    await act(async () => {
+      createRoot(container).render(<Pai />);
+    });
+
+    await act(async () => definir({ modo: "novo", id: "n1" }));
+    await esperar(() => !!document.body.querySelector(".ProseMirror"));
+    expect(document.body.textContent).toContain("Novo e-mail");
+    expect(textoDoEditor()).toBe("");
+    expect(destinatarios()).toBe("");
+
+    await clicar("escolher-a");
+    await esperar(() => destinatarios().includes("fin@a.com"));
+    expect(destinatarios()).toContain("fin@a.com");
+    // o contato do cliente é sugestão, não entra sozinho
+    expect(destinatarios()).not.toContain("socia@a.com");
+
+    await clicar("escolher-b");
+    await esperar(() => destinatarios().includes("adm@b.com"));
+    expect(destinatarios()).toContain("adm@b.com");
+    expect(destinatarios()).not.toContain("fin@a.com");
+
+    await clicar("tirar");
+    await esperar(() => !destinatarios().includes("adm@b.com"));
+    expect(destinatarios()).toBe("");
   }, 15_000);
 });
