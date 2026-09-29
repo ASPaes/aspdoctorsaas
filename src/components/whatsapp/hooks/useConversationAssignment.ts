@@ -179,6 +179,20 @@ export const useConversationAssignment = () => {
 
   const transferToDepartment = useMutation({
     mutationFn: async ({ conversationId, departmentId, reason }: { conversationId: string; departmentId: string; reason?: string }) => {
+      // DEM-0488: a RPC grava atendimento → log → conversa, nessa ordem, numa
+      // transação. As escritas soltas abaixo trocavam a conversa primeiro, e o
+      // motor atribuía um agente que a escrita seguinte apagava (dono fantasma).
+      const { data: rpcData, error: rpcErr } = await (supabase.rpc as any)('transfer_conversation_to_department', {
+        p_conversation_id: conversationId,
+        p_department_id: departmentId,
+        p_reason: reason || null,
+      });
+      if (!rpcErr) {
+        return { conversationId, departmentId, departmentName: (rpcData?.department_name ?? null) as string | null };
+      }
+      // Frontend no ar antes do SQL: cai no caminho antigo em vez de quebrar.
+      if (rpcErr.code !== 'PGRST202') throw rpcErr;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
@@ -223,15 +237,26 @@ export const useConversationAssignment = () => {
         reason: reason ? `[Setor] ${reason}` : '[Transferência de setor]',
       } as any);
 
-      return { conversationId, departmentId };
+      return { conversationId, departmentId, departmentName: null as string | null };
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
-      toast({ title: "Setor alterado", description: "A conversa foi transferida para o novo setor." });
+      queryClient.invalidateQueries({ queryKey: ['conversation-assignment-history', res.conversationId] });
+      toast({
+        title: "Setor alterado",
+        description: res.departmentName
+          ? `O atendimento foi para a fila de ${res.departmentName}, na mesma posição.`
+          : "A conversa foi transferida para o novo setor.",
+      });
     },
-    onError: () => {
-      toast({ title: "Erro ao transferir setor", description: "Não foi possível transferir a conversa.", variant: "destructive" });
+    onError: (error: any) => {
+      // Regras da RPC (mesmo setor, setor inativo, grupo) já vêm com a frase pronta.
+      toast({
+        title: "Erro ao transferir setor",
+        description: error?.code === 'P0001' && error?.message ? error.message : "Não foi possível transferir a conversa.",
+        variant: "destructive",
+      });
     },
   });
 

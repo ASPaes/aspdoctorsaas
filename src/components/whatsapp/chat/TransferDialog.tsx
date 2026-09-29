@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ interface TransferDialogProps {
   currentAssignee: string | null;
   /** Grupo transfere só para agente: ver a aba Setor abaixo. */
   isGroup?: boolean;
+  /** DEM-0488: atendimento esperando sem dono. Abre na aba Setor, que é o caso de uso. */
+  naFila?: boolean;
   onDepartmentTransferred?: () => void;
 }
 
@@ -67,8 +69,14 @@ function useDepartments() {
   });
 }
 
-export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, isGroup = false, onDepartmentTransferred }: TransferDialogProps) {
+export function TransferDialog({ open, onOpenChange, conversationId, currentAssignee, isGroup = false, naFila = false, onDepartmentTransferred }: TransferDialogProps) {
   const [tab, setTab] = useState<string>("agent");
+
+  // A aba inicial é decidida a cada abertura: o mesmo diálogo serve a conversa
+  // que estava na fila agora e a que já tem dono.
+  useEffect(() => {
+    if (open) setTab(naFila && !isGroup ? "department" : "agent");
+  }, [open, naFila, isGroup]);
   const [selectedUser, setSelectedUser] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
   const [reason, setReason] = useState("");
@@ -183,7 +191,9 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
               </Select>
             </div>
             <p className="text-xs text-muted-foreground">
-              A conversa será desvinculada do agente atual e voltará para a fila do setor selecionado.
+              {naFila
+                ? "O cliente passa para a fila do setor selecionado, na mesma posição em que estava."
+                : "A conversa será desvinculada do agente atual e voltará para a fila do setor selecionado."}
             </p>
           </TabsContent>
           )}

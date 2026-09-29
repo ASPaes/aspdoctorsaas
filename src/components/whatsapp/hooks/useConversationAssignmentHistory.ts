@@ -7,7 +7,8 @@ import { useMemo } from 'react';
  * Nem toda linha de `conversation_assignments` e uma transferencia:
  *  - `auto`              distribuicao automatica (assigned_by NULL)
  *  - `claim`             o proprio agente assumiu (reason "Assumido manualmente")
- *  - `department`        troca de setor (assigned_to NULL — o setor destino nao e gravado)
+ *  - `department`        troca de setor (assigned_to NULL). Desde a DEM-0488 o setor
+ *                        destino vem no reason: "[Setor: Nome] motivo".
  *  - `transfer`          agente A passou para o agente B
  *  - `transfer_unknown`  transferencia anterior a 10/09/2026, quando a RPC gravava o
  *                        autor nas duas colunas: o destinatario se perdeu.

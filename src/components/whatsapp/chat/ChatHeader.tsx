@@ -1418,6 +1418,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         // sempre NULL e sem isto o agente atual apareceria na lista de destinos.
         currentAssignee={attendance?.assigned_to ?? conversation.assigned_to ?? null}
         isGroup={isGroupConv}
+        naFila={attendance?.status === "waiting" && !attendance?.assigned_to}
         onDepartmentTransferred={onDepartmentTransferred}
       />
       <CreateCSTicketFromChat

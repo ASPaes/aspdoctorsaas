@@ -592,10 +592,14 @@ export function ChatMessages({
                   // e só transferência tem alguém do outro lado. Antes tudo saía como
                   // "Transferido para X", o que dizia o contrário do que aconteceu.
                   const EventIcon = ev.kind === 'auto' ? Users : ev.kind === 'claim' ? UserCheck : ArrowRightLeft;
+                  // DEM-0488: a RPC grava "[Setor: Nome] motivo". Log antigo é só "[Setor]".
+                  const setorDestino = ev.kind === 'department'
+                    ? /^\[Setor: ([^\]]+)\]/.exec(ev.reason ?? '')?.[1] ?? null
+                    : null;
                   const texto =
                     ev.kind === 'auto' ? `Distribuído para ${quem}${cargo}`
                     : ev.kind === 'claim' ? `${quem} assumiu o atendimento`
-                    : ev.kind === 'department' ? `Transferido de setor por ${autor}`
+                    : ev.kind === 'department' ? (setorDestino ? `Transferido para o setor ${setorDestino} por ${autor}` : `Transferido de setor por ${autor}`)
                     : ev.kind === 'transfer_unknown' ? `Transferido por ${autor}${cargoAutor}`
                     : `Transferido de ${autor}${cargoAutor} para ${quem}${cargo}`;
                   return (

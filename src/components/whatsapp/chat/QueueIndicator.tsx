@@ -123,16 +123,33 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
 
       {/* Primary action button */}
       {canClaim ? (
-        <Button
-          variant="default"
-          size="sm"
-          className="h-7 text-xs gap-1.5 rounded-full"
-          onClick={claim.pedirClaim}
-          disabled={isPending || isBlocked}
-        >
-          {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
-          Assumir
-        </Button>
+        <>
+          <Button
+            variant="default"
+            size="sm"
+            className="h-7 text-xs gap-1.5 rounded-full"
+            onClick={claim.pedirClaim}
+            disabled={isPending || isBlocked}
+          >
+            {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserCheck className="h-3 w-3" />}
+            Assumir
+          </Button>
+          {/* DEM-0488: cliente que escolheu o setor errado sai da fila errada sem
+              ninguém precisar assumir antes. Portão ignora o setor do usuário de
+              propósito: quem enxerga a fila é quem percebe o engano. */}
+          {podeTransferir && !compacto && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 rounded-full"
+              onClick={onTransferClick}
+              aria-label="Transferir"
+              title="Transferir para outro setor"
+            >
+              <ArrowRightLeft className="h-3 w-3" />
+            </Button>
+          )}
+        </>
       ) : canReopen ? (
         <Button
           variant="default"
