@@ -2,8 +2,9 @@
 // de um sistema parceiro (hoje: DoctorDev / devflow-hub e o site, na inscrição
 // do evento online).
 //
-// Autenticação: HMAC-SHA256 sobre o payload inteiro, com o segredo compartilhado
-// DEVFLOW_WA_SECRET. Mesmo padrão do SSO que já existe entre os dois projetos —
+// Autenticação: HMAC-SHA256 sobre o payload inteiro, com um segredo compartilhado
+// por parceiro: DEVFLOW_WA_SECRET (DoctorDev) ou SITE_WA_SECRET (site). Segredos
+// separados para poder revogar um parceiro sem derrubar o outro. Mesmo padrão do SSO que já existe entre os dois projetos —
 // por isso `verify_jwt = false` no config.toml: quem chama não tem JWT daqui.
 //
 // A mensagem viaja DENTRO do payload assinado: sem a assinatura correta não dá
@@ -100,9 +101,10 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
 
   try {
-    const segredo = Deno.env.get('DEVFLOW_WA_SECRET');
-    if (!segredo) {
-      console.error('[ds-enviar-whatsapp-externo] DEVFLOW_WA_SECRET ausente');
+    const segredos = [Deno.env.get('DEVFLOW_WA_SECRET'), Deno.env.get('SITE_WA_SECRET')]
+      .filter((s): s is string => !!s);
+    if (segredos.length === 0) {
+      console.error('[ds-enviar-whatsapp-externo] nenhum segredo configurado');
       return json({ ok: false, error: 'secret_nao_configurado' }, 500);
     }
 
@@ -115,7 +117,11 @@ Deno.serve(async (req) => {
     const [payloadB64, assinatura] = token.split('.');
     if (!payloadB64 || !assinatura) return json({ ok: false, error: 'token_malformado' }, 400);
 
-    if (!(await assinaturaConfere(payloadB64, assinatura, segredo))) {
+    let confere = false;
+    for (const segredo of segredos) {
+      if (await assinaturaConfere(payloadB64, assinatura, segredo)) { confere = true; break; }
+    }
+    if (!confere) {
       return json({ ok: false, error: 'assinatura_invalida' }, 401);
     }
 
