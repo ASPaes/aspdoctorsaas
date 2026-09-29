@@ -6,6 +6,7 @@ import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useAprovacaoOemStatus } from "@/hooks/useAprovacaoOem";
 import { useLinhaDestacada, CLASSE_DESTAQUE } from "@/hooks/useDeepLinkIntegracao";
 import { rotuloDaFonte } from "@/lib/fonteDoPedido";
+import { diaSP } from "@/components/clientes/visao360/visao360Calc";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -162,6 +163,58 @@ function efeito(p: Pedido): string {
 }
 
 /**
+ * Quanto o pedido mexe no MRR do cliente, com sinal. Mesmas regras do `efeito`,
+ * que é o texto que o aprovador lê logo acima: se as duas contas divergirem, a
+ * tela se contradiz. `null` = o pedido não mexe no MRR (licença nova, ou sem
+ * valor informado), e aí não há "antes e depois" a mostrar.
+ */
+function deltaMrr(p: Pedido): number | null {
+  if (p.acao === "ativar") {
+    const v = (Number(p.vlr_mensal) || 0) * Math.max(Number(p.quantidade) || 1, 1);
+    return v > 0 ? v : null;
+  }
+  if (p.acao === "quantidade") {
+    const delta = Number(p.quantidade ?? 0) - Number(p.quantidade_antes ?? p.quantidade_atual ?? 0);
+    const v = (Number(p.vlr_mensal) || 0) * delta;
+    return v > 0 ? v : null;
+  }
+  if (p.acao === "cancelar") {
+    const v = Number(p.valor_downsell) || 0;
+    return v > 0 ? -v : null;
+  }
+  return null;
+}
+
+/**
+ * Valor do contrato antes e depois, para quem aprova ver o impacto inteiro e não
+ * só o delta (DEM-0486). O "antes" é o saldo de hoje (`fn_mrr_cliente_em`):
+ * pedido que espera ainda não entrou na ficha, então o saldo atual é o antes.
+ */
+function ImpactoNoContrato({ p, atual }: { p: Pedido; atual: number | undefined }) {
+  const delta = deltaMrr(p);
+  if (delta == null || atual == null) return null;
+  const novo = Math.round((atual + delta) * 100) / 100;
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+      <span>
+        <span className="text-muted-foreground">Valor atual do contrato: </span>
+        <span className="font-medium">{fmtBRL(atual)}/mês</span>
+      </span>
+      <span>
+        <span className="text-muted-foreground">Novo valor do contrato: </span>
+        <span
+          className={`font-semibold ${
+            delta < 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          {fmtBRL(novo)}/mês
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
  * O pedido de licença nova por inteiro. É dinheiro cobrado pelo parceiro a
  * partir do dia da criação, então quem aprova vê tudo o que vai: onde nasce,
  * com que CNPJ, os três códigos que o OEM exige e cada módulo.
@@ -271,6 +324,32 @@ export default function AprovacaoOemTab() {
   const aguardando = useMemo(() => itens.filter((i) => i.situacao === "aguardando"), [itens]);
   const decididos = useMemo(() => itens.filter((i) => i.situacao !== "aguardando"), [itens]);
 
+  // Saldo de hoje de cada cliente com pedido esperando. Só dos que esperam: no
+  // histórico o pedido já entrou na ficha, e o saldo de hoje não é mais o "antes".
+  const clientesAguardando = useMemo(
+    () => [...new Set(aguardando.filter((p) => p.cliente_id && deltaMrr(p) != null).map((p) => p.cliente_id!))].sort(),
+    [aguardando],
+  );
+  const mrrQ = useQuery<Record<string, number>>({
+    queryKey: ["oem-aprovacao-mrr", tid, clientesAguardando],
+    enabled: !!tid && clientesAguardando.length > 0,
+    queryFn: async () => {
+      const hoje = diaSP(new Date());
+      const pares = await Promise.all(
+        clientesAguardando.map(async (id) => {
+          const { data, error } = await (supabase.rpc as any)("fn_mrr_cliente_em", {
+            p_tenant: tid,
+            p_cliente: id,
+            p_data: hoje,
+          });
+          if (error) throw error;
+          return [id, Number(data) || 0] as const;
+        }),
+      );
+      return Object.fromEntries(pares);
+    },
+  });
+
   // Linha apontada pela notificação (?fila=<id>).
   const { destacarId, refDestaque } = useLinhaDestacada(!listaQ.isLoading);
   const destacada = destacarId ? itens.find((i) => i.id === destacarId) : undefined;
@@ -285,6 +364,7 @@ export default function AprovacaoOemTab() {
   const invalidarTudo = () => {
     qc.invalidateQueries({ queryKey: ["oem-aprovacao-lista"] });
     qc.invalidateQueries({ queryKey: ["oem-aprovacao-status"] });
+    qc.invalidateQueries({ queryKey: ["oem-aprovacao-mrr"] });
     // A ficha do cliente mostra o selo "aguardando aprovação" na linha do módulo.
     qc.invalidateQueries({ queryKey: ["oem_pendencias_cliente"] });
   };
@@ -523,6 +603,7 @@ export default function AprovacaoOemTab() {
                           </div>
                         )}
                         <div className="text-xs">{efeito(p)}</div>
+                        <ImpactoNoContrato p={p} atual={p.cliente_id ? mrrQ.data?.[p.cliente_id] : undefined} />
                         {p.motivo && (
                           <div className="text-xs text-muted-foreground">Motivo: {p.motivo}</div>
                         )}

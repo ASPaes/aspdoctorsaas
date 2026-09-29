@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- ⬆️ **Valor do contrato antes e depois na Aprovação OEM** — Em **Clientes › Aprovação OEM**, cada pedido que mexe no MRR passa a mostrar o **valor atual do contrato** e o **novo valor do contrato** se o pedido for aprovado, além do valor que entra ou sai. O novo valor aparece em verde quando o contrato sobe e em vermelho quando cai. Assim quem aprova vê o impacto inteiro no cliente sem precisar abrir a ficha.
+
 - 🆕 **Pauta do 1:1 pelo Théo** — Na **Visão 360°** do colaborador, o head e o administrador têm o botão **Gerar pauta** na aba Visão geral. O Théo lê os números da pessoa no período, os assuntos que ela atende, os comentários dos clientes e a jornada, e monta a pauta da conversa individual em três partes: o que **reconhecer**, o que **conversar** e o que **desenvolver**, sempre com o dado que sustenta cada ponto. Só roda quando alguém clica, respeita o teto mensal de IA da empresa, e toda pauta fica no **Histórico**. O operador não vê as pautas.
 
 - ⬆️ **Visão geral, avaliações, jornada e linha do tempo na Visão 360° do colaborador** — A **Visão 360°** do menu do usuário ganhou quatro abas. **Visão geral** mostra o perfil de competências, o volume e o CSAT por semana, os dias e horários em que a pessoa mais atende, os assuntos que mais atende e o que os clientes comentaram. **Avaliações** traz cada nota com o comentário do cliente. **Jornada e pausas** mostra o tempo em expediente, as pausas por motivo e quanto passou do previsto. **Linha do tempo** junta tudo o que aconteceu no período, dia a dia. Acima das abas aparecem os pontos fortes e os pontos de atenção da pessoa, como "1ª resposta mais rápida do setor" ou "Pausas acima do previsto".
