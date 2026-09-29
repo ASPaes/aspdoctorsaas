@@ -24,6 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
 import { AlertTriangle, Info } from "lucide-react";
 import { MetaTemplatePicker } from "@/components/whatsapp/templates/MetaTemplatePicker";
+import { pedirReaberturaAoAbrir } from "../chat/reaberturaPedida";
 
 interface ContactOption {
   label: string;
@@ -326,6 +327,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
                     toast.error(`Este contato já está em atendimento com ${d.techName || 'outro atendente'}`);
                     return;
                   }
+                  // Retomada: se o atendimento dela estiver encerrado, o chat reabre ao abrir.
+                  if (d.status === 'reused') pedirReaberturaAoAbrir(d.conversationId);
                   toast.success(d.status === 'reused' ? 'Conversa retomada' : 'Conversa criada com sucesso');
                   onOpenChange(false);
                   resetForm();
@@ -362,6 +365,8 @@ export function NewConversationModal({ open, onOpenChange, onCreated, initialPho
             toast.error(`Este contato já está em atendimento com ${d.techName || 'outro atendente'}`);
             return;
           }
+          // Retomada: se o atendimento dela estiver encerrado, o chat reabre ao abrir.
+          if (d.status === 'reused') pedirReaberturaAoAbrir(d.conversationId);
           toast.success(d.status === 'reused' ? 'Conversa retomada' : 'Conversa criada com sucesso');
           onOpenChange(false);
           resetForm();

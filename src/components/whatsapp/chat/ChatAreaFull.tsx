@@ -28,6 +28,7 @@ import { useAttendanceStatus } from "../hooks/useAttendanceStatus";
 import { useAtendimentoClaim } from "../hooks/useAtendimentoClaim";
 import { ClientBlockDialog } from "./ClientBlockDialog";
 import { atendimentoEncerradoParaDigitar } from "./composerTravado";
+import { consumirReaberturaPedida } from "./reaberturaPedida";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
 import { RotateCcw, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -175,6 +176,16 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     clienteId: (conversation as any)?.contact?.cliente_id ?? null,
   });
   const podeReabrir = claimAtendimento.podeAssumir && souDoSetor;
+
+  // Veio da "Nova conversa" numa conversa com atendimento encerrado: quem clicou
+  // já decidiu falar com o cliente, então reabre como o botão faria (mesmos guards).
+  // Sem pedido — a aba esquecida — nada muda e a trava da DEM-0464 segue valendo.
+  useEffect(() => {
+    if (!convIdParaAtendimento || attendanceLoading) return;
+    if (!consumirReaberturaPedida(convIdParaAtendimento)) return;
+    if (atendimentoEncerrado && podeReabrir) claimAtendimento.pedirClaim();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convIdParaAtendimento, attendanceLoading]);
 
   const toggleSelect = useCallback((msgId: string) => {
     setSelectedMessages(prev => {
