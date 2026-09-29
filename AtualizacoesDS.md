@@ -17,7 +17,9 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
-### 29/09
+### 28/09
+
+- 🔧 **Cliente repetido no SLA por etapa da Implantação** — Em **Implantação › Dashboard**, na visão **Por etapa**, ao abrir a lista de uma etapa da Implantação (como **Treinamento Marcado**), o mesmo cliente aparecia duas vezes com tempos quase iguais: a mesma passagem era contada uma vez pela jornada e outra pelo treinamento. Agora cada passagem conta uma vez só, na visão **Por etapa** e na **Por responsável**, e as médias dessas etapas ficam corretas. Cliente com mais de um treinamento continua aparecendo uma vez por treinamento, e cada linha passa a dizer qual é o treinamento e quando ele entrou na etapa, também no **Exportar Excel**.
 
 - 🆕 **Copiar o link do ticket** — Em **Tickets**, o ticket aberto ganhou o botão **Copiar link**, ao lado de **E-mail**. O aviso de ticket criado também traz o botão. Quem recebe o link e ainda não entrou no sistema faz o login e cai direto no ticket, em vez de parar na tela inicial. O link não abre nada sozinho: quem não tem acesso àquele ticket vê o aviso "Este ticket não existe ou você não tem acesso a ele.", em vez de uma tela em branco.
 
@@ -36,8 +38,6 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 - 🆕 **Fixar conversas no topo do Chat** — No **Chat**, passe o mouse sobre uma conversa e clique na setinha ao lado do horário (ou use o botão direito) para **Fixar conversa**. Ela sobe para o bloco **Fixadas**, no topo da lista, marcada com um alfinete. Vale para conversas individuais e grupos, continua fixada mesmo depois de encerrada e cada pessoa tem a sua própria lista, com até 5 conversas. A fixada aparece no topo das abas em que ela já estaria; a aba **Fila** mantém a ordem de chegada.
 
 - 🆕 **Visão 360° do colaborador** — No menu do usuário, no canto inferior esquerdo, ao lado de **Preferências** e **Notificações**, há a nova opção **Visão 360°**. Ela mostra o status da pessoa naquele momento (online, em pausa, chats em andamento, fila e tickets abertos), uma **nota de desempenho de 0 a 100** e os principais números do período: atendimentos encerrados, CSAT, 1ª resposta, tempo médio, resolvidos no 1º contato e tickets resolvidos, cada um comparado com a média do setor e com a posição no ranking. O operador vê só a própria visão, o head vê a equipe do setor dele e o administrador vê todos.
-
-### 28/09
 
 - 🆕 **No telefone, dá para mover a jornada de etapa pelo próprio cartão** — No **Implantação** pelo celular, arrastar o cartão nunca funcionou: arrastar é coisa de mouse. Agora cada cartão traz o botão **Mover**, que abre a lista de etapas do pipeline e leva a jornada para a escolhida. Vale nos três quadros — Onboarding, Implantação e Acompanhamento — e segue as mesmas regras de sempre: checklist obrigatório continua barrando a passagem, e a coluna de conclusão da Implantação não aparece na lista, porque o go-live é dado pelo ticket com todos os treinamentos encerrados. No computador nada muda: arrastar continua sendo o caminho.
 
