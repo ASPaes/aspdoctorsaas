@@ -27,6 +27,7 @@ import TempoDeEntregaSection from "./TempoDeEntregaSection";
 import PermanenciaSection from "./PermanenciaSection";
 import { useJourneyNames } from "./useJourneyNames";
 import { useOnboardingDashFilters } from "./useOnboardingDashFilters";
+import { condutorNoFiltro } from "./dashFilters";
 import { pct, separarJornadas, contarDeListas, listarSituacao, agregarTreinos, desfechoTreino } from "./dashMetrics";
 import type { LinhaJornada } from "./jornadaLinha";
 
@@ -379,6 +380,9 @@ export default function OnboardingDashboardPage() {
       const d = new Date(ref).getTime();
       if (d < from || d > to) return false;
       if (t.journey_id == null || !allowedJourneyIds.has(t.journey_id)) return false;
+      // Filtro de pessoa também recorta a MEDIDA: na jornada do Jonathan cabem treinos
+      // da Geovanna, e contá-los como dele confundia quem lia a tabela.
+      if (!condutorNoFiltro(dashFilters.filtro, t.conduzido_por)) return false;
       // O filtro de tipo recorta a MEDIDA: escolher "Treinamento PDV" e continuar
       // somando as sessões de Estoque da mesma jornada seria responder outra pergunta.
       if (tipoTreinoIds.length > 0) {
@@ -386,7 +390,7 @@ export default function OnboardingDashboardPage() {
       }
       return true;
     });
-  }, [trainingsAllQ.data, dateRange, allowedJourneyIds, tipoTreinoIds]);
+  }, [trainingsAllQ.data, dateRange, allowedJourneyIds, tipoTreinoIds, dashFilters.filtro]);
 
   // Resolver nomes via profiles → funcionarios. Entra quem conduziu o treino e também
   // quem encerrou o sub-ticket: a lista de desistências mostra os dois.

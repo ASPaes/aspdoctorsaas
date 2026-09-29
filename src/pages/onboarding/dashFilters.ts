@@ -93,6 +93,21 @@ export function filtrarJornadas(
   return out;
 }
 
+/**
+ * Recorte da MEDIDA de treino por pessoa. Escolher a jornada não basta: a jornada de
+ * um implantador tem treinos conduzidos por outros, e o filtro do Jonathan mostrava
+ * sessões da Geovanna no drill-down (medido em set/26: das 47 sessões realizadas nas
+ * jornadas dele, 27 eram dele).
+ *
+ * Responsável e Participante recortam pelo mesmo campo — quem CONDUZIU. Com os dois
+ * preenchidos vale a união: a interseção de duas pessoas diferentes seria sempre vazia.
+ */
+export function condutorNoFiltro(filtro: FiltroDash, conduzidoPor: string | null): boolean {
+  const pessoas = [...filtro.responsavelIds, ...filtro.participanteIds];
+  if (pessoas.length === 0) return true;
+  return conduzidoPor != null && pessoas.includes(conduzidoPor);
+}
+
 /* ---------- recorte por pipeline ---------- */
 
 /**

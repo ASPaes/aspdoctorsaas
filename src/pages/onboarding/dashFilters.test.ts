@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  filtrarJornadas, filtroAtivo, pipelineSelecionado, fasesDosPipelines,
+  filtrarJornadas, filtroAtivo, pipelineSelecionado, fasesDosPipelines, condutorNoFiltro,
   FILTRO_VAZIO, type JourneyFiltravel,
 } from "./dashFilters";
 
@@ -127,5 +127,33 @@ describe("fasesDosPipelines", () => {
 
   it("pipeline desconhecido não inventa fase", () => {
     expect([...fasesDosPipelines(["desconhecido"], fasePorPipeline)!]).toEqual([]);
+  });
+});
+
+describe("condutorNoFiltro", () => {
+  it("sem pessoa no filtro, todo treino passa — inclusive sem condutor", () => {
+    expect(condutorNoFiltro(FILTRO_VAZIO, "u1")).toBe(true);
+    expect(condutorNoFiltro(FILTRO_VAZIO, null)).toBe(true);
+    expect(condutorNoFiltro({ ...FILTRO_VAZIO, tipoTreinoIds: ["t1"] }, "u1")).toBe(true);
+  });
+
+  it("filtro de responsável conta só o treino que a pessoa conduziu", () => {
+    const f = { ...FILTRO_VAZIO, responsavelIds: ["u1"] };
+    expect(condutorNoFiltro(f, "u1")).toBe(true);
+    expect(condutorNoFiltro(f, "u2")).toBe(false);
+    expect(condutorNoFiltro(f, null)).toBe(false);
+  });
+
+  it("filtro de participante recorta do mesmo jeito", () => {
+    const f = { ...FILTRO_VAZIO, participanteIds: ["u9"] };
+    expect(condutorNoFiltro(f, "u9")).toBe(true);
+    expect(condutorNoFiltro(f, "u1")).toBe(false);
+  });
+
+  it("responsável e participante juntos: vale quem estiver em qualquer um dos dois", () => {
+    const f = { ...FILTRO_VAZIO, responsavelIds: ["u1"], participanteIds: ["u9"] };
+    expect(condutorNoFiltro(f, "u1")).toBe(true);
+    expect(condutorNoFiltro(f, "u9")).toBe(true);
+    expect(condutorNoFiltro(f, "u2")).toBe(false);
   });
 });
