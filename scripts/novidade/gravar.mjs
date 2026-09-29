@@ -21,6 +21,9 @@
 //     { "digitar": { "seletor": "#busca", "texto": "e-mail", "limpar": true }, "legenda": "..." }
 //   ]
 // }
+// "contexto": { "userAgent": "...", "permissoes": ["notifications"] } vale para a
+// sessao inteira. Um passo pode conceder no meio com "permitir": ["notifications"].
+//
 // Cada passo aceita: ir (rota), clicar (seletor), digitar, arrastar ({ seletor, dx, dy }:
 // segura o elemento e arrasta, ex.: o canto de redimensionar), tecla (ex.: "Escape"),
 // destacar (seletor), opcional (true: pula o passo se `clicar` não aparecer em 3s,
@@ -75,6 +78,10 @@ const browser = await chromium.launch({ executablePath: CHROME, headless: true }
 const context = await browser.newContext({
   viewport: { width: W, height: H },
   recordVideo: { dir: path.join(saida, ".video"), size: { width: W, height: H } },
+  // `contexto` no roteiro: userAgent (para telas que mudam por aparelho, como o
+  // convite de instalacao no iPhone) e permissoes ja concedidas na abertura.
+  ...(roteiro.contexto?.userAgent ? { userAgent: roteiro.contexto.userAgent } : {}),
+  ...(roteiro.contexto?.permissoes ? { permissions: roteiro.contexto.permissoes } : {}),
 });
 const page = await context.newPage();
 for (const sim of roteiro.simular ?? []) {
@@ -214,6 +221,13 @@ for (const p of roteiro.passos) {
     if (!vis) continue;
   }
   if (p.legenda) n++;
+  // `permitir` concede a permissao do navegador ANTES da acao do passo. E o que
+  // deixa gravar a faixa "Receba aviso de mensagem neste aparelho" e, no passo
+  // seguinte, a tela ja com o aviso permitido — no headless o dialogo do sistema
+  // nunca aparece, entao sem isto o clique em "Permitir" nao muda nada.
+  if (p.permitir) {
+    await context.grantPermissions(p.permitir, { origin: base });
+  }
   if (p.ir) {
     await page.goto(`${base}${p.ir}`);
     await page.waitForTimeout(2500);
