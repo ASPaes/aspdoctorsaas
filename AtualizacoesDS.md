@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 29/09
+
+- 🆕 **Visão 360° do colaborador** — No menu do usuário, no canto inferior esquerdo, ao lado de **Preferências** e **Notificações**, há a nova opção **Visão 360°**. Ela mostra o status da pessoa naquele momento (online, em pausa, chats em andamento, fila e tickets abertos), uma **nota de desempenho de 0 a 100** e os principais números do período: atendimentos encerrados, CSAT, 1ª resposta, tempo médio, resolvidos no 1º contato e tickets resolvidos, cada um comparado com a média do setor e com a posição no ranking. O operador vê só a própria visão, o head vê a equipe do setor dele e o administrador vê todos.
+
 ### 28/09
 
 - ⬆️ **Correções da Evolução DS com o mesmo visual das novidades** — Na **Evolução DS**, o quadro que reúne as correções do dia virou um cartão como os de novidades e melhorias: cada correção aparece com um ícone próprio, separada da seguinte, e o quadro indica quantos ajustes saíram naquele dia. Quando há correção que você ainda não viu, ele ganha a marca verde de **Novo para você**.
