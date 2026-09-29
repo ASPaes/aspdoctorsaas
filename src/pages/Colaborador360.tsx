@@ -1,4 +1,10 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { lazyWithReload } from "@/lib/staleChunkReload";
+import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { useAgentes360 } from "@/components/clientes/visao360/useVisao360";
+import { TicketsColaborador } from "@/components/colaborador360/TicketsColaborador";
 import { useSearchParams } from "react-router-dom";
 import { endOfDay, format, formatDistanceStrict, parseISO, startOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -11,8 +17,10 @@ import { NotaDoColaborador } from "@/components/colaborador360/NotaDoColaborador
 import { AtendimentosLista } from "@/components/clientes/visao360/Visao360Listas";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAtendimentosColaborador, useColaborador360, type Alvo360, type MembroEquipe360,
+  useAtendimentosColaborador, useColaborador360, useTicketsColaborador, type Alvo360, type MembroEquipe360,
 } from "@/components/colaborador360/useColaborador360";
+
+const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 import {
   calcularNota, fmtNum, fmtTempo, iniciais, posicao, statusAoVivo, vsTime,
   type Metricas360, type Time360,
@@ -32,8 +40,18 @@ export default function Colaborador360() {
   const m = alvo?.metricas ?? null;
   const nota = useMemo(() => calcularNota(m), [m]);
   const ats = useAtendimentosColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  const tks = useTicketsColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const agentes = useAgentes360(tid);
+  const qc = useQueryClient();
+  const [subAba, setSubAba] = useState("atendimentos");
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
-  const nomeAgente = useCallback((uid: string | null) => (uid && uid === alvo?.user_id ? alvo?.nome ?? null : null), [alvo]);
+  const [ticketAberto, setTicketAberto] = useState<string | null>(null);
+  const nomeAgente = useCallback(
+    (uid: string | null) => (uid ? agentes.data?.get(uid) ?? (uid === alvo?.user_id ? alvo?.nome ?? null : null) : null),
+    [agentes.data, alvo],
+  );
+  const ticketsAbertos = (tks.data ?? []).filter((t) => t.responsavel_user_id === alvo?.user_id && !t.status_final).length;
 
   const escolher = (id: string) => {
     const p = new URLSearchParams(params);
@@ -74,23 +92,43 @@ export default function Colaborador360() {
           <Topo alvo={alvo} nota={nota} carregando={q.isLoading} time={d?.time ?? null} />
           <Numeros m={m} t={d?.time ?? null} alvo={alvo} carregando={q.isLoading} />
           {alvo && (
-            <section className="grid gap-2">
-              <h2 className="sr-only">Atendimentos</h2>
-              {ats.isLoading ? (
-                <Skeleton className="h-64 w-full rounded-xl" />
-              ) : ats.isError ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar os atendimentos agora.</p>
-              ) : (
-                <AtendimentosLista
-                  atendimentos={ats.data ?? []}
-                  periodo={periodo}
-                  nomeAgente={nomeAgente}
-                  onAbrir={setAtendimentoAberto}
-                  rotuloPessoa="Cliente"
-                  comResumo={false}
-                />
-              )}
-            </section>
+            <Tabs value={subAba} onValueChange={setSubAba}>
+              <TabsList className="h-auto w-full justify-start gap-0.5 rounded-none border-b bg-transparent p-0">
+                <SubAba valor="atendimentos" qtd={ats.data?.length}>Atendimentos</SubAba>
+                <SubAba valor="tickets" qtd={tks.data ? ticketsAbertos : undefined}>Tickets</SubAba>
+              </TabsList>
+              <TabsContent value="atendimentos" className="mt-4">
+                {ats.isLoading ? (
+                  <Skeleton className="h-64 w-full rounded-xl" />
+                ) : ats.isError ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar os atendimentos agora.</p>
+                ) : (
+                  <AtendimentosLista
+                    atendimentos={ats.data ?? []}
+                    periodo={periodo}
+                    nomeAgente={nomeAgente}
+                    onAbrir={setAtendimentoAberto}
+                    rotuloPessoa="Cliente"
+                    comResumo={false}
+                  />
+                )}
+              </TabsContent>
+              <TabsContent value="tickets" className="mt-4">
+                {tks.isLoading ? (
+                  <Skeleton className="h-64 w-full rounded-xl" />
+                ) : tks.isError ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar os tickets agora.</p>
+                ) : (
+                  <TicketsColaborador
+                    tickets={tks.data ?? []}
+                    userId={alvo.user_id}
+                    periodo={periodo}
+                    nomeAgente={nomeAgente}
+                    onAbrir={setTicketAberto}
+                  />
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </>
       )}
@@ -100,7 +138,34 @@ export default function Colaborador360() {
         open={!!atendimentoAberto}
         onOpenChange={(o) => !o && setAtendimentoAberto(null)}
       />
+      <Suspense fallback={null}>
+        {ticketAberto && (
+          <SupportTicketDetailDialog
+            ticketId={ticketAberto}
+            open={!!ticketAberto}
+            onOpenChange={(o) => {
+              if (!o) {
+                setTicketAberto(null);
+                qc.invalidateQueries({ queryKey: ["colaborador-360-tickets"] });
+                qc.invalidateQueries({ queryKey: ["colaborador-360"] });
+              }
+            }}
+          />
+        )}
+      </Suspense>
     </div>
+  );
+}
+
+function SubAba({ valor, qtd, children }: { valor: string; qtd?: number; children: ReactNode }) {
+  return (
+    <TabsTrigger
+      value={valor}
+      className="gap-1.5 rounded-none border-b-2 border-transparent px-3 py-2.5 text-[13px] font-bold text-muted-foreground shadow-none data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+    >
+      {children}
+      {qtd != null && <span className="rounded-full bg-muted px-1.5 text-[10.5px] tabular-nums">{qtd}</span>}
+    </TabsTrigger>
   );
 }
 

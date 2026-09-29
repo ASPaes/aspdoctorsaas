@@ -45,6 +45,8 @@ export interface Ticket360 {
   status_final: boolean;
   categoria: string | null;
   responsavel_user_id: string | null;
+  /** Só na Visão 360° do colaborador: com o campo presente, a lista do cartão mostra a coluna Cliente. */
+  cliente?: string | null;
 }
 
 export interface Produto360 {

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
-import type { Atendimento360 } from "@/components/clientes/visao360/visao360Calc";
+import type { Atendimento360, Ticket360 } from "@/components/clientes/visao360/visao360Calc";
 import type { Metricas360, Time360 } from "./colaborador360Calc";
 
 export interface Alvo360 {
@@ -107,6 +107,60 @@ export function useAtendimentosColaborador(userId: string | null, de: Date, ate:
             rotulo_pessoa: cli ? cli.nome_fantasia || cli.razao_social || null : null,
           };
         });
+    },
+  });
+}
+
+export interface TicketColaborador extends Ticket360 {
+  criado_por: string | null;
+}
+
+const COLS_TICKET = `id, ticket_code, assunto, aberto_em, concluido_em, responsavel_user_id, criado_por,
+  ticket_statuses!support_tickets_status_id_fkey(name, color, is_terminal),
+  service_categories!support_tickets_category_id_fkey(nome),
+  clientes!support_tickets_cliente_fkey(nome_fantasia, razao_social)`;
+
+/**
+ * Tickets que interessam aos 3 cartões da aba: os abertos em que a pessoa é a
+ * responsável (sem olhar o período, ticket esquecido é o que precisa aparecer),
+ * os que ela concluiu no período e os que ela criou no período. Três consultas
+ * pelos índices de cada coluna, juntadas aqui.
+ */
+export function useTicketsColaborador(userId: string | null, de: Date, ate: Date, enabled: boolean) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery<TicketColaborador[]>({
+    queryKey: ["colaborador-360-tickets", tid, userId, de.toISOString(), ate.toISOString()],
+    enabled: enabled && !!userId,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const base = () => {
+        let q = (supabase.from("support_tickets") as any).select(COLS_TICKET).is("deleted_at", null);
+        if (tid) q = q.eq("tenant_id", tid);
+        return q;
+      };
+      const [abertos, concluidos, criados] = await Promise.all([
+        fetchAllRows<any>(() => base().eq("responsavel_user_id", userId).is("concluido_em", null).order("aberto_em", { ascending: false })),
+        fetchAllRows<any>(() => base().eq("responsavel_user_id", userId).gte("concluido_em", de.toISOString()).lte("concluido_em", ate.toISOString()).order("aberto_em", { ascending: false })),
+        fetchAllRows<any>(() => base().eq("criado_por", userId).gte("aberto_em", de.toISOString()).lte("aberto_em", ate.toISOString()).order("aberto_em", { ascending: false })),
+      ]);
+      const vistos = new Set<string>();
+      return [...abertos, ...concluidos, ...criados]
+        .filter((r) => (vistos.has(r.id) ? false : (vistos.add(r.id), true)))
+        .map((r) => ({
+          id: r.id,
+          ticket_code: r.ticket_code,
+          assunto: r.assunto,
+          aberto_em: r.aberto_em,
+          concluido_em: r.concluido_em,
+          status_nome: r.ticket_statuses?.name ?? null,
+          status_cor: r.ticket_statuses?.color ?? null,
+          // Mesma regra da Visão 360° do cliente: sem status, vale a data de conclusão.
+          status_final: r.ticket_statuses ? !!r.ticket_statuses.is_terminal : !!r.concluido_em,
+          categoria: r.service_categories?.nome ?? null,
+          responsavel_user_id: r.responsavel_user_id,
+          criado_por: r.criado_por,
+          cliente: r.clientes ? r.clientes.nome_fantasia || r.clientes.razao_social || null : null,
+        }));
     },
   });
 }

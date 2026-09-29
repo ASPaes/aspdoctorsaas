@@ -434,7 +434,7 @@ export function AvaliacoesLista({
  * Os tickets que formam o número de um cartão da aba Tickets. "Abrir ticket"
  * abre o detalhe por cima desta lista; fechar o detalhe volta para ela.
  */
-function TicketsDoCartao({
+export function TicketsDoCartao({
   cartao, onFechar, onAbrir, nomeAgente,
 }: {
   cartao: { titulo: string; itens: Ticket360[] } | null;
@@ -443,6 +443,7 @@ function TicketsDoCartao({
   nomeAgente: (uid: string | null) => string | null;
 }) {
   const itens = [...(cartao?.itens ?? [])].sort((a, b) => (b.aberto_em > a.aberto_em ? 1 : -1));
+  const comCliente = itens.some((t) => t.cliente !== undefined);
   return (
     <Dialog open={!!cartao} onOpenChange={(o) => !o && onFechar()}>
       <DialogContent className="max-h-[88vh] w-[96vw] max-w-6xl overflow-y-auto">
@@ -457,7 +458,9 @@ function TicketsDoCartao({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="whitespace-nowrap">Código</TableHead><TableHead className="whitespace-nowrap">Aberto em</TableHead><TableHead className="whitespace-nowrap">Assunto</TableHead>
+                  <TableHead className="whitespace-nowrap">Código</TableHead><TableHead className="whitespace-nowrap">Aberto em</TableHead>
+                  {comCliente && <TableHead className="whitespace-nowrap">Cliente</TableHead>}
+                  <TableHead className="whitespace-nowrap">Assunto</TableHead>
                   <TableHead className="whitespace-nowrap">Categoria</TableHead><TableHead className="whitespace-nowrap">Responsável</TableHead><TableHead className="whitespace-nowrap">Status</TableHead><TableHead />
                 </TableRow>
               </TableHeader>
@@ -466,6 +469,7 @@ function TicketsDoCartao({
                   <TableRow key={t.id}>
                     <TableCell className="whitespace-nowrap font-mono text-xs">{t.ticket_code ?? "—"}</TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">{format(parseISO(t.aberto_em), "dd/MM/yy")}</TableCell>
+                    {comCliente && <TableCell className="max-w-[180px] truncate" title={t.cliente ?? undefined}>{t.cliente ?? "Sem cliente"}</TableCell>}
                     <TableCell className="max-w-[220px] truncate" title={t.assunto}>{t.assunto}</TableCell>
                     <TableCell className="whitespace-nowrap">{t.categoria ?? "Sem categoria"}</TableCell>
                     <TableCell className="whitespace-nowrap">{nomeAgente(t.responsavel_user_id) ?? "—"}</TableCell>

@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- ⬆️ **Tickets da pessoa na Visão 360° do colaborador** — Na **Visão 360°** do menu do usuário, a nova aba **Tickets** mostra os tickets abertos com a pessoa, os resolvidos no período, os que ela abriu e os parados há mais de 7 dias. Clicar em qualquer um desses cartões abre a lista dos tickets, e o botão **Abrir ticket** abre o ticket completo ali mesmo: dá para mudar status, responsável e prioridade, registrar ocorrência e encerrar sem sair da tela.
+
 - ⬆️ **Lista de atendimentos na Visão 360° do colaborador** — Na **Visão 360°** do menu do usuário, abaixo dos números, aparece a lista de atendimentos da pessoa no período, com o cliente de cada um. Cada coluna pode ser ordenada e tem um funil para filtrar, por exemplo só os atendimentos de um cliente, de um assunto ou com nota baixa. Clicar no atendimento abre os detalhes.
 
 - 🆕 **Fixar conversas no topo do Chat** — No **Chat**, passe o mouse sobre uma conversa e clique na setinha ao lado do horário (ou use o botão direito) para **Fixar conversa**. Ela sobe para o bloco **Fixadas**, no topo da lista, marcada com um alfinete. Vale para conversas individuais e grupos, continua fixada mesmo depois de encerrada e cada pessoa tem a sua própria lista, com até 5 conversas. A fixada aparece no topo das abas em que ela já estaria; a aba **Fila** mantém a ordem de chegada.
