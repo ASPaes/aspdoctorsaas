@@ -1137,9 +1137,9 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_ag_frt: {
     title: "1ª Resposta",
-    definition: "Tempo mediano até a primeira resposta do agente ao cliente dentro de cada atendimento.",
+    definition: "Tempo mediano até a primeira resposta do agente ao cliente dentro de cada atendimento, contando só o horário de atendimento do setor.",
     why_it_matters: "É o silêncio inicial que o cliente mais percebe — define a primeira impressão do atendimento.",
-    formula: "mediana de first_response_time_seconds do agente, excluindo zeros e acima de 4h",
+    formula: "mediana de (1ª resposta − aberto) do agente em horário útil do setor, excluindo zeros e acima de 4h",
     market_benchmark: "Em chat, 1–2 min é o ideal de mercado.",
   },
   atendimento_ag_latencia: {
