@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- 🔧 **Histórico da latência abria na conversa errada** — Em **Atendimento › Dashboard › Agentes**, na latência de um agente, ao clicar numa resposta, o histórico do chat abria no começo da janela e mostrava outra troca de mensagens, que parecia desmentir o tempo da lista. Agora ele abre direto na mensagem medida e destaca as duas pontas: a mensagem do cliente ("Mensagem medida") e a resposta do agente ("Resposta medida").
+
 - 🔧 **Pessoa presa em duas áreas da jornada** — Em **Implantação**, na jornada aberta, o bloco **Responsável & participantes** mostrava o responsável em mais de uma área (por exemplo em **Onboarding** e em **Implantador**) e não deixava removê-lo de nenhuma delas. Agora dá para tirar a pessoa de uma área sem mexer nas outras; só a última área dela continua travada, porque o responsável precisa aparecer na lista. Trocar o responsável do treino também deixou de colocar a pessoa em **Onboarding** por engano: quem já participa da jornada não é repetido, e quem entra vai para a área do seu setor. Adicionar e remover participantes passa a ser só para administrador, head e o responsável da jornada.
 
 - 🆕 **Evolução DS no telefone** — A tela inicial do celular ganhou o atalho **Evolução DS**, que abre as novidades, melhorias e correções do sistema sem sair do aplicativo. O cartão mostra quantas você ainda não viu e **brilha enquanto houver novidade**, como o item do menu no computador; entrar já conta como visto. A tela foi acertada para o telefone: o destaque com vídeo, os filtros e a busca cabem na largura do aparelho, inclusive nos mais estreitos.
