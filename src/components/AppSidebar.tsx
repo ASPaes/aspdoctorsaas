@@ -4,7 +4,7 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { usePortao } from "@/hooks/usePortao";
 import { useOnboardingAccess } from "@/hooks/useOnboardingAccess";
 import { useFinanceiroAccess } from "@/hooks/useFinanceiroAccess";
-import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3, Wallet } from "lucide-react";
+import { Settings, LogOut, Crown, SlidersHorizontal, Activity, Ticket, Bell, Orbit, ChevronsUpDown, Sparkles, ChevronDown, Library, Building2, Rocket, BarChart3, Wallet } from "lucide-react";
 import { NAV_ITEMS } from "@/config/navItems";
 import { UserPreferencesDialog } from "@/components/UserPreferencesDialog";
 import { Logo } from "@/components/Logo";
@@ -453,6 +453,10 @@ export function AppSidebar() {
                 <DropdownMenuItem onClick={() => navigate("/configuracoes/notificacoes")}>
                   <Bell className="h-4 w-4 mr-2" />
                   Notificações
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate("/visao-360")}>
+                  <Orbit className="h-4 w-4 mr-2" />
+                  Visão 360°
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

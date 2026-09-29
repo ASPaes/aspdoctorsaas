@@ -58,6 +58,7 @@ const OnboardingDashboardPage = lazyWithReload(() => import("@/pages/onboarding/
 
 const SupportTickets = lazyWithReload(() => import("@/pages/SupportTickets"));
 const ConfiguracoesNotificacoes = lazyWithReload(() => import("@/pages/ConfiguracoesNotificacoes"));
+const Colaborador360 = lazyWithReload(() => import("@/pages/Colaborador360"));
 
 import SuperAdminGuard from "@/components/SuperAdminGuard";
 import OnboardingGuard from "@/components/OnboardingGuard";
@@ -132,6 +133,8 @@ const App = () => (
               <Route path="/financeiro" element={<RequirePermission resource="nav.financeiro"><FinanceiroGuard><Financeiro /></FinanceiroGuard></RequirePermission>} />
               <Route path="/configuracoes" element={<RequirePermission resource="nav.configuracoes"><Configuracoes /></RequirePermission>} />
               <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />
+              {/* Visão 360° do colaborador: sem RequirePermission. Todo usuário vê a própria; quem pode ver os outros é decidido na RPC get_colaborador_360. */}
+              <Route path="/visao-360" element={<Colaborador360 />} />
               <Route path="/settings/users" element={<Navigate to="/configuracoes?tab=usuarios" replace />} />
               <Route path="/customer-success" element={<RequirePermission resource="nav.customer_success"><CustomerSuccess /></RequirePermission>} />
               {/* O RequireRole saiu: ele anulava a permissão concedida — o admin liberava

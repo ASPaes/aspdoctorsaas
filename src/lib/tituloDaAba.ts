@@ -18,6 +18,7 @@ const TELAS: Array<[RegExp, string]> = [
   [/^\/emails$/, "E-mails"],
   [/^\/financeiro$/, "Financeiro"],
   [/^\/configuracoes\/notificacoes$/, "Notificações"],
+  [/^\/visao-360$/, "Visão 360°"],
   [/^\/configuracoes$/, "Configurações"],
   [/^\/customer-success$/, "Customer Success"],
   [/^\/atendimento\/dashboard$/, "Dashboard de Atendimento"],
