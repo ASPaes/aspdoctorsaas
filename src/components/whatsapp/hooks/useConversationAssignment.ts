@@ -243,6 +243,9 @@ export const useConversationAssignment = () => {
       queryClient.invalidateQueries({ queryKey: ['whatsapp', 'conversations'] });
       queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
       queryClient.invalidateQueries({ queryKey: ['conversation-assignment-history', res.conversationId] });
+      // Pill tem chave própria: sem isto a lista esvazia e a "Fila" segue
+      // contando o cliente que saiu do setor, até o próximo poll (60s).
+      queryClient.invalidateQueries({ queryKey: ['whatsapp', 'pill-counts'] });
       toast({
         title: "Setor alterado",
         description: res.departmentName
