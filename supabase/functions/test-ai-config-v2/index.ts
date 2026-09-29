@@ -2,6 +2,44 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.85.0";
 
 const FUNCTION_NAME = "test-ai-config-v2";
 
+// Erro HTTP do provedor, com o corpo cru para traduzirmos o motivo.
+class ProviderError extends Error {
+  constructor(public status: number, public body: string) {
+    super(`HTTP ${status}: ${body.slice(0, 200)}`);
+  }
+}
+
+// Traduz a falha do provedor para o admin saber o que fazer.
+function friendlyTestError(e: unknown, model: string): string {
+  if (!(e instanceof ProviderError)) {
+    return "Não foi possível conectar ao provedor. Verifique a URL e tente de novo.";
+  }
+  const { status } = e;
+  const body = e.body.toLowerCase();
+
+  if (body.includes("insufficient_quota") || body.includes("no credits") ||
+      body.includes("credit balance is too low")) {
+    return "A conta do provedor está sem créditos. Adicione créditos no painel de cobrança do provedor e teste de novo.";
+  }
+  if (status === 429 || body.includes("resource_exhausted")) {
+    return "O provedor recusou por limite de uso. Aguarde alguns minutos e teste de novo.";
+  }
+  if (status === 401 || body.includes("api_key_invalid") || body.includes("invalid api key") ||
+      body.includes("invalid_api_key") || body.includes("incorrect api key")) {
+    return "Chave de API inválida ou revogada. Confira a chave e salve de novo.";
+  }
+  if (status === 404 || body.includes("model_not_found") || body.includes("does not exist")) {
+    return `O modelo "${model}" não existe ou esta chave não tem acesso a ele. Escolha outro modelo.`;
+  }
+  if (status === 403) {
+    return "A chave não tem permissão para usar este modelo. Confira as permissões da chave no provedor.";
+  }
+  if (status >= 500) {
+    return "O provedor está instável agora. Tente de novo em alguns minutos.";
+  }
+  return `O provedor recusou a requisição (HTTP ${status}). Verifique a chave e o modelo.`;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -78,6 +116,7 @@ Deno.serve(async (req) => {
     const start = Date.now();
     let testOk = false;
     let testError: string | null = null;
+    let friendlyError: string | null = null;
     let modelUsed = model;
 
     try {
@@ -95,10 +134,7 @@ Deno.serve(async (req) => {
             max_completion_tokens: 10,
           }),
         });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
-        }
+        if (!res.ok) throw new ProviderError(res.status, await res.text());
         const data = await res.json();
         modelUsed = data.model || model;
         testOk = true;
@@ -108,10 +144,7 @@ Deno.serve(async (req) => {
           headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
           body: JSON.stringify({ model, max_tokens: 10, messages: [{ role: "user", content: testPrompt }] }),
         });
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
-        }
+        if (!res.ok) throw new ProviderError(res.status, await res.text());
         const data = await res.json();
         modelUsed = data.model || model;
         testOk = true;
@@ -121,10 +154,7 @@ Deno.serve(async (req) => {
           `https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${apiKey}`,
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: testPrompt }] }] }) }
         );
-        if (!res.ok) {
-          const errText = await res.text();
-          throw new Error(`HTTP ${res.status}: ${errText.slice(0, 200)}`);
-        }
+        if (!res.ok) throw new ProviderError(res.status, await res.text());
         await res.json();
         testOk = true;
       } else {
@@ -132,6 +162,7 @@ Deno.serve(async (req) => {
       }
     } catch (e: any) {
       testError = (e.message || "Erro desconhecido").slice(0, 500);
+      friendlyError = friendlyTestError(e, model);
       testOk = false;
     }
 
@@ -156,7 +187,7 @@ Deno.serve(async (req) => {
         latency_ms: latencyMs,
         model_used: modelUsed,
         provider_used: provider,
-        error_message: testOk ? null : "Falha ao conectar com o provedor. Verifique suas credenciais e modelo.",
+        error_message: testOk ? null : friendlyError,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

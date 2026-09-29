@@ -61,6 +61,9 @@ verify_jwt = false
 [functions.test-ai-config]
 verify_jwt = false
 
+[functions.test-ai-config-v2]
+verify_jwt = false
+
 [functions.check-csat-timeout]
 verify_jwt = false
 
