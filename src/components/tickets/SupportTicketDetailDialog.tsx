@@ -1909,6 +1909,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
   // DEM-0445: quem abre um link de ticket de outra empresa, ou de ticket
   // excluído, recebe zero linhas do RLS. Antes o modal abria em branco.
+  // Os botões do cabeçalho somem junto: sem ticket, nenhum deles tem o que fazer.
+  const semAcesso = !isLoading && !ticket;
   const semAcessoNode = (
     <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
       <Lock className="h-8 w-8 text-muted-foreground" />
@@ -2073,7 +2075,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 {ticket?.assunto || "Detalhes do ticket"}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className={`flex items-center gap-1.5 shrink-0 ${semAcesso ? "hidden" : ""}`}>
               <Button
                 size="sm"
                 variant="outline"
@@ -2199,7 +2201,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           </div>
 
           {/* Top strip */}
-          <div className="flex items-center gap-2 px-5 py-2.5 border-b flex-wrap shrink-0">
+          <div className={`flex items-center gap-2 px-5 py-2.5 border-b flex-wrap shrink-0 ${semAcesso ? "hidden" : ""}`}>
             {/* Prioridade — antes: sem restrição */}
             <Select
               value={ticket?.prioridade ?? ""}
