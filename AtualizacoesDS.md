@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- 🆕 **Copiar o link do ticket** — Em **Tickets**, o ticket aberto ganhou o botão **Copiar link**, ao lado de **E-mail**. O aviso de ticket criado também traz o botão. Quem recebe o link e ainda não entrou no sistema faz o login e cai direto no ticket, em vez de parar na tela inicial. O link não abre nada sozinho: quem não tem acesso àquele ticket vê o aviso "Este ticket não existe ou você não tem acesso a ele.", em vez de uma tela em branco.
+
 - ⬆️ **Transferir para outro setor quem ainda está na fila** — No **Chat**, quando o cliente escolhe o setor errado, dá para mandá-lo para o setor certo sem precisar assumir o atendimento antes. Com a conversa aberta na **Fila**, o botão de transferir aparece ao lado de **Assumir** e já abre na aba **Setor**. O cliente entra na fila do novo setor **na mesma posição em que estava**, sem voltar para o fim, e a conversa registra para qual setor foi e quem transferiu.
 
 - ⬆️ **Valor do contrato antes e depois na Aprovação OEM** — Em **Clientes › Aprovação OEM**, cada pedido que mexe no MRR passa a mostrar o **valor atual do contrato** e o **novo valor do contrato** se o pedido for aprovado, além do valor que entra ou sai. O novo valor aparece em verde quando o contrato sobe e em vermelho quando cai. Assim quem aprova vê o impacto inteiro no cliente sem precisar abrir a ficha.
