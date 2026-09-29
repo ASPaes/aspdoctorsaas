@@ -1760,9 +1760,10 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
     }
   }
 
-  // Quem pode trocar o papel de um participante: o responsavel pela jornada,
-  // admin/head, ou super admin. A regra tambem e aplicada dentro da RPC — isso
-  // aqui e so para nao mostrar um controle que vai falhar.
+  // Quem pode trocar o papel, adicionar ou remover participante: o responsavel pela
+  // jornada, admin/head, ou super admin. A regra tambem e aplicada no banco (RPC e
+  // RLS via fn_onb_pode_gerir_participantes, DEM-0469) — isso aqui e so para nao
+  // mostrar um controle que vai falhar.
   const podeEditarPapel =
     profile?.is_super_admin === true ||
     profile?.role === "admin" ||
@@ -3192,6 +3193,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             <ArrowRight className="h-3.5 w-3.5 mr-1" /> Transferir
                           </Button>
                         )}
+                        {podeEditarPapel && (
                         <Popover open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
                           <PopoverTrigger asChild>
                             <Button size="sm" variant="outline" className="h-7 text-xs">
@@ -3224,6 +3226,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                             <Button size="sm" className="w-full" onClick={handleAddParticipant}>Adicionar</Button>
                           </PopoverContent>
                         </Popover>
+                        )}
                         </div>
                       </div>
                       <div className="p-3 space-y-2">
@@ -3260,6 +3263,11 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                   // O responsavel e marcado onde ele estiver: a responsabilidade
                                   // nao depende mais do papel.
                                   const isResp = p.user_id === journey?.responsavel_user_id;
+                                  // So a ULTIMA linha do responsavel e intocavel: com ele em outro
+                                  // papel, tirar esta linha nao o some da lista (DEM-0469).
+                                  const travaRemocao =
+                                    isResp &&
+                                    (participantsQ.data ?? []).filter((x) => x.user_id === p.user_id).length <= 1;
                                   return (
                                   <div
                                     key={p.id}
@@ -3326,7 +3334,7 @@ export default function JourneyDetailSheet({ open, onOpenChange, journeyId, tena
                                         {role.nome}
                                       </Badge>
                                     )}
-                                    {isResp ? (
+                                    {!podeEditarPapel ? null : travaRemocao ? (
                                       // Remover o responsavel deixaria a jornada com um
                                       // responsavel que nao aparece na lista. Transfira antes.
                                       <span className="w-6 shrink-0" />
