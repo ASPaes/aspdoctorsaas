@@ -282,6 +282,7 @@ export function LatenciaAgenteDialog({ agente, onOpenChange }: Props) {
         conversationId={chatAberto?.conversation_id ?? null}
         attendanceCode={chatAberto ? `Respondeu em ${fmtDur(chatAberto.seg)} úteis` : ""}
         contactName={chatAberto?.contato}
+        destaque={chatAberto ? { de: chatAberto.cli_first, ate: chatAberto.agt_first } : null}
         openedAt={
           chatAberto ? new Date(new Date(chatAberto.cli_first).getTime() - 15 * 60_000).toISOString() : null
         }

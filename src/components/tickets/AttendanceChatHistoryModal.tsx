@@ -29,6 +29,9 @@ interface Props {
   openedAt: string | null;
   closedAt: string | null;
   csatRespondedAt?: string | null;
+  /** Par medido (bloco do cliente → primeira resposta do agente). Quando vem,
+   *  o histórico destaca as duas pontas e abre rolado até elas, em vez do topo. */
+  destaque?: { de: string; ate: string } | null;
 }
 
 function formatDateLabel(iso: string): string {
@@ -59,9 +62,13 @@ export function AttendanceChatHistoryModal({
   openedAt,
   closedAt,
   csatRespondedAt,
+  destaque,
 }: Props) {
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const focoRef = useRef<HTMLDivElement>(null);
+  const deMs = destaque ? new Date(destaque.de).getTime() : null;
+  const ateMs = destaque ? new Date(destaque.ate).getTime() : null;
 
   const { data: nextAttendanceStart } = useQuery({
     queryKey: ["next_attendance_start", conversationId, closedAt],
@@ -109,11 +116,20 @@ export function AttendanceChatHistoryModal({
     },
   });
 
+  // Primeira mensagem do par medido: é nela que o histórico abre.
+  const primeiroFocoId = useMemo(() => {
+    if (deMs === null) return null;
+    return messages.find((m: any) => !m.is_from_me && new Date(m.timestamp).getTime() >= deMs)?.id ?? null;
+  }, [messages, deMs]);
+
   useEffect(() => {
-    if (open && scrollRef.current) {
+    if (!open) return;
+    if (focoRef.current) {
+      focoRef.current.scrollIntoView({ block: "center" });
+    } else if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
-  }, [open, messages.length]);
+  }, [open, messages.length, primeiroFocoId]);
 
   const items = useMemo(() => {
     const result: Array<
@@ -226,6 +242,10 @@ export function AttendanceChatHistoryModal({
                 (!msg.sender_name && !msg.is_from_me && !msg.content?.trim() && !hasMedia);
               const isClient = !msg.is_from_me;
               const textContent = msg.content || "";
+              const ts = new Date(msg.timestamp).getTime();
+              const focoCliente =
+                deMs !== null && ateMs !== null && isClient && ts >= deMs && ts < ateMs;
+              const focoResposta = ateMs !== null && !isClient && ts === ateMs;
 
               if (isSystem) {
                 return (
@@ -246,18 +266,31 @@ export function AttendanceChatHistoryModal({
               return (
                 <div
                   key={item.key}
+                  ref={msg.id === primeiroFocoId ? focoRef : undefined}
                   className={cn(
                     "flex flex-col",
                     isClient ? "items-start" : "items-end",
                     tightTop ? "mt-0.5" : "mt-1.5"
                   )}
                 >
+                  {(msg.id === primeiroFocoId || focoResposta) && (
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium mb-0.5",
+                        focoResposta ? "text-primary" : "text-amber-500"
+                      )}
+                    >
+                      {focoResposta ? "Resposta medida" : "Mensagem medida"}
+                    </span>
+                  )}
                   <div
                     className={cn(
                       "max-w-[75%] p-2.5 rounded-lg",
                       isClient
                         ? "bg-muted/50 rounded-tl-sm"
-                        : "bg-primary/10 rounded-tr-sm ml-auto"
+                        : "bg-primary/10 rounded-tr-sm ml-auto",
+                      focoCliente && "ring-1 ring-amber-500/70",
+                      focoResposta && "ring-1 ring-primary/70"
                     )}
                   >
                     {showSender && msg.sender_name && (
