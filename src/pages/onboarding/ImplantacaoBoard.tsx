@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type DragEvent } from "react";
 import { usePortao } from "@/hooks/usePortao";
 import { useQueryClient } from "@tanstack/react-query";
+import { MenuMoverEtapa } from "./MenuMoverEtapa";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, CircleAlert, Clock, GraduationCap, Rocket, RotateCcw, Search, Ticket, Users, UserX } from "lucide-react";
@@ -720,6 +721,20 @@ export default function ImplantacaoBoard({
                               </span>
                             )}
                           </div>
+
+                          {/* No telefone o quadro mostra uma etapa por vez e arrastar nao
+                              funciona no toque. So as etapas do pipeline entram no menu: a
+                              coluna de conclusao nao aceita cartao solto — o go-live e dado
+                              pelo ticket, com todos os treinamentos encerrados. */}
+                          {etapaVisivelId && podeMover && (
+                            <div className="mt-2 flex justify-end border-t pt-2">
+                              <MenuMoverEtapa
+                                etapas={stages.map((s) => ({ id: s.id, nome: s.nome, cor: s.cor }))}
+                                etapaAtualId={t.current_stage_id}
+                                onMover={(destino) => handleDrop(t.training_id, destino, t.current_stage_id ?? "")}
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}

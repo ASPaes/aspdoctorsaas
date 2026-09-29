@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { useUserNames } from "@/hooks/useUserNames";
+import { MenuMoverEtapa } from "./MenuMoverEtapa";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Building2, CalendarDays, CheckCircle2 } from "lucide-react";
@@ -265,6 +266,18 @@ export default function AcompanhamentoBoard({
 
                         {t.descricao && (
                           <p className="text-[10px] text-muted-foreground truncate mt-1">{t.descricao}</p>
+                        )}
+
+                        {/* No telefone o quadro mostra uma etapa por vez e arrastar nao
+                            funciona no toque. Mesmo caminho do arrasto: handleDrop. */}
+                        {etapaVisivelId && podeMover && !encerrado && (
+                          <div className="mt-2 flex justify-end border-t pt-2">
+                            <MenuMoverEtapa
+                              etapas={stages.map((s) => ({ id: s.id, nome: s.nome, cor: s.cor }))}
+                              etapaAtualId={col.id}
+                              onMover={(destino) => handleDrop(t.id, destino)}
+                            />
+                          </div>
                         )}
                       </div>
                     );

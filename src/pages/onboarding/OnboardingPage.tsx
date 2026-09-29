@@ -27,6 +27,7 @@ import JourneyDetailSheet from "./JourneyDetailSheet";
 import { SaidaSemTreinoDialog } from "./SaidaSemTreinoDialog";
 import ImplantacaoBoard, { GOLIVE_COL_ID, type TrainingCardRow, type JornadaSemTreino } from "./ImplantacaoBoard";
 import AcompanhamentoBoard from "./AcompanhamentoBoard";
+import { MenuMoverEtapa } from "./MenuMoverEtapa";
 import { NewAcompanhamentoModal } from "@/components/tickets/NewAcompanhamentoModal";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import {
@@ -1515,6 +1516,20 @@ export default function OnboardingPage() {
                                 </span>
                               )}
                             </div>
+
+                            {/* No telefone o quadro mostra uma etapa por vez e arrastar nao
+                                funciona no toque: este menu e a unica forma de mover o cartao
+                                de dentro da lista. Chama o mesmo handleDrop do arrasto, com as
+                                mesmas validacoes. */}
+                            {etapaVisivelId && !concluida && !cancelada && (
+                              <div className="mt-2 flex justify-end border-t pt-2">
+                                <MenuMoverEtapa
+                                  etapas={etapasDoQuadro}
+                                  etapaAtualId={col.id}
+                                  onMover={(destino) => handleDrop(j.journey_id, destino, col.id)}
+                                />
+                              </div>
+                            )}
                           </div>
                         );
                       })
