@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useUnidadeFilter } from "@/contexts/UnidadeFilterContext";
 import { useClienteSearch } from "@/components/whatsapp/hooks/useClienteSearch";
+import { useUserDepartment } from "@/hooks/useUserDepartment";
+import { usePodeVerTodosSetores } from "@/hooks/usePodeVerTodosSetores";
 import { subDays } from "date-fns";
 import {
   Search, Inbox, SlidersHorizontal, X, Clock, MessageCircle, User,
@@ -231,6 +233,19 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const effectiveResolucaoFilter = embedded && resolucaoFilterOverride && resolucaoFilterOverride !== "all" ? resolucaoFilterOverride : resolucaoFilter;
   const effectiveTipoFilter = embedded && tipoFilterOverride && tipoFilterOverride !== "all" ? tipoFilterOverride : tipoFilter;
 
+  // DEM-0458: operador enxerga os atendimentos do SETOR dele, não só os que
+  // ele próprio atendeu — mesma regra da aba Lista. Sem setor, continua só os
+  // próprios. O setor vai nas duas consultas porque a RPC dos cards é
+  // SECURITY DEFINER e não passa pelo RLS: sem ele, os cards contariam o
+  // tenant inteiro e a lista só o setor.
+  const podeVerTodosSetores = usePodeVerTodosSetores();
+  const verTudo = isAdminOrHead || podeVerTodosSetores;
+  const { data: userDepartmentId, fetchStatus: userDeptFetchStatus } = useUserDepartment();
+  const escopoPronto = verTudo || userDeptFetchStatus === "idle";
+  const setorTravado = !verTudo && userDepartmentId ? userDepartmentId : null;
+  const donoTravado = !verTudo && !userDepartmentId && userId ? userId : null;
+  const deptConsulta = setorTravado ?? (effectiveDeptFilter !== "all" ? effectiveDeptFilter : null);
+
   const fromISO = dateRange.from.toISOString();
   const toDate = new Date(dateRange.to);
   toDate.setHours(23, 59, 59, 999);
@@ -240,8 +255,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   const searchParam = debouncedSearch.trim().length >= 2 ? debouncedSearch.trim().replace(/[%,()]/g, "") : null;
 
   const { data: metrics } = useQuery({
-    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, isAdminOrHead, userId, searchParam, clienteIdOverride ?? null, selectedUnidadeId],
-    enabled: !!tid,
+    queryKey: ["attendance_summary_metrics", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, setorTravado, donoTravado, searchParam, clienteIdOverride ?? null, selectedUnidadeId],
+    enabled: !!tid && escopoPronto,
     queryFn: async () => {
       const toEnd = new Date(dateRange.to);
       toEnd.setHours(23, 59, 59, 999);
@@ -249,8 +264,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         p_date_from: dateRange.from.toISOString(),
         p_date_to: toEnd.toISOString(),
         p_status: statusFilter !== "all" ? statusFilter : null,
-        p_agent_id: !isAdminOrHead && userId ? userId : (effectiveAgente !== "all" ? effectiveAgente : null),
-        p_department_id: effectiveDeptFilter !== "all" ? effectiveDeptFilter : null,
+        p_agent_id: donoTravado ?? (effectiveAgente !== "all" ? effectiveAgente : null),
+        p_department_id: deptConsulta,
         p_closure_type: effectiveClosureType !== "all" ? effectiveClosureType : null,
         p_tenant_id: tid,
         p_csat_filter: effectiveCsatFilter !== "all" ? effectiveCsatFilter : null,
@@ -280,8 +295,8 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
   });
 
   const { data: result, isLoading } = useQuery({
-    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, page, isAdminOrHead, userId, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
-    enabled: !!tid,
+    queryKey: ["attendances_list", tid, fromISO, toISO, statusFilter, effectiveAgente, effectiveDeptFilter, effectiveClosureType, effectiveCsatFilter, effectiveCsatScoreFilter, effectiveTicketFilter, effectiveSentimentFilter, effectiveInstanceFilter, effectiveResolucaoFilter, effectiveTipoFilter, page, setorTravado, donoTravado, debouncedSearch, clienteIdOverride ?? null, selectedUnidadeId],
+    enabled: !!tid && escopoPronto,
     queryFn: async () => {
       let q = (supabase.from("support_attendances" as any) as any)
         .select(`
@@ -304,7 +319,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
 
       if (statusFilter !== "all") q = q.eq("status", statusFilter);
       if (effectiveAgente !== "all") q = q.eq("assigned_to", effectiveAgente);
-      if (effectiveDeptFilter !== "all") q = q.eq("department_id", effectiveDeptFilter);
+      if (deptConsulta) q = q.eq("department_id", deptConsulta);
       if (effectiveClosureType !== "all") q = q.eq("closure_type", effectiveClosureType);
       if (effectiveCsatFilter === "sent") q = q.eq("csat_sent", true);
       if (effectiveCsatFilter === "not_sent") q = q.eq("csat_sent", false);
@@ -326,7 +341,7 @@ function AttendancesTab({ isAdminOrHead = true, isAdmin = false, userId = null, 
         const s = debouncedSearch.trim().replace(/[%,()]/g, "");
         q = q.or(`attendance_code.ilike.%${s}%,contact_name.ilike.%${s}%,contact_phone.ilike.%${s}%`);
       }
-      if (!isAdminOrHead && userId) q = q.eq("assigned_to", userId);
+      if (donoTravado) q = q.eq("assigned_to", donoTravado);
 
       const { data, error, count } = await q;
       if (error) throw error;
