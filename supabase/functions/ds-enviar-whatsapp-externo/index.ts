@@ -101,8 +101,22 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
 
   try {
-    const segredos = [Deno.env.get('DEVFLOW_WA_SECRET'), Deno.env.get('SITE_WA_SECRET')]
-      .filter((s): s is string => !!s);
+    // Cada parceiro tem segredo E tenant próprios: o segredo que assinou decide
+    // de qual tenant sai a mensagem. O site não consegue enviar pelo tenant do
+    // DoctorDev, nem o contrário.
+    const parceiros = [
+      {
+        nome: 'doctordev',
+        segredo: Deno.env.get('DEVFLOW_WA_SECRET'),
+        tenant: Deno.env.get('DEVFLOW_WA_TENANT_ID') || TENANT_ASP_PADRAO,
+      },
+      {
+        nome: 'site',
+        segredo: Deno.env.get('SITE_WA_SECRET'),
+        tenant: Deno.env.get('SITE_WA_TENANT_ID'),
+      },
+    ].filter((p) => !!p.segredo);
+    const segredos = parceiros.map((p) => p.segredo as string);
     if (segredos.length === 0) {
       console.error('[ds-enviar-whatsapp-externo] nenhum segredo configurado');
       return json({ ok: false, error: 'secret_nao_configurado' }, 500);
@@ -117,11 +131,11 @@ Deno.serve(async (req) => {
     const [payloadB64, assinatura] = token.split('.');
     if (!payloadB64 || !assinatura) return json({ ok: false, error: 'token_malformado' }, 400);
 
-    let confere = false;
-    for (const segredo of segredos) {
-      if (await assinaturaConfere(payloadB64, assinatura, segredo)) { confere = true; break; }
+    let parceiro: (typeof parceiros)[number] | null = null;
+    for (const p of parceiros) {
+      if (await assinaturaConfere(payloadB64, assinatura, p.segredo as string)) { parceiro = p; break; }
     }
-    if (!confere) {
+    if (!parceiro) {
       return json({ ok: false, error: 'assinatura_invalida' }, 401);
     }
 
@@ -159,7 +173,11 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     );
 
-    const tenantId = Deno.env.get('DEVFLOW_WA_TENANT_ID') || TENANT_ASP_PADRAO;
+    const tenantId = parceiro.tenant;
+    if (!tenantId) {
+      console.error(`[ds-enviar-whatsapp-externo] tenant do parceiro ${parceiro.nome} nao configurado`);
+      return json({ ok: false, error: `tenant_nao_configurado (${parceiro.nome})` }, 500);
+    }
     const preferida =
       typeof payload.instancia === 'string' && payload.instancia.trim()
         ? payload.instancia.trim()
