@@ -32,8 +32,9 @@ import {
   Loader2, Bot, MessageCircle, Plus, Calendar, Clock, Phone, User, Mail, Eye,
   TicketCheck, ArrowUpRight, Send, Headphones, MessageSquareText, Timer, Sparkles,
   Tag as TagIcon, X, ListChecks, Trash2, ChevronDown, Building2, MessageSquare, UserPlus, Rocket,
-  Check, Lock, RefreshCw,
+  Check, Lock, RefreshCw, Link2,
 } from "lucide-react";
+import { linkDoTicket } from "@/lib/linkDoTicket";
 import AcompanhamentoSection from "@/pages/onboarding/AcompanhamentoSection";
 
 
@@ -1906,6 +1907,29 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
     </div>
   );
 
+  // DEM-0445: quem abre um link de ticket de outra empresa, ou de ticket
+  // excluído, recebe zero linhas do RLS. Antes o modal abria em branco.
+  const semAcessoNode = (
+    <div className="flex flex-col items-center justify-center gap-2 py-16 px-6 text-center">
+      <Lock className="h-8 w-8 text-muted-foreground" />
+      <p className="text-sm font-medium">Este ticket não existe ou você não tem acesso a ele.</p>
+      <p className="text-xs text-muted-foreground">Confira se você entrou com o usuário certo.</p>
+    </div>
+  );
+
+  // DEM-0445: link direto, o mesmo que vai no e-mail de aviso
+  const copiarLink = async () => {
+    if (!ticket) return;
+    const link = linkDoTicket(ticket.id);
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success(`Link do ${ticket.ticket_code ?? "ticket"} copiado`);
+    } catch {
+      // navegador sem permissão de área de transferência: mostra para copiar à mão
+      toast(link, { description: "Não deu para copiar sozinho. Selecione o endereço acima.", duration: 15000 });
+    }
+  };
+
   const childDialog = (
     <CreateChildTicketDialog
       open={childOpen}
@@ -1964,7 +1988,16 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
         <Sheet open={open} onOpenChange={onOpenChange}>
           <SheetContent side="bottom" className="h-[95vh] p-0">
             <SheetHeader className="px-4 py-3 border-b">
-              <SheetTitle>Detalhes do Ticket</SheetTitle>
+              {/* pr-8: o X de fechar do Sheet fica no canto direito */}
+              <div className="flex items-center justify-between gap-2 pr-8">
+                <SheetTitle>Detalhes do Ticket</SheetTitle>
+                {ticket && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={copiarLink}>
+                    <Link2 className="h-3.5 w-3.5" />
+                    Copiar link
+                  </Button>
+                )}
+              </div>
             </SheetHeader>
             <div className="flex flex-col h-[calc(95vh-60px)]">
               {/* px-4 para bater com o p-4 do conteudo: com p-2 as abas ficavam 8px
@@ -1984,7 +2017,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
                 </Button>
               </div>
               <div className="flex-1 overflow-hidden">
-                {isLoading ? loadingNode : (
+                {isLoading ? loadingNode : !ticket ? semAcessoNode : (
                   <ScrollArea className="h-full">
                     {mobileView === "details"
                       ? <div className="p-4">{detailsContent}</div>
@@ -2059,6 +2092,16 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
               >
                 {envioEmail.verificando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
                 E-mail
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs gap-1.5"
+                onClick={copiarLink}
+                disabled={!ticket}
+              >
+                <Link2 className="h-3.5 w-3.5" />
+                Copiar link
               </Button>
               {/* antes: sem restrição */}
               {podeCriarTicket && (
@@ -2249,6 +2292,8 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
 
           {isLoading ? (
             <div className="flex-1 overflow-hidden px-6 py-4">{loadingNode}</div>
+          ) : !ticket ? (
+            <div className="flex-1 overflow-hidden">{semAcessoNode}</div>
           ) : (
             <div ref={containerRef} className="grid flex-1 overflow-hidden" style={{ gridTemplateColumns: `minmax(0, 1fr) auto min(${rightPanelWidth}px, max(220px, calc(100% - 368px)))` }}>
               <div className="p-4 space-y-4 overflow-y-auto">

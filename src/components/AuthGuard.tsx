@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Loader2 } from "lucide-react";
+import { guardarDestinoPosLogin } from "@/lib/destinoPosLogin";
 
 /** Routes that AuthGuard should NOT redirect away from */
 const ACCESS_STATUS_ROUTES = ["/access-pending", "/access-blocked", "/onboarding"];
@@ -13,9 +14,11 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !user) {
+      // DEM-0445: link de ticket aberto sem login volta para o ticket depois
+      guardarDestinoPosLogin(location.pathname + location.search);
       navigate("/login", { replace: true });
     }
-  }, [isLoading, user, navigate]);
+  }, [isLoading, user, navigate, location.pathname, location.search]);
 
   // Redirect based on profile / access_status
   useEffect(() => {

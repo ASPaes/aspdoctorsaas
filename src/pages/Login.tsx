@@ -18,6 +18,7 @@ import {
   isOutsideWindow,
   resumirIntervalos,
 } from "@/lib/accessWindow";
+import { consumirDestinoPosLogin } from "@/lib/destinoPosLogin";
 
 /** DEM-0415: por que a pessoa não entrou (ou foi desconectada). */
 type AvisoHorario = {
@@ -74,7 +75,7 @@ export default function Login() {
       return;
     }
     setLoading(false);
-    navigate("/clientes", { replace: true });
+    navigate(consumirDestinoPosLogin() ?? "/clientes", { replace: true });
   };
 
   const proximoAcesso = avisoHorario

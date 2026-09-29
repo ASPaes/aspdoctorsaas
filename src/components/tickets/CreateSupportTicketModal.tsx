@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { toast } from "sonner";
+import { linkDoTicket } from "@/lib/linkDoTicket";
 import { useClienteSearch, type ClienteSearchResult } from "@/components/whatsapp/hooks/useClienteSearch";
 import { SupportTicketDetailDialog } from "@/components/tickets/SupportTicketDetailDialog";
 import { ancoraTipoHorario } from "@/components/tickets/tipoHorarioAnchor";
@@ -1041,7 +1042,23 @@ export function CreateSupportTicketModal({
       toast.success(
         fromClosure && mode === "demanda_externa"
           ? "Ticket de demanda externa aberto!"
-          : "Ticket criado com sucesso"
+          : "Ticket criado com sucesso",
+        // DEM-0445: copiar o link sem precisar abrir o ticket
+        ticketId
+          ? {
+              duration: 8000,
+              action: {
+                label: "Copiar link",
+                onClick: () => {
+                  const link = linkDoTicket(ticketId!);
+                  navigator.clipboard.writeText(link).then(
+                    () => toast.success("Link copiado"),
+                    () => toast(link, { description: "Não deu para copiar sozinho. Selecione o endereço acima.", duration: 15000 }),
+                  );
+                },
+              },
+            }
+          : undefined,
       );
       onCreated?.();
 
