@@ -1,7 +1,14 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock, Moon } from "lucide-react";
+import { useState } from "react";
+import { Archive, CheckCheck, AlertTriangle, CalendarClock, Ban, Clock, Moon, Pin, PinOff, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatBRPhone } from "@/lib/phoneBR";
 
 import type { ConversationWithContact } from "../hooks/useWhatsAppConversations";
@@ -34,9 +41,17 @@ interface Props {
   queueSince?: string | null;
   /** Relógio da sidebar (tick de 5s). Evita um interval por item. */
   nowMs?: number;
+  /** DEM-0491 — fixada no topo pelo usuário logado. */
+  isPinned?: boolean;
+  /** Sem isto o menu do item não aparece (ex.: resultado de busca). */
+  onTogglePin?: () => void;
+  /** Limite de fixadas atingido: "Fixar" fica desabilitado. */
+  pinDisabled?: boolean;
 }
 
-export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos, deptReleasesOffHours, queuePosition, queueSince, nowMs }: Props) {
+export function ConversationItem({ conversation: conv, isSelected, onClick, instanceName, attendance, isAgentAlert, showDepartment, departmentName, produtos, deptReleasesOffHours, queuePosition, queueSince, nowMs, isPinned, onTogglePin, pinDisabled }: Props) {
+  // Controlado para o botão direito abrir o MESMO menu do ▾.
+  const [menuOpen, setMenuOpen] = useState(false);
   const contact = conv.contact;
   const name = contact?.name || (contact?.phone_number ? formatBRPhone(contact.phone_number) : "Desconhecido");
   const sentimentData = conv.sentiment as any;
@@ -222,14 +237,17 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
   return (
     <button
       onClick={onClick}
+      onContextMenu={onTogglePin ? (e) => { e.preventDefault(); setMenuOpen(true); } : undefined}
       className={cn(
         // Seleção precisa ser legível: `bg-accent` é o azul sólido #0EA5E9 e apagava
         // horário, preview e badges. Tinta leve + trilho na borda dá o mesmo sinal
         // sem competir com o texto.
-        "w-full grid gap-3 p-3 rounded-md text-left transition-colors border-l-[3px] border-l-transparent",
+        "group/conv w-full grid gap-3 p-3 rounded-md text-left transition-colors border-l-[3px] border-l-transparent",
         isSelected
           ? "bg-accent/30 border-l-accent hover:bg-accent/35 dark:bg-accent/[0.35] dark:hover:bg-accent/40"
           : "hover:bg-muted/60",
+        // Fixada: tinta leve para o bloco do topo se ler como bloco.
+        isPinned && !isSelected && "bg-muted/30",
         needsCSTicket && "ring-1 ring-destructive/40",
         hasBlock && "ring-1 ring-destructive/60 bg-destructive/5",
         !hasBlock && hasClientAlert && "ring-1 ring-amber-500/50 bg-amber-500/5",
@@ -349,12 +367,63 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
             <Clock className="h-3 w-3" />
             {waitLabel}
           </span>
-        ) : timeStr && (
-          <span className={cn(
-            "text-xs",
-            hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
-          )}>
-            {timeStr}
+        ) : (timeStr || onTogglePin) && (
+          <span className="inline-flex items-center gap-0.5">
+            {timeStr && (
+              <span className={cn(
+                "text-xs",
+                hasUnread ? "text-green-500 font-semibold" : "text-muted-foreground"
+              )}>
+                {timeStr}
+              </span>
+            )}
+            {onTogglePin && (
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                {/* span, não button: o item inteiro já é um <button> e botão
+                    dentro de botão é HTML inválido. Some no celular (sm:), onde
+                    o menu abre pelo toque longo. */}
+                <DropdownMenuTrigger asChild>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Opções da conversa"
+                    onClick={(e) => e.stopPropagation()}
+                    className={cn(
+                      "hidden sm:inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground transition-opacity",
+                      "hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                      menuOpen ? "opacity-100" : "opacity-0 group-hover/conv:opacity-100"
+                    )}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </span>
+                </DropdownMenuTrigger>
+                {/* O conteúdo vai para um portal, mas o evento sintético do React
+                    ainda borbulha até o <button> do item e abriria o chat. */}
+                <DropdownMenuContent
+                  align="end"
+                  className="w-52"
+                  onClick={(e) => e.stopPropagation()}
+                  onContextMenu={(e) => e.stopPropagation()}
+                >
+                  {isPinned ? (
+                    <DropdownMenuItem onSelect={() => onTogglePin()}>
+                      <PinOff className="h-4 w-4 mr-2" />
+                      Desafixar conversa
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem disabled={pinDisabled} onSelect={() => onTogglePin()}>
+                      <Pin className="h-4 w-4 mr-2" />
+                      Fixar conversa
+                    </DropdownMenuItem>
+                  )}
+                  {!isPinned && pinDisabled && (
+                    <p className="px-2 pb-1.5 text-[11px] text-muted-foreground">
+                      Você já tem 5 fixadas. Desafixe uma para fixar esta.
+                    </p>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </span>
         )}
         {isAgentAlert && (
@@ -379,6 +448,7 @@ export function ConversationItem({ conversation: conv, isSelected, onClick, inst
         {attendanceBadge}
         <div className="flex items-center gap-1">
           {conv.status === "archived" && <Archive className="h-3 w-3 text-muted-foreground" />}
+          {isPinned && <Pin aria-label="Fixada" className="h-3 w-3 text-muted-foreground" />}
           {hasUnread && (
             <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-green-500 text-white text-[10px] font-bold leading-none">
               {unreadCount > 99 ? "99+" : unreadCount}

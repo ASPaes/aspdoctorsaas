@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- 🆕 **Fixar conversas no topo do Chat** — No **Chat**, passe o mouse sobre uma conversa e clique na setinha ao lado do horário (ou use o botão direito) para **Fixar conversa**. Ela sobe para o bloco **Fixadas**, no topo da lista, marcada com um alfinete. Vale para conversas individuais e grupos, continua fixada mesmo depois de encerrada e cada pessoa tem a sua própria lista, com até 5 conversas. A fixada aparece no topo das abas em que ela já estaria; a aba **Fila** mantém a ordem de chegada.
+
 - 🆕 **Visão 360° do colaborador** — No menu do usuário, no canto inferior esquerdo, ao lado de **Preferências** e **Notificações**, há a nova opção **Visão 360°**. Ela mostra o status da pessoa naquele momento (online, em pausa, chats em andamento, fila e tickets abertos), uma **nota de desempenho de 0 a 100** e os principais números do período: atendimentos encerrados, CSAT, 1ª resposta, tempo médio, resolvidos no 1º contato e tickets resolvidos, cada um comparado com a média do setor e com a posição no ranking. O operador vê só a própria visão, o head vê a equipe do setor dele e o administrador vê todos.
 
 ### 28/09

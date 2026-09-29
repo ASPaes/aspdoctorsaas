@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2, RefreshCw } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2, RefreshCw, Pin } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 import { toast } from "sonner";
 import {
@@ -35,6 +35,7 @@ import { usePillCounts } from "../hooks/usePillCounts";
 import { useQueueAlertState } from "@/contexts/QueueAlertContext";
 import { useSupportDepartments } from "../hooks/useSupportDepartments";
 import { useContactProdutos } from "../hooks/useContactProdutos";
+import { useConversationPins } from "../hooks/useConversationPins";
 import { type ConversationStateRow } from "@/utils/whatsapp/conversationBucket";
 import { ConversationItem } from "./ConversationItem";
 import { ConversationFiltersPopover, type FiltersState } from "./ConversationFiltersPopover";
@@ -322,25 +323,29 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
     refetchIntervalMs: CADENCIA_SEGURANCA_MS,
   });
 
+  // DEM-0491 — fixadas do usuário logado (no máximo 5, por PK).
+  const { pinned, pinnedAt, togglePin, isFull: pinsFull } = useConversationPins();
+
   // Get attendance data for all loaded conversations (still used for ConversationItem display)
   const conversationIds = useMemo(() => {
     const baseIds = conversations.map(c => c.id);
     const searchIds = searchResults.map(c => c.id);
-    return [...new Set([...baseIds, ...searchIds])];
-  }, [conversations, searchResults]);
+    const pinnedIds = pinned.map(c => c.id);
+    return [...new Set([...baseIds, ...searchIds, ...pinnedIds])];
+  }, [conversations, searchResults, pinned]);
   const { attendanceMap } = useAttendanceStatus(conversationIds, true);
 
   // Produto (software) do cliente vinculado, para o badge ao lado do nome
   const contactsForProdutos = useMemo(() => {
     const byId = new Map<string, { id: string; cliente_id?: string | null }>();
-    [...conversations, ...searchResults].forEach((c) => {
+    [...conversations, ...searchResults, ...pinned].forEach((c) => {
       const contact = c.contact as any;
       if (contact?.id && !byId.has(contact.id)) {
         byId.set(contact.id, { id: contact.id, cliente_id: contact.cliente_id ?? null });
       }
     });
     return [...byId.values()];
-  }, [conversations, searchResults]);
+  }, [conversations, searchResults, pinned]);
   const { data: produtosByContact } = useContactProdutos(contactsForProdutos);
 
   const { stateMap, isLoading: isStatesLoading } = useConversationStates(conversationIds);
@@ -602,6 +607,48 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
     return result;
   }, [conversations, activePill, isQueuePill, queueLikePills, filters.sortBy, filters.instanceId, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, forcedConvId, attendanceMap, stateMap, selectedDepartmentId, filteredInstanceIds, getStateForConv, nowMs]);
 
+  // DEM-0491 — fixadas sobem ao topo, mas SÓ nas abas em que a conversa já
+  // apareceria (decisão do owner no mockup): grupo encerrado fixado aparece em
+  // Grupos e Todos, não em Atendendo.
+  //
+  // Fora da regra: a Fila (FIFO — fixada no topo mentiria sobre quem é o
+  // "Próximo"), a busca e a visão agrupada por operador.
+  const pinsApply = !isSearching && !isQueuePill && !isGroupedView;
+  const pinnedVisible = useMemo(() => {
+    if (!pinsApply || pinned.length === 0) return [];
+    const inList = new Map(filtered.map((c) => [c.id, c]));
+    // Filtros que a conversa fixada só pode provar passando pelo servidor: com
+    // eles ligados, vale só a fixada que já veio na página carregada.
+    const strictFilters =
+      !!filters.status || !!resolvedAssignedTo || resolvedUnassigned ||
+      !!filters.autoReplyDisabledOnly || !!filters.rulesDisabledOnly;
+    const out: ConversationWithContact[] = [];
+    for (const p of pinned) {
+      const loaded = inList.get(p.id);
+      if (loaded) { out.push(loaded); continue; }
+      if (strictFilters) continue;
+      // Fora da página carregada: mesma regra de aba que a RPC da lista aplica.
+      const isGroup = p.is_group === true;
+      if (isGroupsPill) {
+        if (!isGroup || (p as any).group_enabled === false) continue;
+      } else if (activePill !== "all") {
+        if (isGroup || p.bucket !== activePill) continue;
+      }
+      if (selectedDepartmentId && p.department_id && p.department_id !== selectedDepartmentId) continue;
+      if (!selectedDepartmentId && filteredInstanceIds && !filteredInstanceIds.includes(p.instance_id ?? "")) continue;
+      if (filters.instanceId && !isGroupsPill && !isGroup && p.instance_id !== filters.instanceId) continue;
+      if (unreadOnly && !(p.unread_count > 0)) continue;
+      out.push(p);
+    }
+    return out;
+  }, [pinsApply, pinned, filtered, filters.status, resolvedAssignedTo, resolvedUnassigned, filters.autoReplyDisabledOnly, filters.rulesDisabledOnly, isGroupsPill, activePill, selectedDepartmentId, filteredInstanceIds, filters.instanceId, unreadOnly]);
+
+  const unpinnedList = useMemo(() => {
+    if (pinnedVisible.length === 0) return filtered;
+    const ids = new Set(pinnedVisible.map((c) => c.id));
+    return filtered.filter((c) => !ids.has(c.id));
+  }, [filtered, pinnedVisible]);
+
   const agentGroups = useMemo(() => {
     if (!isGroupedView) return [];
     const groups = new Map<string, ConversationWithContact[]>();
@@ -765,8 +812,15 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
       departmentName={conv.department_id ? (departmentNameMap.get(conv.department_id) ?? null) : null}
       deptReleasesOffHours={conv.department_id ? (deptReleasesOffHoursMap.get(conv.department_id) ?? false) : false}
       produtos={conv.contact?.id ? produtosByContact?.get(conv.contact.id) : undefined}
+      isPinned={pinnedAt.has(conv.id)}
+      // Busca devolve linha parcial (sem tenant_id garantido): fixa-se pela lista.
+      onTogglePin={isSearching ? undefined : () => togglePin(conv)}
+      pinDisabled={pinsFull}
     />
   );
+
+  const sectionLabelClass =
+    "flex items-center gap-1.5 px-2 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground";
 
   return (
     <div className={cn("flex flex-col h-full", !isMobileVariant && "border-r border-border")}>
@@ -1043,7 +1097,7 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
               </div>
             ))}
           </div>
-        ) : (isSearching ? visibleSearchResults : filtered).length === 0 ? (
+        ) : (isSearching ? visibleSearchResults.length === 0 : filtered.length === 0 && pinnedVisible.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
             <MessageSquare className="h-10 w-10 mb-2 opacity-50" />
             <p className="text-sm">
@@ -1073,7 +1127,23 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
                     {!collapsedAgents.has(group.key) && group.convs.map(renderConversation)}
                   </div>
                 ))
-              : (isSearching ? visibleSearchResults : filtered).map(renderConversation)}
+              : isSearching
+                ? visibleSearchResults.map(renderConversation)
+                : pinnedVisible.length > 0
+                  ? (
+                    <>
+                      <div className={sectionLabelClass}>
+                        <Pin className="h-3 w-3" />
+                        Fixadas · {pinnedVisible.length}
+                      </div>
+                      {pinnedVisible.map((c) => renderConversation(c))}
+                      {unpinnedList.length > 0 && (
+                        <div className={cn(sectionLabelClass, "pt-2.5")}>Conversas</div>
+                      )}
+                      {unpinnedList.map((c) => renderConversation(c))}
+                    </>
+                  )
+                  : filtered.map(renderConversation)}
 
             {/* Paginação real: sem isto o servidor pagina e o usuário nunca passa
                 da primeira página — era assim que conversa encerrada antiga ficava
