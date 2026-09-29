@@ -17,6 +17,7 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_pede boolean; v_cliente uuid; v_ticket_jornada uuid; v_codigo text; v_res jsonb;
+  v_aberto uuid; v_condutor text; v_texto text;
 BEGIN
   -- só a TRANSIÇÃO para realizado; salvar o treino de novo não reabre nada
   IF NEW.status IS DISTINCT FROM 'realizado'::public.onb_treino_status THEN RETURN NEW; END IF;
@@ -33,11 +34,28 @@ BEGIN
     FROM public.onboarding_journeys j WHERE j.id = NEW.journey_id;
   IF v_cliente IS NULL THEN RETURN NEW; END IF;
 
-  -- Cliente já acompanhado: segue calado. Chamar a função de criação aqui gravaria um
-  -- "reforço" no acompanhamento a cada treino elegível da mesma jornada.
-  IF EXISTS (SELECT 1 FROM public.support_tickets tk
-              WHERE tk.tenant_id = NEW.tenant_id AND tk.cliente_id = v_cliente
-                AND tk.is_acompanhamento AND tk.concluido_em IS NULL AND tk.deleted_at IS NULL) THEN
+  -- Cliente já acompanhado: um cartão por cliente (decisão do Alexandre, 29/09). O novo
+  -- treino entra na linha do tempo do cartão aberto, com quem conduziu. Medido no dia: 12
+  -- de 81 clientes tiveram mais de um treino elegível, até 4 — abrir um cartão por treino
+  -- espalharia o mesmo cliente pelo quadro.
+  SELECT tk.id INTO v_aberto FROM public.support_tickets tk
+   WHERE tk.tenant_id = NEW.tenant_id AND tk.cliente_id = v_cliente
+     AND tk.is_acompanhamento AND tk.concluido_em IS NULL AND tk.deleted_at IS NULL
+   ORDER BY tk.aberto_em DESC LIMIT 1;
+
+  IF v_aberto IS NOT NULL THEN
+    SELECT f.nome INTO v_condutor
+      FROM public.profiles p JOIN public.funcionarios f ON f.id = p.funcionario_id
+     WHERE p.user_id = NEW.conduzido_por;
+    v_texto := 'Novo treino concluído: ' || COALESCE(NEW.titulo, '—')
+               || COALESCE(' · conduzido por ' || v_condutor, '');
+    -- voltar o treino para agendado e concluir de novo não repete a linha
+    IF NOT EXISTS (SELECT 1 FROM public.support_ticket_events e
+                    WHERE e.ticket_id = v_aberto AND e.event_type = 'acompanhamento_reforco'
+                      AND e.content = v_texto) THEN
+      INSERT INTO public.support_ticket_events (tenant_id, ticket_id, user_id, event_type, content)
+      VALUES (NEW.tenant_id, v_aberto, auth.uid(), 'acompanhamento_reforco', v_texto);
+    END IF;
     RETURN NEW;
   END IF;
 
