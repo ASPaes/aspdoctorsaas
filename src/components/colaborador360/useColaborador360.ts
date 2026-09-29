@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+import { normalizarJornada, type AtendimentoJornada } from "@/components/atendimento/useAtendimentoJornada";
 import type { Atendimento360, Ticket360 } from "@/components/clientes/visao360/visao360Calc";
 import type { Metricas360, Time360 } from "./colaborador360Calc";
 
@@ -161,6 +162,31 @@ export function useTicketsColaborador(userId: string | null, de: Date, ate: Date
           criado_por: r.criado_por,
           cliente: r.clientes ? r.clientes.nome_fantasia || r.clientes.razao_social || null : null,
         }));
+    },
+  });
+}
+
+/**
+ * Jornada e pausas da pessoa no período. Reusa `get_atendimento_jornada`, a
+ * mesma do Dashboard de Atendimento: operador que chama recebe sempre a
+ * própria jornada, admin e head recebem a do `p_agent_id` pedido.
+ */
+export function useJornadaColaborador(userId: string | null, de: Date, ate: Date, enabled: boolean) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery<AtendimentoJornada>({
+    queryKey: ["colaborador-360-jornada", tid, userId, de.toISOString(), ate.toISOString()],
+    enabled: enabled && !!userId,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data, error } = await (supabase.rpc as any)("get_atendimento_jornada", {
+        p_tenant_id: tid,
+        p_date_from: de.toISOString(),
+        p_date_to: ate.toISOString(),
+        p_department_id: null,
+        p_agent_id: userId,
+      });
+      if (error) throw error;
+      return normalizarJornada(data);
     },
   });
 }

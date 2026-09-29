@@ -339,12 +339,14 @@ export function TicketsLista({
 const COR_NOTA = ["#EF4444", "#F97316", "#F59E0B", "#86EFAC", "#22C55E"];
 
 export function AvaliacoesLista({
-  atendimentos, periodo, nomeAgente, onAbrir,
+  atendimentos, periodo, nomeAgente, onAbrir, comMeses = true,
 }: {
   atendimentos: Atendimento360[];
   periodo: Periodo;
   nomeAgente: (uid: string | null) => string | null;
   onAbrir: (id: string) => void;
+  /** Média dos últimos 12 meses. Some quando a lista só traz o período. */
+  comMeses?: boolean;
 }) {
   const k = kpisCsat(atendimentos, periodo);
   const avaliados = atendimentos
@@ -380,7 +382,7 @@ export function AvaliacoesLista({
                   <Estrelas nota={a.csat_score as number} />
                   <span className="text-xs text-muted-foreground">
                     {format(parseISO(a.csat_respondido_em ?? a.closed_at ?? a.opened_at), "dd/MM/yy")}
-                    {nomeAgente(a.assigned_to) ? ` · ${nomeAgente(a.assigned_to)}` : ""}
+                    {(a.rotulo_pessoa !== undefined ? a.rotulo_pessoa : nomeAgente(a.assigned_to)) ? ` · ${a.rotulo_pessoa !== undefined ? a.rotulo_pessoa : nomeAgente(a.assigned_to)}` : ""}
                     {a.attendance_code ? ` · ${a.attendance_code}` : ""}
                   </span>
                 </button>
@@ -406,7 +408,7 @@ export function AvaliacoesLista({
             ))}
           </div>
         </Cartao>
-        <Cartao titulo="Média por mês" sub="últimos 12 meses">
+        <Cartao titulo="Média por mês" sub="últimos 12 meses" className={cn(!comMeses && "hidden")}>
           <div className="flex h-32 items-end gap-1.5 px-4 pb-2">
             {meses.map((m) => (
               <div key={m.mes.toISOString()} className="flex h-full flex-1 flex-col items-center justify-end gap-1" title={m.media != null ? `${m.media.toFixed(1)} · ${m.qtd} avaliações` : "sem avaliação"}>

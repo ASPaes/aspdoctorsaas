@@ -112,72 +112,77 @@ export function useAtendimentoJornada() {
         p_agent_id: agentId ?? null,
       });
       if (error) throw error;
-      const d = (data ?? {}) as any;
-      const t = (d.totais ?? {}) as any;
-      return {
-        periodo: {
-          de: d.periodo?.de ?? null,
-          ate: d.periodo?.ate ?? null,
-          truncado_no_agora: b(d.periodo?.truncado_no_agora),
-        },
-        totais: {
-          agentes: n(t.agentes),
-          dias: n(t.dias),
-          pausas: n(t.pausas),
-          ativo_seg: n(t.ativo_seg),
-          pausa_seg: n(t.pausa_seg),
-          bruto_seg: n(t.bruto_seg),
-          ativo_est_seg: n(t.ativo_est_seg),
-          pausa_est_seg: n(t.pausa_est_seg),
-          dias_sem_entrada: n(t.dias_sem_entrada),
-          dias_sem_saida: n(t.dias_sem_saida),
-          dias_incompletos: n(t.dias_incompletos),
-        },
-        agentes: ((d.agentes ?? []) as any[]).map((r) => ({
-          user_id: String(r.user_id ?? ""),
-          nome: r.nome ?? "(sem nome)",
-          dias: n(r.dias),
-          pausas: n(r.pausas),
-          ativo_seg: n(r.ativo_seg),
-          pausa_seg: n(r.pausa_seg),
-          bruto_seg: n(r.bruto_seg),
-          est_seg: n(r.est_seg),
-          dias_incompletos: n(r.dias_incompletos),
-        })),
-        dias: ((d.dias ?? []) as any[]).map((r) => ({
-          user_id: String(r.user_id ?? ""),
-          nome: r.nome ?? "(sem nome)",
-          dia: String(r.dia ?? ""),
-          entrada: r.entrada ?? null,
-          saida: r.saida ?? null,
-          ativo_seg: n(r.ativo_seg),
-          pausa_seg: n(r.pausa_seg),
-          bruto_seg: n(r.bruto_seg),
-          pausas: n(r.pausas),
-          sem_entrada: b(r.sem_entrada),
-          sem_saida: b(r.sem_saida),
-          em_andamento: b(r.em_andamento),
-        })),
-        pausas: ((d.pausas ?? []) as any[]).map((r) => ({
-          user_id: String(r.user_id ?? ""),
-          nome: r.nome ?? "(sem nome)",
-          dia: String(r.dia ?? ""),
-          inicio: String(r.inicio ?? ""),
-          fim: r.fim ?? null,
-          segundos: n(r.segundos),
-          motivo: r.motivo ?? "Sem motivo",
-          previsto_min: r.previsto_min === null || r.previsto_min === undefined ? null : Number(r.previsto_min),
-          estimada: b(r.estimada),
-          em_andamento: b(r.em_andamento),
-        })),
-        motivos: ((d.motivos ?? []) as any[]).map((r) => ({
-          motivo: r.motivo ?? "Sem motivo",
-          pausas: n(r.pausas),
-          segundos: n(r.segundos),
-          media_seg: n(r.media_seg),
-        })),
-        pausas_limitadas: b(d.pausas_limitadas),
-      } as AtendimentoJornada;
+      return normalizarJornada(data);
     },
   });
+}
+
+/** Converte a resposta crua de `get_atendimento_jornada`. Usado também pela Visão 360° do colaborador. */
+export function normalizarJornada(data: unknown): AtendimentoJornada {
+  const d = (data ?? {}) as any;
+  const t = (d.totais ?? {}) as any;
+  return {
+    periodo: {
+      de: d.periodo?.de ?? null,
+      ate: d.periodo?.ate ?? null,
+      truncado_no_agora: b(d.periodo?.truncado_no_agora),
+    },
+    totais: {
+      agentes: n(t.agentes),
+      dias: n(t.dias),
+      pausas: n(t.pausas),
+      ativo_seg: n(t.ativo_seg),
+      pausa_seg: n(t.pausa_seg),
+      bruto_seg: n(t.bruto_seg),
+      ativo_est_seg: n(t.ativo_est_seg),
+      pausa_est_seg: n(t.pausa_est_seg),
+      dias_sem_entrada: n(t.dias_sem_entrada),
+      dias_sem_saida: n(t.dias_sem_saida),
+      dias_incompletos: n(t.dias_incompletos),
+    },
+    agentes: ((d.agentes ?? []) as any[]).map((r) => ({
+      user_id: String(r.user_id ?? ""),
+      nome: r.nome ?? "(sem nome)",
+      dias: n(r.dias),
+      pausas: n(r.pausas),
+      ativo_seg: n(r.ativo_seg),
+      pausa_seg: n(r.pausa_seg),
+      bruto_seg: n(r.bruto_seg),
+      est_seg: n(r.est_seg),
+      dias_incompletos: n(r.dias_incompletos),
+    })),
+    dias: ((d.dias ?? []) as any[]).map((r) => ({
+      user_id: String(r.user_id ?? ""),
+      nome: r.nome ?? "(sem nome)",
+      dia: String(r.dia ?? ""),
+      entrada: r.entrada ?? null,
+      saida: r.saida ?? null,
+      ativo_seg: n(r.ativo_seg),
+      pausa_seg: n(r.pausa_seg),
+      bruto_seg: n(r.bruto_seg),
+      pausas: n(r.pausas),
+      sem_entrada: b(r.sem_entrada),
+      sem_saida: b(r.sem_saida),
+      em_andamento: b(r.em_andamento),
+    })),
+    pausas: ((d.pausas ?? []) as any[]).map((r) => ({
+      user_id: String(r.user_id ?? ""),
+      nome: r.nome ?? "(sem nome)",
+      dia: String(r.dia ?? ""),
+      inicio: String(r.inicio ?? ""),
+      fim: r.fim ?? null,
+      segundos: n(r.segundos),
+      motivo: r.motivo ?? "Sem motivo",
+      previsto_min: r.previsto_min === null || r.previsto_min === undefined ? null : Number(r.previsto_min),
+      estimada: b(r.estimada),
+      em_andamento: b(r.em_andamento),
+    })),
+    motivos: ((d.motivos ?? []) as any[]).map((r) => ({
+      motivo: r.motivo ?? "Sem motivo",
+      pausas: n(r.pausas),
+      segundos: n(r.segundos),
+      media_seg: n(r.media_seg),
+    })),
+    pausas_limitadas: b(d.pausas_limitadas),
+  } as AtendimentoJornada;
 }

@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 29/09
 
+- ⬆️ **Visão geral, avaliações, jornada e linha do tempo na Visão 360° do colaborador** — A **Visão 360°** do menu do usuário ganhou quatro abas. **Visão geral** mostra o perfil de competências, o volume e o CSAT por semana, os dias e horários em que a pessoa mais atende, os assuntos que mais atende e o que os clientes comentaram. **Avaliações** traz cada nota com o comentário do cliente. **Jornada e pausas** mostra o tempo em expediente, as pausas por motivo e quanto passou do previsto. **Linha do tempo** junta tudo o que aconteceu no período, dia a dia. Acima das abas aparecem os pontos fortes e os pontos de atenção da pessoa, como "1ª resposta mais rápida do setor" ou "Pausas acima do previsto".
+
 - ⬆️ **Tickets da pessoa na Visão 360° do colaborador** — Na **Visão 360°** do menu do usuário, a nova aba **Tickets** mostra os tickets abertos com a pessoa, os resolvidos no período, os que ela abriu e os parados há mais de 7 dias. Clicar em qualquer um desses cartões abre a lista dos tickets, e o botão **Abrir ticket** abre o ticket completo ali mesmo: dá para mudar status, responsável e prioridade, registrar ocorrência e encerrar sem sair da tela.
 
 - ⬆️ **Lista de atendimentos na Visão 360° do colaborador** — Na **Visão 360°** do menu do usuário, abaixo dos números, aparece a lista de atendimentos da pessoa no período, com o cliente de cada um. Cada coluna pode ser ordenada e tem um funil para filtrar, por exemplo só os atendimentos de um cliente, de um assunto ou com nota baixa. Clicar no atendimento abre os detalhes.

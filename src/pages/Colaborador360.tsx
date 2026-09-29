@@ -14,17 +14,22 @@ import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePic
 import { cn } from "@/lib/utils";
 import { EASE } from "@/components/clientes/visao360/Visao360Ui";
 import { NotaDoColaborador } from "@/components/colaborador360/NotaDoColaborador";
-import { AtendimentosLista } from "@/components/clientes/visao360/Visao360Listas";
+import { AtendimentosLista, AvaliacoesLista } from "@/components/clientes/visao360/Visao360Listas";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAtendimentosColaborador, useColaborador360, useTicketsColaborador, type Alvo360, type MembroEquipe360,
+  useAtendimentosColaborador, useColaborador360, useJornadaColaborador, useTicketsColaborador,
+  type Alvo360, type MembroEquipe360,
 } from "@/components/colaborador360/useColaborador360";
-
-const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 import {
   calcularNota, fmtNum, fmtTempo, iniciais, posicao, statusAoVivo, vsTime,
   type Metricas360, type Time360,
 } from "@/components/colaborador360/colaborador360Calc";
+import { destaques, linhaDoTempo } from "@/components/colaborador360/colaborador360Analise";
+import { Destaques, VisaoGeralColaborador } from "@/components/colaborador360/VisaoGeralColaborador";
+import { JornadaColaborador } from "@/components/colaborador360/JornadaColaborador";
+import { LinhaDoTempoColaborador } from "@/components/colaborador360/LinhaDoTempoColaborador";
+
+const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 
 const periodoPadrao = (): PeriodoRange => ({ from: startOfDay(subDays(new Date(), 29)), to: endOfDay(new Date()) });
 
@@ -44,7 +49,8 @@ export default function Colaborador360() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const agentes = useAgentes360(tid);
   const qc = useQueryClient();
-  const [subAba, setSubAba] = useState("atendimentos");
+  const jor = useJornadaColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  const [subAba, setSubAba] = useState("geral");
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
   const nomeAgente = useCallback(
@@ -52,6 +58,17 @@ export default function Colaborador360() {
     [agentes.data, alvo],
   );
   const ticketsAbertos = (tks.data ?? []).filter((t) => t.responsavel_user_id === alvo?.user_id && !t.status_final).length;
+  const listaAts = useMemo(() => ats.data ?? [], [ats.data]);
+  const pontos = useMemo(() => {
+    const parados = (tks.data ?? []).filter((t) => t.responsavel_user_id === alvo?.user_id && !t.status_final
+      && Date.now() - new Date(t.aberto_em).getTime() > 7 * 86_400_000).length;
+    return destaques(m, listaAts, periodo.from, periodo.to, jor.data, parados);
+  }, [m, listaAts, periodo, jor.data, tks.data, alvo?.user_id]);
+  const dias = useMemo(
+    () => (alvo ? linhaDoTempo(listaAts, tks.data ?? [], jor.data, alvo.user_id, periodo.from, periodo.to) : []),
+    [alvo, listaAts, tks.data, jor.data, periodo],
+  );
+  const avaliacoes = listaAts.filter((a) => a.csat_score != null).length;
 
   const escolher = (id: string) => {
     const p = new URLSearchParams(params);
@@ -91,12 +108,37 @@ export default function Colaborador360() {
         <>
           <Topo alvo={alvo} nota={nota} carregando={q.isLoading} time={d?.time ?? null} />
           <Numeros m={m} t={d?.time ?? null} alvo={alvo} carregando={q.isLoading} />
+          {alvo && <Destaques itens={pontos} />}
           {alvo && (
             <Tabs value={subAba} onValueChange={setSubAba}>
-              <TabsList className="h-auto w-full justify-start gap-0.5 rounded-none border-b bg-transparent p-0">
+              <TabsList className="h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b bg-transparent p-0">
+                <SubAba valor="geral">Visão geral</SubAba>
                 <SubAba valor="atendimentos" qtd={ats.data?.length}>Atendimentos</SubAba>
+                <SubAba valor="avaliacoes" qtd={ats.data ? avaliacoes : undefined}>Avaliações</SubAba>
                 <SubAba valor="tickets" qtd={tks.data ? ticketsAbertos : undefined}>Tickets</SubAba>
+                <SubAba valor="jornada">Jornada e pausas</SubAba>
+                <SubAba valor="linha">Linha do tempo</SubAba>
               </TabsList>
+              <TabsContent value="geral" className="mt-4">
+                {ats.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
+                  <VisaoGeralColaborador nota={nota} ats={listaAts} de={periodo.from} ate={periodo.to} onAbrirAtendimento={setAtendimentoAberto} />
+                )}
+              </TabsContent>
+              <TabsContent value="avaliacoes" className="mt-4">
+                {ats.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
+                  <AvaliacoesLista atendimentos={listaAts} periodo={periodo} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} comMeses={false} />
+                )}
+              </TabsContent>
+              <TabsContent value="jornada" className="mt-4">
+                {jor.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : jor.isError ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar a jornada agora.</p>
+                ) : jor.data ? <JornadaColaborador jornada={jor.data} /> : null}
+              </TabsContent>
+              <TabsContent value="linha" className="mt-4">
+                {ats.isLoading || tks.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
+                  <LinhaDoTempoColaborador dias={dias} onAbrirAtendimento={setAtendimentoAberto} onAbrirTicket={setTicketAberto} />
+                )}
+              </TabsContent>
               <TabsContent value="atendimentos" className="mt-4">
                 {ats.isLoading ? (
                   <Skeleton className="h-64 w-full rounded-xl" />
