@@ -233,8 +233,11 @@ export default function ModulosDaVendaSection({
                           min={1}
                           className="h-8 text-center"
                           disabled={!on}
-                          value={on ? l.quantidade : ""}
-                          onChange={(e) => alterar(m.id, { quantidade: Math.max(1, Number(e.target.value) || 1) })}
+                          // Vazio enquanto se digita: forçar 1 aqui fazia "apagar e
+                          // digitar 2" virar 12. O mínimo de 1 vale ao gravar
+                          // (modulosParaGravar) e na conta do resumo.
+                          value={on ? (l.quantidade || "") : ""}
+                          onChange={(e) => alterar(m.id, { quantidade: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
                           aria-label={`Quantidade de ${m.nome}`}
                         />
                       </td>
