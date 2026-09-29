@@ -233,9 +233,28 @@
     transform: translateX(-100%);
     animation: evo-brilho 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
   }
+  /* O mesmo chamariz do item do menu, no card da tela inicial do telefone. O
+     fundo do .evo-pisca esta preso ao seletor do menu-button, entao aqui vale
+     so o contorno que respira — o card ja tem gradiente proprio. */
+  .evo-card-novo {
+    border-color: rgb(34 197 94 / 0.45);
+    animation: evo-respira 1.6s ease-in-out infinite;
+  }
+  .evo-card-novo::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: evo-brilho 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     [data-sidebar="menu-button"].evo-pisca, .evo-pisca::before { animation: none; }
     [data-sidebar="menu-button"].evo-pisca { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.55); }
+    .evo-card-novo, .evo-card-novo::before { animation: none; }
+    .evo-card-novo { box-shadow: 0 0 0 2px rgb(34 197 94 / 0.55); }
   }
 }
 

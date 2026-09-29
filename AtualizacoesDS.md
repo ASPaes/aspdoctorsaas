@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 29/09
+
+- 🆕 **Evolução DS no telefone** — A tela inicial do celular ganhou o atalho **Evolução DS**, que abre as novidades, melhorias e correções do sistema sem sair do aplicativo. O cartão mostra quantas você ainda não viu e **brilha enquanto houver novidade**, como o item do menu no computador; entrar já conta como visto. A tela foi acertada para o telefone: o destaque com vídeo, os filtros e a busca cabem na largura do aparelho, inclusive nos mais estreitos.
+
 ### 28/09
 
 - 🔧 **Cliente repetido no SLA por etapa da Implantação** — Em **Implantação › Dashboard**, na visão **Por etapa**, ao abrir a lista de uma etapa da Implantação (como **Treinamento Marcado**), o mesmo cliente aparecia duas vezes com tempos quase iguais: a mesma passagem era contada uma vez pela jornada e outra pelo treinamento. Agora cada passagem conta uma vez só, na visão **Por etapa** e na **Por responsável**, e as médias dessas etapas ficam corretas. Cliente com mais de um treinamento continua aparecendo uma vez por treinamento, e cada linha passa a dizer qual é o treinamento e quando ele entrou na etapa, também no **Exportar Excel**.

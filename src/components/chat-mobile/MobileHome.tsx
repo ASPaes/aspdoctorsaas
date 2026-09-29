@@ -1,9 +1,10 @@
 import { useNavigate } from "react-router-dom";
-import { MessageCircle, Ticket, KanbanSquare, Mail, TrendingUp } from "lucide-react";
+import { MessageCircle, Ticket, KanbanSquare, Mail, Sparkles, TrendingUp } from "lucide-react";
 import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
 import { usePortao } from "@/hooks/usePortao";
 import { cn } from "@/lib/utils";
 import { useContadoresDoMobile } from "./useContadoresDoMobile";
+import { useEvolucaoDS } from "@/hooks/useEvolucaoDS";
 
 /**
  * Tela inicial do telefone: a porta de entrada da versão mobile.
@@ -28,6 +29,13 @@ interface Atalho {
   contagem: number;
   /** Contagem informativa (cinza) em vez de pendência (vermelho). */
   calma?: boolean;
+  /** Novidade que a pessoa ainda não viu: o card respira, como o item do menu
+   *  no computador. Novidade é convite, não pendência — por isso não usa o selo
+   *  vermelho nem entra no mesmo tom dos outros. */
+  novidade?: boolean;
+  /** Ocupa a linha inteira, deitado. A Evolucao DS nao e um modulo de trabalho
+   *  como os outros quatro, e em coluna sobrava um buraco ao lado dela. */
+  largo?: boolean;
   liberado: boolean;
 }
 
@@ -42,6 +50,8 @@ export default function MobileHome() {
   const podeTickets = usePortao("tickets");
   const podeImplantacao = usePortao("nav.onboarding");
   const podeEmails = usePortao("nav.emails");
+  // Sem portão: a Evolução DS é para todo mundo, como no menu do computador.
+  const evolucao = useEvolucaoDS();
 
   const primeiroNome = (nomeExibido ?? "").split(" ")[0];
 
@@ -87,6 +97,19 @@ export default function MobileHome() {
       contagem: contadores.emails,
       liberado: podeEmails,
     },
+    {
+      chave: "evolucao",
+      titulo: "Evolução DS",
+      descricao: "O que mudou no sistema",
+      destino: "/evolucao",
+      icone: Sparkles,
+      cor: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+      contagem: evolucao.naoVistos,
+      calma: true,
+      novidade: evolucao.estado === "pisca",
+      largo: true,
+      liberado: true,
+    },
   ];
 
   const visiveis = atalhos.filter((a) => a.liberado);
@@ -121,9 +144,11 @@ export default function MobileHome() {
               type="button"
               onClick={() => navigate(a.destino)}
               className={cn(
-                "relative flex min-h-[124px] flex-col justify-between overflow-hidden rounded-2xl border border-border p-3.5 text-left",
+                "relative overflow-hidden rounded-2xl border border-border p-3.5 text-left",
+                a.largo ? "col-span-2 flex items-center" : "flex min-h-[124px] flex-col justify-between",
                 "bg-gradient-to-br from-card to-muted/40",
-                "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97]"
+                "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)] active:scale-[0.97]",
+                a.novidade && "evo-card-novo"
               )}
             >
               {/* spotlight */}
@@ -131,25 +156,39 @@ export default function MobileHome() {
                 className="pointer-events-none absolute -right-12 -top-14 h-36 w-36 rounded-full"
                 style={{ background: "radial-gradient(circle, rgba(255,255,255,.06), transparent 70%)" }}
               />
-              <div className="flex items-start justify-between">
-                <span className={cn("grid h-10 w-10 place-items-center rounded-xl border", a.cor)}>
+              <div className={cn(a.largo ? "flex w-full items-center gap-3" : "flex items-start justify-between")}>
+                <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl border", a.cor)}>
                   <Icone className="h-5 w-5" />
                 </span>
+                {a.largo && (
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-semibold">{a.titulo}</span>
+                    <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+                      {a.descricao}
+                    </span>
+                  </span>
+                )}
                 {a.contagem > 0 && (
                   <span
                     className={cn(
                       "grid h-[22px] min-w-[22px] place-items-center rounded-full px-1.5 text-[11px] font-bold",
-                      a.calma ? "bg-foreground/10 text-muted-foreground" : "bg-destructive text-destructive-foreground"
+                      a.novidade
+                        ? "bg-emerald-500 text-white"
+                        : a.calma
+                          ? "bg-foreground/10 text-muted-foreground"
+                          : "bg-destructive text-destructive-foreground"
                     )}
                   >
                     {a.contagem > 99 ? "99+" : a.contagem}
                   </span>
                 )}
               </div>
-              <div>
-                <h2 className="text-[15px] font-semibold">{a.titulo}</h2>
-                <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{a.descricao}</p>
-              </div>
+              {!a.largo && (
+                <div>
+                  <h2 className="text-[15px] font-semibold">{a.titulo}</h2>
+                  <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">{a.descricao}</p>
+                </div>
+              )}
             </button>
           );
         })}

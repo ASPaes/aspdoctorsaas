@@ -89,10 +89,17 @@ function BotaoComoFunciona({ item, onAbrir }: { item: ItemEvolucao; onAbrir: () 
     .filter(Boolean)
     .join(" · ");
   return (
-    <Button size="sm" onClick={onAbrir} className="bg-green-600 text-white hover:bg-green-700">
-      <PlayCircle className="mr-2 h-4 w-4" />
+    // "Ver como funciona · vídeo · N passos" nao cabe num aparelho de 320px, e o
+    // botao nasce com whitespace-nowrap: passava da borda. No estreito o complemento
+    // some e o rotulo pode quebrar.
+    <Button
+      size="sm"
+      onClick={onAbrir}
+      className="h-auto max-w-full whitespace-normal bg-green-600 py-1.5 text-left text-white hover:bg-green-700"
+    >
+      <PlayCircle className="mr-2 h-4 w-4 shrink-0" />
       Ver como funciona
-      <span className="ml-2 text-xs font-normal opacity-80">{partes}</span>
+      {partes && <span className="ml-2 hidden text-xs font-normal opacity-80 min-[360px]:inline">{partes}</span>}
     </Button>
   );
 }
@@ -343,19 +350,19 @@ export default function EvolucaoDS() {
       </header>
 
       {emDestaque && (
-        <section className="grid overflow-hidden rounded-2xl border bg-card md:grid-cols-[1.1fr_1fr]">
+        <section className="grid overflow-hidden rounded-2xl border bg-card md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           {emDestaque.video_url ? (
             <video
               src={emDestaque.video_url}
               controls
               playsInline
               preload="metadata"
-              className="aspect-video h-full w-full bg-slate-950 object-contain"
+              className="aspect-video h-full w-full min-w-0 bg-slate-950 object-contain"
             />
           ) : (
-            <img src={emDestaque.passo_a_passo?.[0]?.imagem_url} alt="" className="h-full w-full object-cover" />
+            <img src={emDestaque.passo_a_passo?.[0]?.imagem_url} alt="" className="h-full w-full min-w-0 object-cover" />
           )}
-          <div className="flex flex-col gap-2 p-5">
+          <div className="flex min-w-0 flex-col gap-2 p-5">
             <span className="inline-flex w-max items-center gap-1.5 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-950 dark:text-green-300">
               <Sparkles className="h-3 w-3" />
               Em destaque

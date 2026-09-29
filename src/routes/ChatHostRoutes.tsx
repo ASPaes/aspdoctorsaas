@@ -25,6 +25,7 @@ const WhatsAppContatos = lazyWithReload(() => import("@/pages/WhatsAppContatos")
 const SupportTickets = lazyWithReload(() => import("@/pages/SupportTickets"));
 const Emails = lazyWithReload(() => import("@/pages/Emails"));
 const OnboardingPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingPage"));
+const EvolucaoDS = lazyWithReload(() => import("@/pages/EvolucaoDS"));
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-background">
@@ -100,6 +101,12 @@ export default function ChatHostRoutes() {
               <Suspense fallback={<PageLoader />}><Emails /></Suspense>
             </RequirePermission>
           }
+        />
+        {/* Sem permissao: a Evolucao DS e para todo mundo, como no menu do
+            computador — e onde a pessoa descobre o que mudou no sistema. */}
+        <Route
+          path="/evolucao"
+          element={<Suspense fallback={<PageLoader />}><EvolucaoDS /></Suspense>}
         />
         <Route
           path="/whatsapp/contatos"
