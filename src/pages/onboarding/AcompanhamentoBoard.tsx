@@ -3,6 +3,7 @@ import { usePortao } from "@/hooks/usePortao";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+import { useUserNames } from "@/hooks/useUserNames";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { TrendingUp, Building2, CalendarDays, CheckCircle2 } from "lucide-react";
@@ -22,6 +23,7 @@ interface TicketRow {
   acompanhamento_stage_id: string | null;
   concluido_em: string | null;
   cliente_id: string | null;
+  responsavel_user_id: string | null;
   clientes?: { nome_fantasia: string | null; razao_social: string | null } | null;
 }
 
@@ -42,6 +44,8 @@ export default function AcompanhamentoBoard({
   stages,
   tenantId,
   busca,
+  responsavel = "todos",
+  onResponsaveisChange,
   onOpenTicket,
   onTotalChange,
   etapaVisivelId,
@@ -50,6 +54,11 @@ export default function AcompanhamentoBoard({
   stages: AcompanhamentoStage[];
   tenantId: string | null;
   busca: string;
+  /** user_id escolhido no filtro de responsável da página, ou "todos". */
+  responsavel?: string;
+  /** Quem é responsável por algum acompanhamento do quadro, para o filtro da página
+   *  listar só nomes que filtram alguma coisa aqui. */
+  onResponsaveisChange?: (opcoes: { id: string; nome: string }[]) => void;
   onOpenTicket: (ticketId: string) => void;
   /** Quantos tickets estão no quadro agora. Os tickets são buscados aqui dentro, então
    *  esta é a única forma de o cabeçalho da página mostrar o total desta jornada. */
@@ -70,7 +79,7 @@ export default function AcompanhamentoBoard({
     queryFn: async () =>
       fetchAllRows<TicketRow>(() =>
         (supabase.from("support_tickets" as any) as any)
-          .select("id, ticket_code, assunto, descricao, aberto_em, concluido_em, acompanhamento_stage_id, cliente_id, clientes:cliente_id(nome_fantasia, razao_social)")
+          .select("id, ticket_code, assunto, descricao, aberto_em, concluido_em, acompanhamento_stage_id, cliente_id, responsavel_user_id, clientes:cliente_id(nome_fantasia, razao_social)")
           .eq("tenant_id", tenantId)
           .eq("is_acompanhamento", true)
           .is("deleted_at", null)
@@ -81,18 +90,36 @@ export default function AcompanhamentoBoard({
       ),
   });
 
+  const { data: nomes = {} } = useUserNames(
+    tickets.map((t) => t.responsavel_user_id).filter((id): id is string => !!id),
+  );
+
+  const opcoesResponsavel = useMemo(() => {
+    const ids = Array.from(new Set(tickets.map((t) => t.responsavel_user_id).filter((id): id is string => !!id)));
+    return ids
+      .map((id) => ({ id, nome: nomes[id] || "—" }))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+  }, [tickets, nomes]);
+
+  useEffect(() => {
+    onResponsaveisChange?.(opcoesResponsavel);
+  }, [opcoesResponsavel, onResponsaveisChange]);
+
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return tickets;
     return tickets.filter((t) => {
+      if (responsavel !== "todos" && t.responsavel_user_id !== responsavel) return false;
+      if (!termo) return true;
       const cliente = t.clientes?.nome_fantasia || t.clientes?.razao_social || "";
+      const resp = t.responsavel_user_id ? nomes[t.responsavel_user_id] ?? "" : "";
       return (
         (t.ticket_code ?? "").toLowerCase().includes(termo) ||
         (t.assunto ?? "").toLowerCase().includes(termo) ||
-        cliente.toLowerCase().includes(termo)
+        cliente.toLowerCase().includes(termo) ||
+        resp.toLowerCase().includes(termo)
       );
     });
-  }, [tickets, busca]);
+  }, [tickets, busca, responsavel, nomes]);
 
   const porEtapa = useMemo(() => {
     const m: Record<string, TicketRow[]> = {};
@@ -226,6 +253,14 @@ export default function AcompanhamentoBoard({
                         <p className="text-xs text-foreground truncate flex items-center gap-1">
                           <Building2 className="h-3 w-3 shrink-0 text-muted-foreground" />
                           {cliente}
+                        </p>
+
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                          {t.responsavel_user_id ? (
+                            <>Resp.: {nomes[t.responsavel_user_id] ?? "…"}</>
+                          ) : (
+                            <span className="text-amber-500/90">Sem responsável</span>
+                          )}
                         </p>
 
                         {t.descricao && (

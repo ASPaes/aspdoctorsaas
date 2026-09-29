@@ -565,7 +565,12 @@ export default function OnboardingPage() {
   /** Na Implantação quem importa é quem CONDUZ o treinamento, não o responsável da
    *  jornada — era exatamente esse o furo: um especialista com seis treinamentos
    *  marcados não se achava no filtro porque a jornada tinha outro dono. */
+  /** No Acompanhamento o cartão é um ticket, buscado dentro do próprio quadro — é ele
+   *  quem diz quais responsáveis existem ali. */
+  const [acompResponsaveis, setAcompResponsaveis] = useState<{ id: string; nome: string }[]>([]);
+
   const opcoesResponsavel = useMemo(() => {
+    if (isAcompanhamento) return acompResponsaveis;
     const seen = new Map<string, string>();
     if (isImplantacao) {
       trainingCards.forEach((t) => {
@@ -582,7 +587,7 @@ export default function OnboardingPage() {
     return Array.from(seen.entries())
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [journeys, trainingCards, isImplantacao]);
+  }, [journeys, trainingCards, isImplantacao, isAcompanhamento, acompResponsaveis]);
 
   const opcoesDemanda = useMemo(() => {
     const seen = new Map<string, string>();
@@ -1314,6 +1319,8 @@ export default function OnboardingPage() {
           stages={stages}
           tenantId={effectiveTenantId}
           busca={busca}
+          responsavel={filtroResponsavel}
+          onResponsaveisChange={setAcompResponsaveis}
           onOpenTicket={setAcompTicketId}
           onTotalChange={setTotalAcompanhamento}
           etapaVisivelId={etapaVisivelId}
