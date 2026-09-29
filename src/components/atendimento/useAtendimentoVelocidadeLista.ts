@@ -19,7 +19,10 @@ export interface VelocidadeItem {
   departamento: string | null;
   agente: string | null;
   is_group: boolean;
+  /** TME, 1ª resposta e TMR: em horário útil do setor (DEM-0460). */
   seg: number;
+  /** O mesmo tempo no relógio de parede. Difere de `seg` quando houve espera fora do expediente. */
+  seg_corrido: number;
   /** false = acima do teto da métrica, fora do cálculo da mediana e do p90. */
   no_calculo: boolean;
 }
@@ -36,6 +39,8 @@ export interface AtendimentoVelocidadeLista {
   total_fora_cap: number;
   /** `total_base - total_lista`: sem tempo para mostrar (ex: assumido na hora). */
   total_sem_valor: number;
+  /** Parte do `total_sem_valor`: esperou só fora do expediente, então o tempo útil é 0. */
+  total_fora_expediente: number;
   p50: number | null;
   p90: number | null;
   truncado: boolean;
@@ -90,6 +95,7 @@ export function useAtendimentoVelocidadeLista(
         total_no_calculo: Number(d.total_no_calculo ?? 0),
         total_fora_cap: Number(d.total_fora_cap ?? 0),
         total_sem_valor: Number(d.total_sem_valor ?? 0),
+        total_fora_expediente: Number(d.total_fora_expediente ?? 0),
         p50: num(d.p50),
         p90: num(d.p90),
         truncado: d.truncado === true,
@@ -106,6 +112,7 @@ export function useAtendimentoVelocidadeLista(
           agente: i.agente ?? null,
           is_group: i.is_group === true,
           seg: Number(i.seg ?? 0),
+          seg_corrido: Number(i.seg_corrido ?? i.seg ?? 0),
           no_calculo: i.no_calculo !== false,
         })),
       } as AtendimentoVelocidadeLista;

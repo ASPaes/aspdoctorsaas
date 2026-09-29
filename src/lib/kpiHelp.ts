@@ -1009,15 +1009,15 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   // ── Atendimento — Velocidade / SLA ──
   atendimento_tme: {
     title: "Tempo de Espera (TME)",
-    definition: "Quanto tempo o cliente fica na fila até um agente assumir. Conta tanto quem assume pela tela quanto quem responde direto pelo WhatsApp do celular. Mostramos a mediana (p50) e a cauda (p90).",
+    definition: "Quanto tempo o cliente fica na fila até um agente assumir, contando só o horário de atendimento do setor. Mensagem que chega antes de abrir começa a contar na abertura. Conta tanto quem assume pela tela quanto quem responde direto pelo WhatsApp do celular. Mostramos a mediana (p50) e a cauda (p90).",
     why_it_matters: "Fila longa frustra e gera abandono. A mediana mostra o típico; o p90 mostra o pior caso recorrente.",
-    formula: "mediana e p90 de (assumido − aberto), excluindo zeros e outliers acima de 2h",
+    formula: "mediana e p90 de (assumido − aberto) em horário útil do setor, excluindo zeros e outliers acima de 2h",
   },
   atendimento_frt: {
     title: "1ª Resposta",
-    definition: "Tempo até a primeira resposta de um agente ao cliente — pela tela ou pelo WhatsApp do celular, conta igual. A saudação automática não conta. Mediana (p50) e cauda (p90).",
+    definition: "Tempo até a primeira resposta de um agente ao cliente, contando só o horário de atendimento do setor. Pela tela ou pelo WhatsApp do celular, conta igual. A saudação automática não conta. Mediana (p50) e cauda (p90).",
     why_it_matters: "É a métrica de SLA que o cliente mais percebe — o silêncio inicial define a impressão do atendimento.",
-    formula: "mediana e p90 de first_response_time_seconds, excluindo zeros e outliers acima de 4h",
+    formula: "mediana e p90 de (1ª resposta − aberto) em horário útil do setor, excluindo zeros e outliers acima de 4h",
     market_benchmark: "Em chat, 1–2 min é o ideal de mercado; em suporte técnico B2B, alguns minutos é realista.",
   },
   atendimento_tma: {
@@ -1028,7 +1028,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
   },
   atendimento_tmr: {
     title: "Tempo de Resolução (TMR)",
-    definition: "Tempo total da abertura ao encerramento da conversa. Mediana (p50) e p90.",
+    definition: "Tempo total da abertura ao encerramento da conversa. A espera na fila conta só o horário de atendimento do setor. Mediana (p50) e p90.",
     why_it_matters: "É o tempo que o cliente espera até o problema acabar — resolução ponta a ponta.",
     formula: "mediana e p90 de (encerrado − aberto), excluindo outliers acima de 10h (conversa largada)",
   },

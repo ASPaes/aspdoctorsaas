@@ -27,13 +27,13 @@ const TEXTOS: Record<VelocidadeMetrica, {
 }> = {
   tme: {
     titulo: "TME por atendimento",
-    descricao: "Espera da abertura até alguém assumir, nos filtros do período.",
+    descricao: "Espera da abertura até alguém assumir, só no horário de atendimento do setor, nos filtros do período.",
     coluna: "Espera",
     semValor: "assumidos na hora, sem espera",
   },
   frt: {
     titulo: "1ª Resposta por atendimento",
-    descricao: "Da abertura até a primeira resposta do agente, nos filtros do período.",
+    descricao: "Da abertura até a primeira resposta do agente, só no horário de atendimento do setor, nos filtros do período.",
     coluna: "1ª resposta",
     semValor: "sem 1ª resposta registrada",
   },
@@ -45,7 +45,7 @@ const TEXTOS: Record<VelocidadeMetrica, {
   },
   tmr: {
     titulo: "TMR por atendimento",
-    descricao: "Espera mais atendimento, da abertura ao encerramento, nos filtros do período.",
+    descricao: "Espera (só no horário de atendimento do setor) mais atendimento, nos filtros do período.",
     coluna: "Resolução",
     semValor: "sem tempo registrado",
   },
@@ -128,6 +128,9 @@ export function VelocidadeListaDialog({ metrica, onOpenChange }: Props) {
                 {data.total_sem_valor > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] tabular-nums text-muted-foreground">
                     <b className="font-semibold">{n(data.total_sem_valor)}</b> {t?.semValor}
+                    {data.total_fora_expediente > 0 && (
+                      <> · {n(data.total_fora_expediente)} só fora do expediente</>
+                    )}
                   </span>
                 )}
               </div>
@@ -187,6 +190,14 @@ export function VelocidadeListaDialog({ metrica, onOpenChange }: Props) {
                           {!it.no_calculo && (
                             <span className="block text-[9px] font-medium uppercase tracking-wide text-amber-600/75 dark:text-amber-400/75">
                               fora do cálculo
+                            </span>
+                          )}
+                          {it.seg_corrido - it.seg >= 60 && (
+                            <span
+                              className="block text-[10px] tabular-nums text-muted-foreground"
+                              title="Tempo no relógio, contando o período fora do expediente"
+                            >
+                              {fmtEspera(it.seg_corrido)} no relógio
                             </span>
                           )}
                         </td>
