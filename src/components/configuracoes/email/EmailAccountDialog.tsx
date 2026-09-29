@@ -11,7 +11,7 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, ChevronDown, ImagePlus, Loader2, PenLine, Plug, Trash2 } from "lucide-react";
+import { Ban, BookOpen, ChevronDown, ImagePlus, Loader2, PenLine, Plug, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -24,6 +24,7 @@ import { AgentMultiSelect } from "@/components/configuracoes/whatsapp/AgentMulti
 import {
   useAssinaturaDaConta, type AssinaturaImagem, type EmailAccount, type EmailAccountInput,
 } from "./useEmailAccounts";
+import { CORES_DA_CAIXA, type CorModo } from "@/components/emails/corDaCaixa";
 
 interface Props {
   open: boolean;
@@ -65,6 +66,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
   const [receberRespostas, setReceberRespostas] = useState(false);
   const [aceitarCliente, setAceitarCliente] = useState(false);
   const [descartarAutomaticos, setDescartarAutomaticos] = useState(true);
+  const [cor, setCor] = useState<string | null>(null);
+  const [corModo, setCorModo] = useState<CorModo>("email");
   const [assinaturaTexto, setAssinaturaTexto] = useState("");
   const [assinaturaImagem, setAssinaturaImagem] = useState<AssinaturaImagem | null>(null);
   const assinaturaQuery = useAssinaturaDaConta(open ? account?.id ?? null : null);
@@ -98,6 +101,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setReceberRespostas(account.receber_respostas ?? false);
       setAceitarCliente(account.aceitar_cliente_cadastrado ?? false);
       setDescartarAutomaticos(account.descartar_automaticos ?? true);
+      setCor(account.cor ?? null);
+      setCorModo(account.cor_modo === "linha" ? "linha" : "email");
       // conta que já falhou abre com o guia à vista
       setGuiaAberto(account.last_test_ok === false || guiaAbreSozinho(account.provider));
     } else {
@@ -121,6 +126,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
       setReceberRespostas(false);
       setAceitarCliente(false);
       setDescartarAutomaticos(true);
+      setCor(null);
+      setCorModo("email");
       setGuiaAberto(guiaAbreSozinho("gmail"));
     }
     setServidoresAbertos(true);
@@ -225,6 +232,8 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
         receber_respostas: temEntrada && receberRespostas,
         aceitar_cliente_cadastrado: temEntrada && receberRespostas && aceitarCliente,
         descartar_automaticos: descartarAutomaticos,
+        cor,
+        cor_modo: corModo,
         // assinatura que não carregou fica como está: salvar vazio apagaria a que existe
         assinatura: carregandoAssinatura || assinaturaQuery.isError
           ? undefined
@@ -288,6 +297,77 @@ export function EmailAccountDialog({ open, onOpenChange, account, setores, onSav
                   rotuloContagem={(n) => (n === 1 ? "1 usuário vinculado" : `${n} usuários vinculados`)}
                 />
                 <p className="text-xs text-muted-foreground">Opcional. Quem usa esta conta no dia a dia.</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Aparência na lista (DEM-0497) */}
+          <section className="space-y-3">
+            <div className="space-y-0.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aparência na lista</p>
+              <p className="text-xs text-muted-foreground">
+                Opcional. Ajuda a separar à primeira vista os e-mails desta caixa em Recebidos e Enviados.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Cor</Label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Cor da caixa">
+                <button
+                  type="button"
+                  onClick={() => setCor(null)}
+                  aria-pressed={!cor}
+                  title="Sem cor"
+                  className={cn(
+                    "flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-muted-foreground/60 text-muted-foreground",
+                    !cor && "ring-2 ring-muted-foreground ring-offset-2 ring-offset-background",
+                  )}
+                >
+                  <Ban className="h-3.5 w-3.5" />
+                </button>
+                {CORES_DA_CAIXA.map((c) => {
+                  const marcada = cor?.toUpperCase() === c.hex;
+                  return (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      onClick={() => setCor(c.hex)}
+                      aria-pressed={marcada}
+                      title={c.nome}
+                      aria-label={c.nome}
+                      className="h-7 w-7 rounded-full ring-offset-2 ring-offset-background"
+                      style={{ background: c.hex, boxShadow: marcada ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${c.hex}` : undefined }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+            <div className={cn("space-y-1.5", !cor && "pointer-events-none opacity-40")}>
+              <Label>Onde mostrar a cor</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {(
+                  [
+                    { v: "linha", titulo: "Linha inteira", texto: "A linha toda do e-mail fica na cor." },
+                    { v: "email", titulo: "Só no e-mail", texto: "Só o endereço fica na cor. O resto não muda." },
+                  ] as const
+                ).map((m) => {
+                  const marcado = corModo === m.v;
+                  return (
+                    <button
+                      key={m.v}
+                      type="button"
+                      onClick={() => setCorModo(m.v)}
+                      aria-pressed={marcado}
+                      disabled={!cor}
+                      className={cn(
+                        "flex flex-col items-start gap-0.5 rounded-md border px-3 py-2.5 text-left transition-colors",
+                        marcado ? "border-primary bg-primary/10 ring-1 ring-primary" : "border-border hover:bg-muted/60",
+                      )}
+                    >
+                      <span className="text-sm font-medium">{m.titulo}</span>
+                      <span className="text-xs text-muted-foreground">{m.texto}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </section>

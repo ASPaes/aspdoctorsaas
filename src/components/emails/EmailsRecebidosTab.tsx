@@ -32,6 +32,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
 import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { FiltroMulti } from "./FiltroMulti";
+import { estiloDaCaixa } from "./corDaCaixa";
 import { useOpcoesFiltro } from "./useEmailsEnviados";
 import {
   OPCOES_ACAO, POR_PAGINA_RECEBIDOS, ROTULO_ACAO, nomeDoClienteRecebido, useContagemRecebidos, useEmailsRecebidos,
@@ -305,7 +306,7 @@ export default function EmailsRecebidosTab() {
         <FiltroMulti
           rotulo="Caixa"
           icone={<Mail className="h-3.5 w-3.5 text-muted-foreground" />}
-          opcoes={contas.map((c) => ({ id: c.id, label: c.rotulo, detalhe: c.email }))}
+          opcoes={contas.map((c) => ({ id: c.id, label: c.rotulo, detalhe: c.email, cor: c.cor }))}
           value={filtros.contas}
           onChange={(v) => mudarFiltro({ contas: v })}
         />
@@ -358,7 +359,15 @@ export default function EmailsRecebidosTab() {
       {caixasLendo.length > 0 && (
         <p className="text-xs text-muted-foreground">
           Lendo {caixasLendo.length} caixa{caixasLendo.length === 1 ? "" : "s"}:{" "}
-          {caixasLendo.map((c: any) => c.rotulo).join(", ")}
+          {caixasLendo.map((c: any, i: number) => (
+            <span key={c.id}>
+              {i > 0 && ", "}
+              {c.cor && (
+                <span className="mr-1 inline-block h-2 w-2 rounded-full align-middle" style={{ background: c.cor }} aria-hidden />
+              )}
+              {c.rotulo}
+            </span>
+          ))}
           {caixasLendo.some((c: any) => c.ultimo_erro) && (
             <span className="ml-1 text-destructive">
               · erro na última leitura: {caixasLendo.find((c: any) => c.ultimo_erro)?.ultimo_erro}
@@ -450,11 +459,13 @@ export default function EmailsRecebidosTab() {
             const distingueLido = !filtros.lixeira && !filtros.arquivadas;
             const naoLido = distingueLido && !linha.lido_em;
             const temAnexo = Array.isArray(linha.anexos) && linha.anexos.length > 0;
+            const corCaixa = estiloDaCaixa(linha.email_accounts);
             return (
               <div
                 key={linha.id}
                 role="button"
                 tabIndex={0}
+                style={{ ...corCaixa.linha, ...corCaixa.faixa }}
                 onClick={() => setLendo(linha.id)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLendo(linha.id); } }}
                 className={cn(
@@ -465,7 +476,10 @@ export default function EmailsRecebidosTab() {
               >
                 <div className="flex items-baseline gap-2">
                   {naoLido && <span className="h-2 w-2 shrink-0 rounded-full bg-primary" aria-label="ainda não aberto" />}
-                  <span className={cn("min-w-0 flex-1 truncate text-sm", naoLido && "font-semibold text-foreground")}>
+                  <span
+                    className={cn("min-w-0 flex-1 truncate text-sm", naoLido && "font-semibold text-foreground", corCaixa.email && "rounded px-1.5")}
+                    style={corCaixa.email}
+                  >
                     {linha.de_nome || linha.de_email}
                   </span>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{quando}</span>
@@ -581,9 +595,11 @@ export default function EmailsRecebidosTab() {
                 const distingueLido = !filtros.lixeira && !filtros.arquivadas;
                 const naoLido = distingueLido && !linha.lido_em;
                 const lido = distingueLido && !!linha.lido_em;
+                const corCaixa = estiloDaCaixa(linha.email_accounts, selecionados.includes(linha.id));
                 return (
                   <TableRow
                     key={linha.id}
+                    style={corCaixa.linha}
                     className={cn(
                       selecionados.includes(linha.id) && "bg-accent/10",
                       naTriagem && "bg-warning/5",
@@ -593,7 +609,7 @@ export default function EmailsRecebidosTab() {
                     )}
                   >
                     {ehAdmin && (
-                      <TableCell className="align-top">
+                      <TableCell className="align-top" style={corCaixa.faixa}>
                         {ligado ? (
                           <TooltipProvider>
                             <Tooltip>
@@ -618,7 +634,10 @@ export default function EmailsRecebidosTab() {
                         )}
                       </TableCell>
                     )}
-                    <TableCell className={cn("whitespace-nowrap align-top font-mono text-xs", naoLido && "font-semibold text-foreground")}>
+                    <TableCell
+                      className={cn("whitespace-nowrap align-top font-mono text-xs", naoLido && "font-semibold text-foreground")}
+                      style={ehAdmin ? undefined : corCaixa.faixa}
+                    >
                       {dia}
                       <span className={cn("block", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{hora}</span>
                     </TableCell>
@@ -641,10 +660,16 @@ export default function EmailsRecebidosTab() {
                       {naTriagem && podeTriar && <CaixaTriagem linha={linha} setores={setores} />}
                     </TableCell>
                     <TableCell className="max-w-[190px] align-top">
-                      <span className={cn("block truncate font-mono text-xs", naoLido && "font-semibold text-foreground")}>{linha.de_email}</span>
-                      {linha.de_nome && (
-                        <span className={cn("block truncate text-[11px]", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{linha.de_nome}</span>
-                      )}
+                      <div
+                        className={cn(corCaixa.email && "-mx-2 -my-1 rounded-md px-2 py-1")}
+                        style={corCaixa.email}
+                        title={linha.email_accounts?.rotulo ? `Caixa: ${linha.email_accounts.rotulo}` : undefined}
+                      >
+                        <span className={cn("block truncate font-mono text-xs", naoLido && "font-semibold text-foreground")}>{linha.de_email}</span>
+                        {linha.de_nome && (
+                          <span className={cn("block truncate text-[11px]", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{linha.de_nome}</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate align-top text-sm">
                       {cliente ?? <span className="text-xs text-muted-foreground">não identificado</span>}

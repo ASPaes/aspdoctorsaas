@@ -25,6 +25,9 @@ export interface EmailAccount {
   receber_respostas: boolean;
   aceitar_cliente_cadastrado: boolean;
   descartar_automaticos: boolean;
+  /** DEM-0497: hex da caixa na tela E-mails; null = sem cor */
+  cor: string | null;
+  cor_modo: "linha" | "email";
   last_test_at: string | null;
   last_test_ok: boolean | null;
   last_test_error: string | null;
@@ -63,6 +66,9 @@ export interface EmailAccountInput {
   receber_respostas: boolean;
   aceitar_cliente_cadastrado: boolean;
   descartar_automaticos: boolean;
+  /** DEM-0497; undefined = não mexe na cor (quem salva sem o diálogo) */
+  cor?: string | null;
+  cor_modo?: "linha" | "email";
   /** undefined = não mexe na assinatura (quem salva sem a tela dela, como "usar recomendados") */
   assinatura?: AssinaturaConta;
   /** vazio em edição = mantém a senha que já está no Vault */
@@ -176,7 +182,7 @@ export function useEmailAccounts() {
       });
       if (error) throw error;
 
-      // As três chaves de leitura são colunas comuns e ficam fora da RPC de
+      // As três chaves de leitura (e a cor da DEM-0497) são colunas comuns e ficam fora da RPC de
       // propósito: mexer na assinatura dela de novo obrigaria a derrubar e
       // recriar a função em produção. O RLS de UPDATE já é o mesmo portão
       // (admin ou head), que é exatamente quem chega neste diálogo.
@@ -185,6 +191,8 @@ export function useEmailAccounts() {
           receber_respostas: input.receber_respostas,
           aceitar_cliente_cadastrado: input.aceitar_cliente_cadastrado,
           descartar_automaticos: input.descartar_automaticos,
+          ...(input.cor !== undefined && { cor: input.cor }),
+          ...(input.cor_modo !== undefined && { cor_modo: input.cor_modo }),
         })
         .eq("id", data as string);
       if (erroLeitura) throw erroLeitura;

@@ -21,7 +21,7 @@ export interface EmailEnviado {
   arquivado_em: string | null;
   pasta_id: string | null;
   email_pastas?: { nome: string; cor: string } | null;
-  email_accounts?: { email: string; rotulo: string } | null;
+  email_accounts?: { email: string; rotulo: string; cor: string | null; cor_modo: string | null } | null;
   clientes?: { razao_social: string | null; nome_fantasia: string | null } | null;
   support_departments?: { name: string } | null;
 }
@@ -112,7 +112,7 @@ export function useEmailsEnviados(filtros: FiltrosEnviados, pagina: number) {
 
       let q = (supabase.from("email_envios" as any) as any)
         .select(
-          "id, created_at, assunto, remetente, para, cc, cco, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, arquivado_em, pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), support_departments(name)",
+          "id, created_at, assunto, remetente, para, cc, cco, origem, status, erro, referencia_id, cliente_id, department_id, account_id, deleted_at, arquivado_em, pasta_id, email_pastas(nome, cor), email_accounts(email, rotulo, cor, cor_modo), clientes(razao_social, nome_fantasia), support_departments(name)",
           { count: "exact" },
         )
         .eq("tenant_id", tid)
@@ -156,11 +156,11 @@ export function useOpcoesFiltro() {
     enabled: !!tid,
     queryFn: async () => {
       const { data, error } = await (supabase.from("email_accounts" as any) as any)
-        .select("id, rotulo, email")
+        .select("id, rotulo, email, cor")
         .eq("tenant_id", tid)
         .order("rotulo");
       if (error) throw error;
-      return (data ?? []) as { id: string; rotulo: string; email: string }[];
+      return (data ?? []) as { id: string; rotulo: string; email: string; cor: string | null }[];
     },
   });
 

@@ -41,7 +41,7 @@ export interface EmailRecebido {
   /** arquivos guardados; entram no ticket quando o e-mail é ligado a um */
   anexos?: { nome: string; mime: string; tamanho: number; caminho: string }[] | null;
   anexos_ignorados?: string[] | null;
-  email_accounts?: { email: string; rotulo: string } | null;
+  email_accounts?: { email: string; rotulo: string; cor: string | null; cor_modo: string | null } | null;
   clientes?: { razao_social: string | null; nome_fantasia: string | null } | null;
   support_departments?: { name: string } | null;
   support_tickets?: { ticket_code: string | null } | null;
@@ -131,7 +131,7 @@ export const nomeDoClienteRecebido = (e: EmailRecebido) =>
  */
 const COLUNAS =
   "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, arquivado_em, " +
-  "acao, acao_detalhe, department_id, ticket_id, lido_em, anexos, anexos_ignorados, email_accounts(email, rotulo), clientes(razao_social, nome_fantasia), " +
+  "acao, acao_detalhe, department_id, ticket_id, lido_em, anexos, anexos_ignorados, email_accounts(email, rotulo, cor, cor_modo), clientes(razao_social, nome_fantasia), " +
   "support_departments(name), support_tickets!email_recebidos_ticket_id_fkey(ticket_code), " +
   "email_envios!email_recebidos_envio_id_fkey(assunto, created_at), pasta_id, email_pastas(nome, cor)";
 
@@ -232,7 +232,7 @@ export function useEstadoDaLeitura() {
     queryFn: async () => {
       const [contas, rotas, estados] = await Promise.all([
         (supabase.from("email_accounts" as any) as any)
-          .select("id, rotulo, email, receber_respostas, ativo")
+          .select("id, rotulo, email, receber_respostas, ativo, cor")
           .eq("tenant_id", tid)
           .eq("ativo", true),
         (supabase.from("email_enderecos_destino" as any) as any)

@@ -254,6 +254,13 @@ export default function EmailAccountsTab() {
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
+                    {conta.cor && (
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: conta.cor }}
+                        title={conta.cor_modo === "linha" ? "Cor na linha inteira" : "Cor só no e-mail"}
+                      />
+                    )}
                     <strong className="text-sm font-semibold">{conta.rotulo}</strong>
                     {conta.is_default && (
                       <Badge className="gap-1 bg-primary/15 text-primary hover:bg-primary/15">

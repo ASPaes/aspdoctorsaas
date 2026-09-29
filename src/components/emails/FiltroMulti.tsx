@@ -15,7 +15,8 @@ export function FiltroMulti({
 }: {
   rotulo: string;
   icone?: React.ReactNode;
-  opcoes: { id: string; label: string; detalhe?: string }[];
+  /** `cor` desenha a bolinha da caixa na frente do nome (DEM-0497) */
+  opcoes: { id: string; label: string; detalhe?: string; cor?: string | null }[];
   value: string[];
   onChange: (v: string[]) => void;
 }) {
@@ -58,6 +59,9 @@ export function FiltroMulti({
                   <Check className={cn("h-4 w-4", value.includes(o.id) ? "opacity-100" : "opacity-0")} />
                 </span>
                 <span className="min-w-0 flex-1 truncate">
+                  {o.cor && (
+                    <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: o.cor }} aria-hidden />
+                  )}
                   {o.label}
                   {o.detalhe && <span className="ml-1 text-xs text-muted-foreground">{o.detalhe}</span>}
                 </span>

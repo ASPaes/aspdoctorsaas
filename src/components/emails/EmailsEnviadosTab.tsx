@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
 import { FiltroMulti } from "./FiltroMulti";
+import { estiloDaCaixa } from "./corDaCaixa";
 import {
   POR_PAGINA, ROTULO_ORIGEM, nomeDoCliente, useEmailsEnviados, useLixeiraEnviados, useOpcoesFiltro,
   type FiltrosEnviados,
@@ -204,7 +205,7 @@ export default function EmailsEnviadosTab() {
         <FiltroMulti
           rotulo="Conta"
           icone={<Mail className="h-3.5 w-3.5 text-muted-foreground" />}
-          opcoes={contas.map((c) => ({ id: c.id, label: c.rotulo, detalhe: c.email }))}
+          opcoes={contas.map((c) => ({ id: c.id, label: c.rotulo, detalhe: c.email, cor: c.cor }))}
           value={filtros.contas}
           onChange={(v) => mudarFiltro({ contas: v })}
         />
@@ -345,11 +346,14 @@ export default function EmailsEnviadosTab() {
             const { data: dia, hora } = dataHora(linha.created_at);
             const cliente = nomeDoCliente(linha);
             const recusado = linha.status !== "enviado";
+            // o cartão não mostra o remetente: no modo "só no e-mail" fica a faixa
+            const corCaixa = estiloDaCaixa(linha.email_accounts);
             return (
               <div
                 key={linha.id}
                 role="button"
                 tabIndex={0}
+                style={recusado ? undefined : { ...corCaixa.linha, boxShadow: (corCaixa.faixa ?? corCaixa.email)?.boxShadow }}
                 onClick={() => setLendo(linha.id)}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setLendo(linha.id); } }}
                 className={cn(
@@ -456,10 +460,11 @@ export default function EmailsEnviadosTab() {
                 const { data: dia, hora } = dataHora(linha.created_at);
                 const ligado = !!linha.referencia_id;
                 const cliente = nomeDoCliente(linha);
+                const corCaixa = estiloDaCaixa(linha.email_accounts, selecionados.includes(linha.id));
                 return (
-                  <TableRow key={linha.id} className={cn(selecionados.includes(linha.id) && "bg-accent/10")}>
+                  <TableRow key={linha.id} className={cn(selecionados.includes(linha.id) && "bg-accent/10")} style={corCaixa.linha}>
                     {podeExcluir && (
-                      <TableCell>
+                      <TableCell style={corCaixa.faixa}>
                         {ligado ? (
                           <TooltipProvider>
                             <Tooltip>
@@ -484,7 +489,7 @@ export default function EmailsEnviadosTab() {
                         )}
                       </TableCell>
                     )}
-                    <TableCell className="whitespace-nowrap font-mono text-xs">
+                    <TableCell className="whitespace-nowrap font-mono text-xs" style={podeExcluir ? undefined : corCaixa.faixa}>
                       {dia}
                       <span className="block text-muted-foreground">{hora}</span>
                     </TableCell>
@@ -494,7 +499,15 @@ export default function EmailsEnviadosTab() {
                         para {linha.para.join(", ")}
                       </span>
                     </TableCell>
-                    <TableCell className="truncate font-mono text-xs">{linha.remetente}</TableCell>
+                    <TableCell className="max-w-[190px] font-mono text-xs">
+                      <div
+                        className={cn("truncate", corCaixa.email && "-mx-2 -my-1 rounded-md px-2 py-1")}
+                        style={corCaixa.email}
+                        title={linha.email_accounts?.rotulo ? `Caixa: ${linha.email_accounts.rotulo}` : undefined}
+                      >
+                        {linha.remetente}
+                      </div>
+                    </TableCell>
                     <TableCell className="truncate text-sm">
                       {cliente ?? <span className="text-xs text-muted-foreground">sem cliente</span>}
                     </TableCell>
