@@ -1,5 +1,6 @@
 // ds-enviar-whatsapp-externo — envia UMA mensagem de texto por WhatsApp a pedido
-// de um sistema parceiro (hoje: DoctorDev / devflow-hub).
+// de um sistema parceiro (hoje: DoctorDev / devflow-hub e o site, na inscrição
+// do evento online).
 //
 // Autenticação: HMAC-SHA256 sobre o payload inteiro, com o segredo compartilhado
 // DEVFLOW_WA_SECRET. Mesmo padrão do SSO que já existe entre os dois projetos —
@@ -7,6 +8,11 @@
 //
 // A mensagem viaja DENTRO do payload assinado: sem a assinatura correta não dá
 // para trocar o texto nem o destinatário.
+//
+// Campo opcional `instancia` no payload: trecho do nome da instância que deve
+// enviar (ex.: "suporte"). Sem ele, vale a preferência por "financeiro". Com ele e
+// sem instância correspondente, recusa — mandar por outro número em silêncio
+// seria pior do que falhar.
 //
 // NÃO respeita quiet hours de propósito: isto é disparado por um humano que
 // clicou "enviar", igual a um operador respondendo no chat — não é notificação
@@ -67,7 +73,7 @@ async function assinaturaConfere(
 // A coluna é `is_active` — NÃO existe `ativo` em whatsapp_instances. Errar o nome
 // devolve erro do PostgREST; se ele for engolido, o sintoma vira "nenhuma
 // instância ativa" e manda procurar no lugar errado. Por isso o erro sobe.
-async function escolherInstancia(supabase: any, tenantId: string) {
+async function escolherInstancia(supabase: any, tenantId: string, preferida?: string) {
   const { data: rows, error } = await supabase
     .from('whatsapp_instances')
     .select('id, instance_name, provider_type, instance_id_external, meta_phone_number_id, status')
@@ -76,6 +82,12 @@ async function escolherInstancia(supabase: any, tenantId: string) {
 
   if (error) throw new Error(`consulta de instancias falhou: ${error.message}`);
   if (!rows || rows.length === 0) return null;
+
+  if (preferida) {
+    return rows.find((r: any) =>
+      (r.instance_name || '').toLowerCase().includes(preferida.toLowerCase()),
+    ) ?? null;
+  }
 
   const financeiro = rows.find((r: any) =>
     (r.instance_name || '').toLowerCase().includes('financeiro'),
@@ -142,7 +154,14 @@ Deno.serve(async (req) => {
     );
 
     const tenantId = Deno.env.get('DEVFLOW_WA_TENANT_ID') || TENANT_ASP_PADRAO;
-    const instancia = await escolherInstancia(supabase, tenantId);
+    const preferida =
+      typeof payload.instancia === 'string' && payload.instancia.trim()
+        ? payload.instancia.trim()
+        : undefined;
+    const instancia = await escolherInstancia(supabase, tenantId, preferida);
+    if (!instancia && preferida) {
+      return json({ ok: false, error: `instancia_nao_encontrada (${preferida})` }, 422);
+    }
     if (!instancia) {
       // Diz QUAL tenant ficou sem instância — sem isso, o erro manda procurar no escuro
       return json({ ok: false, error: `nenhuma_instancia_ativa (tenant ${tenantId})` }, 422);
