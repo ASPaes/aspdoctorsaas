@@ -37,6 +37,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 28/09
 
+- ⬆️ **Acompanhamento já nasce com responsável** — Em **Implantação › Acompanhamento**, o ticket de acompanhamento aberto no Go-live passa a ter como responsável quem conduziu o treinamento que pediu acompanhamento (ex.: o Treinamento PDV). Antes ele nascia sem dono. O cartão do quadro agora mostra **Resp.: nome** (ou **Sem responsável**), o filtro **Todos os responsáveis** passa a funcionar nesse quadro e a busca também encontra pelo nome do responsável. Os 14 acompanhamentos que estavam abertos sem responsável já foram preenchidos.
+
 - ⬆️ **No telefone, os botões do e-mail aberto cabem em três linhas** — Ao abrir uma mensagem pelo celular, os seis botões ocupavam seis linhas e empurravam o texto do e-mail para fora da tela. Agora o **Responder** fica sozinho na primeira linha e em destaque, **Responder a todos** e **Encaminhar** dividem a segunda, e **Mover para**, **Arquivar** e **Fechar** dividem a terceira. Em aparelho estreito, o nome desce para baixo do ícone na última linha, para nenhum rótulo aparecer cortado. No computador os botões continuam lado a lado como estavam.
 
 - ⬆️ **Correções da Evolução DS com o mesmo visual das novidades** — Na **Evolução DS**, o quadro que reúne as correções do dia virou um cartão como os de novidades e melhorias: cada correção aparece com um ícone próprio, separada da seguinte, e o quadro indica quantos ajustes saíram naquele dia. Quando há correção que você ainda não viu, ele ganha a marca verde de **Novo para você**.
