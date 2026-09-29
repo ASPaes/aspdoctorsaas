@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Clock, CheckCircle2, Pause, TrendingUp } from "lucide-react";
-import { agregarPorResponsavel, type LinhaAtribuicao } from "./dashMetrics";
+import { agregarPorResponsavel, semEspelhoDaJornada, type LinhaAtribuicao } from "./dashMetrics";
 import { pipelineSelecionado } from "./dashFilters";
 import DrilldownSheet, { type LinhaDrilldown } from "./DrilldownSheet";
 import type { JourneyNomes } from "./useJourneyNames";
@@ -73,6 +73,8 @@ interface StageHistRow {
   saiu_em: string | null;
   duracao_minutos: number | null;
   duracao_util_minutos: number | null;
+  /** Só no histórico de treinamento: uma jornada pode ter vários treinos na mesma etapa. */
+  training_id?: string | null;
 }
 
 export interface SlaJourneyRow {
@@ -330,10 +332,31 @@ export default function OnboardingSlaOverview({
     queryFn: async () =>
       fetchAllRows<StageHistRow>(() =>
         (supabase.from("onboarding_training_stage_history" as any) as any)
-          .select("journey_id, stage_id, entrou_em, saiu_em, duracao_minutos, duracao_util_minutos")
+          .select("journey_id, stage_id, training_id, entrou_em, saiu_em, duracao_minutos, duracao_util_minutos")
           .eq("tenant_id", tenantId!)
           .not("duracao_minutos", "is", null),
       ),
+  });
+
+  /** Nome de cada treinamento — é o que diferencia, na lista da etapa, o treino de PDV
+   *  do de Estoque do mesmo cliente (DEM-0470). Tipo primeiro; título só sem tipo,
+   *  porque ele repete o cliente ("TK-… - TREIN. PDV - SKETCH PARAGEM"). */
+  const trainingNomesQ = useQuery({
+    queryKey: ["onb-sla-training-nomes", tenantId],
+    enabled: !!tenantId,
+    queryFn: async () => {
+      const rows = await fetchAllRows<any>(() =>
+        (supabase.from("onboarding_training_sessions" as any) as any)
+          .select("id, titulo, onboarding_training_types(nome)")
+          .eq("tenant_id", tenantId!),
+      );
+      const m = new Map<string, string>();
+      rows.forEach((r) => {
+        const nome = r.onboarding_training_types?.nome || r.titulo;
+        if (nome) m.set(r.id, nome);
+      });
+      return m;
+    },
   });
 
   const pipeMap = useMemo(() => new Map((pipelinesQ.data ?? []).map((p) => [p.id, p])), [pipelinesQ.data]);
@@ -577,12 +600,19 @@ export default function OnboardingSlaOverview({
   const atribuicaoQ = useQuery({
     queryKey: ["onb-sla-stage-attribution", tenantId],
     enabled: !!tenantId,
-    queryFn: async () =>
-      fetchAllRows<LinhaAtribuicao>(() =>
+    queryFn: async () => {
+      const linhas = await fetchAllRows<LinhaAtribuicao>(() =>
         (supabase.from("vw_onboarding_stage_attribution" as any) as any)
-          .select("journey_id, stage_id, responsavel_user_id, duracao_util_minutos, duracao_minutos")
+          .select("journey_id, stage_id, responsavel_user_id, duracao_util_minutos, duracao_minutos, origem")
           .eq("tenant_id", tenantId!),
-      ),
+      );
+      // A view une os dois históricos como a aba Por Etapa unia — mesma duplicidade,
+      // mesmo remédio (DEM-0470).
+      return semEspelhoDaJornada(
+        linhas.filter((l) => l.origem !== "treino"),
+        linhas.filter((l) => l.origem === "treino"),
+      );
+    },
   });
 
   /** Alvo de cada etapa. Etapa fora do pipeline escolhido fica SEM alvo de propósito:
@@ -658,9 +688,32 @@ export default function OnboardingSlaOverview({
     const allowed = new Set(journeys.map((j) => j.journey_id));
     const m = new Map<string, { count: number; sumC: number; sumE: number }>();
     const porEtapa = new Map<string, LinhaDrilldown[]>();
-    // Etapa de Implantação só recebe movimento de treino; as demais, só de jornada.
-    // Concatenar não duplica nada.
-    [...(historyQ.data ?? []), ...(trainingHistoryQ.data ?? [])].forEach((h) => {
+    // Jornada e treino, sem a linha-espelho da jornada nas etapas de treino (DEM-0470).
+    const todas = semEspelhoDaJornada(historyQ.data ?? [], trainingHistoryQ.data ?? []);
+    // Cliente repetido na lista é legítimo — ou são treinos diferentes, ou o mesmo
+    // voltou à etapa (82 casos em 28/09, quase todos reagendamento). A conta segue por
+    // passagem; o que faltava era a linha dizer QUAL (DEM-0470). A ordem sai da lista
+    // inteira, antes dos filtros, para "2ª passagem" ser a 2ª de verdade.
+    const passagens = new Map<string, string[]>();
+    todas.forEach((h) => {
+      const k = `${h.training_id ?? h.journey_id}|${h.stage_id}`;
+      const arr = passagens.get(k) ?? [];
+      arr.push(h.entrou_em ?? "");
+      passagens.set(k, arr);
+    });
+    passagens.forEach((arr) => arr.sort());
+    const detalhe = (h: StageHistRow): string | undefined => {
+      const partes: string[] = [];
+      if (h.training_id) partes.push(trainingNomesQ.data?.get(h.training_id) ?? "Treinamento");
+      const arr = passagens.get(`${h.training_id ?? h.journey_id}|${h.stage_id}`) ?? [];
+      if (arr.length > 1) partes.push(`${arr.indexOf(h.entrou_em ?? "") + 1}ª passagem`);
+      if (!partes.length) return undefined;
+      if (h.entrou_em) {
+        partes.push(`entrou ${new Date(h.entrou_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" })}`);
+      }
+      return partes.join(" · ");
+    };
+    todas.forEach((h) => {
       if (!allowed.has(h.journey_id)) return;
       const st = stageMap.get(h.stage_id);
       if (!st || !st.sla_minutos || st.sla_minutos <= 0) return;
@@ -674,10 +727,13 @@ export default function OnboardingSlaOverview({
       cur.sumE += e;
       m.set(h.stage_id, cur);
       const arrE = porEtapa.get(h.stage_id) ?? [];
-      arrE.push(linhaDrill(
-        h.journey_id, nomes, nomes.responsavelEm(h.journey_id, h.entrou_em, h.saiu_em),
-        h.duracao_util_minutos, h.duracao_minutos, st.sla_minutos,
-      ));
+      arrE.push({
+        ...linhaDrill(
+          h.journey_id, nomes, nomes.responsavelEm(h.journey_id, h.entrou_em, h.saiu_em),
+          h.duracao_util_minutos, h.duracao_minutos, st.sla_minutos,
+        ),
+        detalhe: detalhe(h),
+      });
       porEtapa.set(h.stage_id, arrE);
     });
     return Array.from(m.entries())
@@ -700,7 +756,7 @@ export default function OnboardingSlaOverview({
         };
       })
       .sort((a, b) => a.pipePos - b.pipePos || a.stagePos - b.stagePos);
-  }, [journeys, historyQ.data, trainingHistoryQ.data, stageMap, pipeMap, nomes, pipelineIds, recorteResponsavel]);
+  }, [journeys, historyQ.data, trainingHistoryQ.data, trainingNomesQ.data, stageMap, pipeMap, nomes, pipelineIds, recorteResponsavel]);
 
   return (
     <>

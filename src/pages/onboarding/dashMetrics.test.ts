@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   pct, separarJornadas, contarSituacao, listarSituacao, contarDeListas, desfechoTreino, agregarTreinos,
   agregarPorResponsavel, mediaTempo, coorteConcluidas, coorteImplantacao, coorteOnboarding, minutosEntre,
+  semEspelhoDaJornada,
   type JourneyLite, type TreinoLite, type LinhaAtribuicao, type JourneyTempo, type SituacaoLite,
 } from "./dashMetrics";
 
@@ -619,5 +620,25 @@ describe("agregarTreinos · baldes", () => {
     const a = agregarTreinos(sessoes);
     expect(ids(a.listas.desistencias)).toEqual(["desistiu"]);
     expect(a.listas.desistencias.length).toBe(a.desistencia);
+  });
+});
+
+describe("semEspelhoDaJornada (DEM-0470)", () => {
+  const l = (journey_id: string, stage_id: string, util: number) => ({ journey_id, stage_id, util });
+
+  it("jornada com treino: a linha-espelho da jornada na etapa de treino sai", () => {
+    // SKETCH PARAGEM em 28/09: jornada e treino de PDV entraram no mesmo instante.
+    const r = semEspelhoDaJornada([l("sketch", "marcado", 1675)], [l("sketch", "marcado", 1663), l("sketch", "marcado", 1640)]);
+    expect(r.map((x) => x.util)).toEqual([1663, 1640]);
+  });
+
+  it("jornada que entrou na Implantação sem treino continua pela própria linha", () => {
+    const r = semEspelhoDaJornada([l("sem-treino", "marcado", 300)], [l("outra", "marcado", 100)]);
+    expect(r.map((x) => x.journey_id).sort()).toEqual(["outra", "sem-treino"]);
+  });
+
+  it("etapa que não recebe treino (Onboarding) não é tocada", () => {
+    const r = semEspelhoDaJornada([l("sketch", "conferencia", 50)], [l("sketch", "marcado", 1663)]);
+    expect(r).toHaveLength(2);
   });
 });

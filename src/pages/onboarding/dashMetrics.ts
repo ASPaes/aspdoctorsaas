@@ -331,6 +331,30 @@ export interface LinhaAtribuicao {
   responsavel_user_id: string | null;
   duracao_util_minutos: number | null;
   duracao_minutos: number | null;
+  /** De qual histórico veio a passagem — a view une o da jornada e o do treino. */
+  origem?: "jornada" | "treino";
+}
+
+/**
+ * Junta o histórico de etapa da jornada com o do treino sem contar a mesma passagem duas
+ * vezes (DEM-0470).
+ *
+ * Na Implantação quem anda pelas etapas é o treino, mas a jornada também ganha linha na
+ * 1ª etapa ao avançar (`advance_onboarding_to_implantacao` roda na mesma transação que
+ * cria o treino, mesmo carimbo de entrada) e às vezes é movida depois. Regra: jornada
+ * COM treino é medida pelo treino nas etapas que recebem treino; jornada que entrou na
+ * Implantação SEM treino continua pela própria linha, que é a única que ela tem.
+ */
+export function semEspelhoDaJornada<T extends { journey_id: string; stage_id: string }>(
+  jornada: T[],
+  treino: T[],
+): T[] {
+  const etapasDeTreino = new Set(treino.map((t) => t.stage_id));
+  const jornadasComTreino = new Set(treino.map((t) => t.journey_id));
+  return [
+    ...jornada.filter((h) => !(etapasDeTreino.has(h.stage_id) && jornadasComTreino.has(h.journey_id))),
+    ...treino,
+  ];
 }
 
 export interface ResponsavelAgg {

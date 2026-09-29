@@ -16,6 +16,10 @@ export interface LinhaDrilldown {
   cal: number | null;
   /** consumo do SLA em %, quando existe alvo. `null` quando não existe. */
   pctSla: number | null;
+  /** O que separa duas linhas do MESMO cliente — qual treinamento, qual passagem.
+   *  Sem isto a aba Por Etapa mostrava a SKETCH PARAGEM duas vezes, idênticas, quando
+   *  eram o treino de PDV e o de Estoque (DEM-0470). */
+  detalhe?: string;
 }
 
 /**
@@ -85,7 +89,10 @@ export default function DrilldownSheet({
             <tbody>
               {ordenadas.map((l, i) => (
                 <tr key={`${l.journeyId}-${i}`} className="border-t border-border hover:bg-muted/20">
-                  <td className="px-2 py-2 font-medium">{l.cliente}</td>
+                  <td className="px-2 py-2">
+                    <div className="font-medium">{l.cliente}</div>
+                    {l.detalhe && <div className="text-[11px] text-muted-foreground">{l.detalhe}</div>}
+                  </td>
                   <td className="px-2 py-2 text-muted-foreground">{l.responsavel}</td>
                   <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">{l.util == null ? "—" : formatMinUtil(l.util)}</td>
                   <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap text-muted-foreground">

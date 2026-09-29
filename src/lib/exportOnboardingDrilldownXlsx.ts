@@ -24,10 +24,14 @@ export function exportDrilldownSlaXlsx(params: {
   linhas: LinhaDrilldown[];
 }): void {
   const { titulo, linhas } = params;
+  // Só as listas que distinguem passagens (aba Por Etapa) ganham a coluna — nas
+  // outras ela sairia vazia.
+  const comDetalhe = linhas.some((l) => l.detalhe);
 
   baixarPlanilha({
     colunas: [
       { header: "Cliente", wch: 38 },
+      ...(comDetalhe ? [{ header: "Passagem", wch: 36 }] : []),
       { header: "Responsável", wch: 24 },
       { header: "Expediente", wch: 14 },
       { header: "Expediente (min)", wch: 16 },
@@ -37,6 +41,7 @@ export function exportDrilldownSlaXlsx(params: {
     ],
     linhas: linhas.map((l) => [
       l.cliente,
+      ...(comDetalhe ? [l.detalhe ?? ""] : []),
       l.responsavel,
       l.util == null ? "" : formatMinUtil(l.util),
       l.util ?? "",
