@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { endOfDay, format, formatDistanceStrict, parseISO, startOfDay, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,7 +8,11 @@ import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePic
 import { cn } from "@/lib/utils";
 import { EASE } from "@/components/clientes/visao360/Visao360Ui";
 import { NotaDoColaborador } from "@/components/colaborador360/NotaDoColaborador";
-import { useColaborador360, type Alvo360, type MembroEquipe360 } from "@/components/colaborador360/useColaborador360";
+import { AtendimentosLista } from "@/components/clientes/visao360/Visao360Listas";
+import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
+import {
+  useAtendimentosColaborador, useColaborador360, type Alvo360, type MembroEquipe360,
+} from "@/components/colaborador360/useColaborador360";
 import {
   calcularNota, fmtNum, fmtTempo, iniciais, posicao, statusAoVivo, vsTime,
   type Metricas360, type Time360,
@@ -27,6 +31,9 @@ export default function Colaborador360() {
   const alvo = d?.alvo;
   const m = alvo?.metricas ?? null;
   const nota = useMemo(() => calcularNota(m), [m]);
+  const ats = useAtendimentosColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
+  const nomeAgente = useCallback((uid: string | null) => (uid && uid === alvo?.user_id ? alvo?.nome ?? null : null), [alvo]);
 
   const escolher = (id: string) => {
     const p = new URLSearchParams(params);
@@ -66,8 +73,33 @@ export default function Colaborador360() {
         <>
           <Topo alvo={alvo} nota={nota} carregando={q.isLoading} time={d?.time ?? null} />
           <Numeros m={m} t={d?.time ?? null} alvo={alvo} carregando={q.isLoading} />
+          {alvo && (
+            <section className="grid gap-2">
+              <h2 className="sr-only">Atendimentos</h2>
+              {ats.isLoading ? (
+                <Skeleton className="h-64 w-full rounded-xl" />
+              ) : ats.isError ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar os atendimentos agora.</p>
+              ) : (
+                <AtendimentosLista
+                  atendimentos={ats.data ?? []}
+                  periodo={periodo}
+                  nomeAgente={nomeAgente}
+                  onAbrir={setAtendimentoAberto}
+                  rotuloPessoa="Cliente"
+                  comResumo={false}
+                />
+              )}
+            </section>
+          )}
         </>
       )}
+
+      <AttendanceDetailModal
+        attendanceId={atendimentoAberto}
+        open={!!atendimentoAberto}
+        onOpenChange={(o) => !o && setAtendimentoAberto(null)}
+      />
     </div>
   );
 }

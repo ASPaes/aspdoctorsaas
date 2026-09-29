@@ -36,12 +36,16 @@ function MaisLinhas({ total, limite, onMais }: { total: number; limite: number; 
 }
 
 export function AtendimentosLista({
-  atendimentos, periodo, nomeAgente, onAbrir,
+  atendimentos, periodo, nomeAgente, onAbrir, rotuloPessoa = "Agente", comResumo = true,
 }: {
   atendimentos: Atendimento360[];
   periodo: Periodo;
   nomeAgente: (uid: string | null) => string | null;
   onAbrir: (id: string) => void;
+  /** Título da coluna de pessoa. Com `rotulo_pessoa` nas linhas, vira "Cliente". */
+  rotuloPessoa?: string;
+  /** Os 4 cartões de cima. A Visão 360° do colaborador já mostra esses números no topo. */
+  comResumo?: boolean;
 }) {
   const [tipo, setTipo] = useState<"todos" | "individual" | "grupo" | "abertos">("todos");
   const [limite, setLimite] = useState(LOTE);
@@ -121,7 +125,7 @@ export function AtendimentosLista({
 
   return (
     <div className="grid gap-3.5">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className={cn("grid grid-cols-2 gap-3 lg:grid-cols-4", !comResumo && "hidden")}>
         <Mini rotulo="Atendimentos no período" valor={k.total} sub={`${dif >= 0 ? "▲" : "▼"} ${Math.abs(dif)} vs. período anterior`} />
         <Mini rotulo="1ª resposta média" valor={minutos(k.primeiraRespostaSeg)} />
         <Mini rotulo="Tempo médio (TMA)" valor={minutos(k.tmaSeg)} sub="dos encerrados" />
@@ -175,7 +179,7 @@ export function AtendimentosLista({
                       <FiltroTexto valor={filtros.contato} onChange={(v) => mexer("contato", v)} placeholder="Nome do contato" />
                     </ColumnFilter>)}
                   {cab("assunto", "Assunto", funilOpcoes("assunto", "Assunto"))}
-                  {cab("agente", "Agente", funilOpcoes("agente", "Agente"))}
+                  {cab("agente", rotuloPessoa, funilOpcoes("agente", rotuloPessoa))}
                   {cab("setor", "Setor", funilOpcoes("setor", "Setor"))}
                   {cab("duracao", "Duração",
                     <ColumnFilter titulo="Duração" ativo={filtroAtendimentoAtivo(filtros, "duracao")} onLimpar={() => mexer("duracao", { min: "", max: "" })} align="end">
@@ -207,7 +211,9 @@ export function AtendimentosLista({
                       <TableCell className="max-w-[240px] truncate text-muted-foreground" title={a.ai_summary ?? undefined}>
                         {a.ai_category || a.ai_summary || "—"}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{nomeAgente(a.assigned_to) ?? "—"}</TableCell>
+                      <TableCell className="max-w-[200px] truncate whitespace-nowrap">
+                        {(a.rotulo_pessoa !== undefined ? a.rotulo_pessoa : nomeAgente(a.assigned_to)) ?? "—"}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap">{a.departamento ?? "—"}</TableCell>
                       <TableCell className="text-right tabular-nums">{a.status === "closed" ? minutos(a.handle_seconds) : "—"}</TableCell>
                       <TableCell>{a.csat_score != null ? <Estrelas nota={a.csat_score} /> : <span className="text-muted-foreground">—</span>}</TableCell>

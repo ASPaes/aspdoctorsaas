@@ -27,6 +27,11 @@ export interface Atendimento360 {
   csat_score: number | null;
   csat_reason: string | null;
   csat_respondido_em: string | null;
+  /**
+   * Quando presente, a coluna "Agente" da tabela mostra este texto no lugar do
+   * agente. A Visão 360° do colaborador usa para mostrar o cliente.
+   */
+  rotulo_pessoa?: string | null;
 }
 
 export interface Ticket360 {
@@ -336,7 +341,7 @@ export function valorOpcaoAtendimento(
 ): string {
   switch (coluna) {
     case "assunto": return a.ai_category || "Sem assunto";
-    case "agente": return nomeAgente(a.assigned_to) || "Sem agente";
+    case "agente": return a.rotulo_pessoa !== undefined ? a.rotulo_pessoa || "Sem cliente" : nomeAgente(a.assigned_to) || "Sem agente";
     case "setor": return a.departamento || "Sem setor";
     case "csat": return a.csat_score != null ? `${Math.round(a.csat_score)} ★` : "Sem avaliação";
     case "resolucao":
@@ -398,7 +403,7 @@ export function filtrarOrdenarAtendimentos(
       case "aberto": return a.opened_at;
       case "contato": return a.contact_name;
       case "assunto": return a.ai_category || a.ai_summary;
-      case "agente": return nomeAgente(a.assigned_to);
+      case "agente": return a.rotulo_pessoa !== undefined ? a.rotulo_pessoa : nomeAgente(a.assigned_to);
       case "setor": return a.departamento;
       case "duracao": return a.status === "closed" && a.handle_seconds ? a.handle_seconds : null;
       case "csat": return a.csat_score;
