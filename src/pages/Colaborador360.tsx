@@ -28,6 +28,7 @@ import { destaques, linhaDoTempo } from "@/components/colaborador360/colaborador
 import { Destaques, VisaoGeralColaborador } from "@/components/colaborador360/VisaoGeralColaborador";
 import { JornadaColaborador } from "@/components/colaborador360/JornadaColaborador";
 import { LinhaDoTempoColaborador } from "@/components/colaborador360/LinhaDoTempoColaborador";
+import { TheoPauta } from "@/components/colaborador360/TheoPauta";
 
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 
@@ -121,7 +122,12 @@ export default function Colaborador360() {
               </TabsList>
               <TabsContent value="geral" className="mt-4">
                 {ats.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
-                  <VisaoGeralColaborador nota={nota} ats={listaAts} de={periodo.from} ate={periodo.to} onAbrirAtendimento={setAtendimentoAberto} />
+                  <VisaoGeralColaborador
+                    nota={nota} ats={listaAts} de={periodo.from} ate={periodo.to} onAbrirAtendimento={setAtendimentoAberto}
+                    pauta={d?.escopo !== "proprio" ? (
+                      <TheoPauta userId={alvo.user_id} nome={alvo.nome} de={periodo.from} ate={periodo.to} tenantId={tid} nomeAgente={nomeAgente} />
+                    ) : undefined}
+                  />
                 )}
               </TabsContent>
               <TabsContent value="avaliacoes" className="mt-4">

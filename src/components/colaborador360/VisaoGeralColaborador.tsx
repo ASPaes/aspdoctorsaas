@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { format, parseISO } from "date-fns";
 import { Award, AlertTriangle, Star, PauseCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -158,12 +158,14 @@ function MapaHorarios({ ats, de, ate }: { ats: Atendimento360[]; de: Date; ate: 
 
 /* ------------------------------------------------------------ tela */
 
-export function VisaoGeralColaborador({ nota, ats, de, ate, onAbrirAtendimento }: {
+export function VisaoGeralColaborador({ nota, ats, de, ate, onAbrirAtendimento, pauta }: {
   nota: Nota360;
   ats: Atendimento360[];
   de: Date;
   ate: Date;
   onAbrirAtendimento: (id: string) => void;
+  /** Card da pauta do Théo; só vem para head e admin. */
+  pauta?: ReactNode;
 }) {
   const top = useMemo(() => assuntos(ats, de, ate), [ats, de, ate]);
   const comentarios = useMemo(
@@ -201,6 +203,7 @@ export function VisaoGeralColaborador({ nota, ats, de, ate, onAbrirAtendimento }
       </div>
 
       <div className="grid content-start gap-3.5">
+        {pauta}
         <Cartao titulo="O que mais atende" sub="assunto dado pela IA">
           {top.length === 0 ? <Vazio>Nenhum atendimento no período.</Vazio> : (
             <div className="grid gap-2.5 px-4 pb-4">

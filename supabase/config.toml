@@ -420,3 +420,6 @@ verify_jwt = true
 # pela send-whatsapp-message, como um anexo do operador.
 [functions.fin-boleto-para-chat]
 verify_jwt = true
+
+[functions.colaborador-pauta-360]
+verify_jwt = true
