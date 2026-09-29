@@ -273,7 +273,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
       const { data, error } = await (supabase.from("support_tickets" as any) as any)
         .select(`
           *,
-          clientes:cliente_id(id, nome_fantasia, cnpj, telefone_whatsapp, produto_id),
+          clientes:cliente_id(id, nome_fantasia, razao_social, cnpj, telefone_whatsapp, produto_id),
           produtos:produto_id(nome),
           service_categories:category_id(nome),
           service_subcategories:subcategory_id(nome),
@@ -1144,6 +1144,7 @@ export function SupportTicketDetailDialog({ ticketId, open, onOpenChange }: Prop
           <div className="bg-muted/50 rounded-lg p-3 space-y-1">
             <p className="text-sm font-semibold">{ticket.clientes.nome_fantasia ?? "—"}</p>
             <div className="text-xs text-muted-foreground space-y-0.5">
+              {ticket.clientes.razao_social && <p>Razão Social: {ticket.clientes.razao_social}</p>}
               {ticket.clientes.cnpj && <p>CNPJ: {ticket.clientes.cnpj}</p>}
               {ticket.clientes.telefone_whatsapp && <p>Tel: {ticket.clientes.telefone_whatsapp}</p>}
             </div>
