@@ -327,7 +327,8 @@ export function EquipeConversa(props: Props) {
             itens.map((it) => {
               if (it.tipo === "dia") {
                 return (
-                  <div key={it.chave} className="sticky top-0 z-[5] flex items-center gap-3 px-4 py-2">
+                  // fundo na faixa: fixa no topo ao rolar, sem ele a data ficava por cima do texto da mensagem
+                  <div key={it.chave} className="sticky top-0 z-[5] flex items-center gap-3 bg-background/95 px-4 py-2 backdrop-blur-sm">
                     <span className="h-px flex-1 bg-border" />
                     <span className="rounded-full border bg-background px-3 py-0.5 text-xs font-semibold text-muted-foreground first-letter:uppercase">{it.rotulo}</span>
                     <span className="h-px flex-1 bg-border" />

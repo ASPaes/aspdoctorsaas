@@ -73,7 +73,7 @@ export default function MobileHome() {
     },
     {
       chave: "equipe",
-      titulo: "Equipe",
+      titulo: "Equipe interna",
       descricao: "Chat interno da equipe",
       destino: "/equipe",
       icone: MessagesSquare,

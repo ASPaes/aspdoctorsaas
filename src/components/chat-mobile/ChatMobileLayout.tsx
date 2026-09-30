@@ -29,7 +29,7 @@ const TITULOS: Record<string, string> = {
   "/implantacao": "Implantação",
   "/emails": "E-mails",
   "/evolucao": "Evolução DS",
-  "/equipe": "Equipe",
+  "/equipe": "Equipe interna",
 };
 
 export default function ChatMobileLayout() {

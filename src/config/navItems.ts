@@ -23,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Dashboard", url: "/atendimento/dashboard", icon: Gauge, resource: "nav.atendimento_dashboard", roles: ["admin", "head"] },
       { title: "Chat", url: "/whatsapp", icon: MessageCircle, resource: "atendimento_chat" },
       { title: "Tickets", url: "/tickets", icon: TicketCheck, resource: "tickets" },
+      { title: "Equipe interna", url: "/equipe", icon: MessagesSquare, resource: "nav.equipe" },
     ],
   },
   { title: "Customer Success", url: "/customer-success", icon: HeadphonesIcon, resource: "nav.customer_success" },
@@ -32,7 +33,6 @@ export const NAV_ITEMS: NavItem[] = [
   // `can(resource)`, e `superAdminOnly` não vale para ele — deixar aqui faria o
   // módulo aparecer para quem não deve.
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
-  { title: "Equipe", url: "/equipe", icon: MessagesSquare, resource: "nav.equipe" },
   { title: "E-mails", url: "/emails", icon: Mail, resource: "nav.emails" },
   { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
   { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },

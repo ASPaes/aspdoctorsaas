@@ -73,6 +73,9 @@ export function AppSidebar() {
   // Equipe DS (chat interno): o tempo real fica aqui porque o menu está sempre na tela
   useEquipeTempoReal();
   const equipeNaoLidas = useEquipeNaoLidas();
+  /** Contador do item de menu (solto ou dentro de grupo). */
+  const naoLidosDe = (resource?: string) =>
+    resource === "nav.emails" ? emailsNaoLidos : resource === "nav.equipe" ? equipeNaoLidas : 0;
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const { canAccess: canOnboarding } = useOnboardingAccess();
@@ -299,13 +302,20 @@ export function AppSidebar() {
                     return can(c.resource!, "view");
                   });
                   if (visibleChildren.length === 0) return null;
+                  // algum filho com não lidas (hoje: Equipe interna): o grupo avisa com um ponto
+                  const grupoTemNovidade = visibleChildren.some((c) => naoLidosDe(c.resource) > 0);
                   if (collapsed) {
                     return (
                       <SidebarMenuItem key={item.title}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <SidebarMenuButton>
-                              <item.icon className="h-4 w-4" />
+                              <span className="relative inline-flex">
+                                <item.icon className="h-4 w-4" />
+                                {grupoTemNovidade && (
+                                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-primary ring-2 ring-sidebar" />
+                                )}
+                              </span>
                               <span>{item.title}</span>
                             </SidebarMenuButton>
                           </DropdownMenuTrigger>
@@ -314,6 +324,11 @@ export function AppSidebar() {
                               <DropdownMenuItem key={child.title} onClick={() => navigate(child.url!)}>
                                 <child.icon className="h-4 w-4 mr-2" />
                                 {child.title}
+                                {naoLidosDe(child.resource) > 0 && (
+                                  <span className="ml-auto pl-3 text-[10px] font-semibold text-primary">
+                                    {naoLidosDe(child.resource) > 99 ? "99+" : naoLidosDe(child.resource)}
+                                  </span>
+                                )}
                               </DropdownMenuItem>
                             ))}
                           </DropdownMenuContent>
@@ -331,7 +346,13 @@ export function AppSidebar() {
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton tooltip={item.title}>
-                            <item.icon className="h-4 w-4" />
+                            <span className="relative inline-flex">
+                              <item.icon className="h-4 w-4" />
+                              {/* grupo fechado esconde o contador do filho: o ponto avisa */}
+                              {grupoTemNovidade && (
+                                <span className="absolute -top-1 -right-1 hidden h-2 w-2 rounded-full bg-primary ring-2 ring-sidebar group-data-[state=closed]/collapsible:block" />
+                              )}
+                            </span>
                             <span>{item.title}</span>
                             <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
                           </SidebarMenuButton>
@@ -344,6 +365,11 @@ export function AppSidebar() {
                                   <NavLink to={child.url!} end activeClassName="bg-sidebar-accent text-sidebar-accent-foreground">
                                     <child.icon className="h-4 w-4" />
                                     <span>{child.title}</span>
+                                    {naoLidosDe(child.resource) > 0 && (
+                                      <span className="ml-auto min-w-[18px] rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-primary-foreground">
+                                        {naoLidosDe(child.resource) > 99 ? "99+" : naoLidosDe(child.resource)}
+                                      </span>
+                                    )}
                                   </NavLink>
                                 </SidebarMenuSubButton>
                               </SidebarMenuSubItem>
@@ -354,7 +380,7 @@ export function AppSidebar() {
                     </Collapsible>
                   );
                 }
-                const naoLidos = item.resource === "nav.emails" ? emailsNaoLidos : item.resource === "nav.equipe" ? equipeNaoLidas : 0;
+                const naoLidos = naoLidosDe(item.resource);
                 const leaf = can(item.resource!, "view") ? (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton

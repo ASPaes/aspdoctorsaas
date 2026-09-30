@@ -75,7 +75,7 @@ export function PedirAjudaDialog({ atendimentoId, aberto, onFechar }: { atendime
       qc.invalidateQueries({ queryKey: chaves.msgs(canalId) });
       // no chat.doctorsaas.com.br não existe a tela Equipe: lá só confirma
       toast.success("Pedido de ajuda enviado", isChatHost() ? undefined
-        : { action: { label: "Ver na Equipe", onClick: () => navigate(`/equipe?c=${canalId}`) } });
+        : { action: { label: "Ver na Equipe interna", onClick: () => navigate(`/equipe?c=${canalId}`) } });
       onFechar();
     } catch (e) {
       toast.error(mensagemDeErro(e));

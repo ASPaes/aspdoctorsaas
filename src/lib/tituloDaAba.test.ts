@@ -5,6 +5,7 @@ describe("tituloDaAba", () => {
   it("põe o nome da tela antes da marca", () => {
     expect(tituloDaAba("/whatsapp")).toBe("Chat - DoctorSaaS");
     expect(tituloDaAba("/tickets")).toBe("Tickets - DoctorSaaS");
+    expect(tituloDaAba("/equipe")).toBe("Equipe interna - DoctorSaaS");
   });
 
   it("separa rotas que começam igual", () => {

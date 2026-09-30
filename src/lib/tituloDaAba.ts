@@ -25,6 +25,7 @@ const TELAS: Array<[RegExp, string]> = [
   [/^\/whatsapp\/contatos$/, "Contatos"],
   [/^\/whatsapp$/, "Chat"],
   [/^\/tickets$/, "Tickets"],
+  [/^\/equipe$/, "Equipe interna"],
   [/^\/painel-uso$/, "Painel de Uso"],
   [/^\/admin\/limpeza-uras$/, "Limpeza de URAs"],
   [/^\/onboarding-implantacao\/dashboard$/, "Dashboard de Implantação"],
