@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- 🔧 **Setup de serviço somado à ativação do módulo** — Quando uma venda da calculadora juntava um módulo com mensalidade (como um ponto adicional) e um serviço sem mensalidade (como uma troca de adquirente), a **Aprovação OEM** em **Clientes** mostrava o setup dos dois somado na ativação do módulo. Agora o módulo fica só com o setup dele e o serviço entra na hora como uma venda avulsa própria, com o seu valor.
+
 - ⬆️ **Mais de uma novidade em destaque na Evolução DS** — O cartão **Em destaque** no topo da **Evolução DS** agora mostra várias novidades: aparece uma de cada vez, com a mais recente primeiro, e passa sozinho para a próxima a cada 8 segundos. Dá para ir e voltar pelas setas, pelas bolinhas embaixo do cartão ou arrastando com o dedo no celular. A troca para quando o mouse está sobre o cartão ou quando um vídeo está tocando.
 
 - 🔧 **Topo da conversa some ao digitar no DS Mobile** — No celular (chat.doctorsaas.com.br), ao tocar no campo de mensagem de uma conversa do **Chat** ou da **Equipe interna**, o teclado empurrava a tela para cima e escondia a barra do topo junto com o nome de quem estava na conversa. Agora o topo continua no lugar e só a lista de mensagens encolhe para caber acima do teclado.
