@@ -58,6 +58,14 @@ const LOTE = 25;
 // que cancelou por engano e reagendar com o mesmo arquivo.
 const ORFAO_DIAS = 7;
 
+// Envio em lote (DEM-0492): linha de lote e pega ate 55 s antes do horario e o
+// motor ESPERA o segundo exato. Sem isso, as mensagens que vencem no mesmo
+// minuto sairiam juntas no tique do cron e o intervalo entre elas viraria
+// rajada -- que e o que faz o WhatsApp bloquear numero Evolution. 55 e nao 60
+// para a execucao terminar antes do proximo tique.
+const ANTECEDENCIA_LOTE_S = 55;
+const PISO_LOTE_MS = 3000;
+
 interface Agendada {
   id: string;
   tenant_id: string;
@@ -72,6 +80,7 @@ interface Agendada {
   media_size_bytes: number | null;
   scheduled_at: string;
   opens_attendance: boolean;
+  bulk_send_id: string | null;
   template_id: string | null;
   template_parameters: string[] | Record<string, string> | null;
 }
@@ -268,6 +277,10 @@ async function enviarUma(supabase: any, ag: Agendada): Promise<{ ok: boolean; me
   }
 
   const assinatura = await resolverAssinatura(supabase, conversation, ag.created_by);
+  // Envio em lote (DEM-0492, decisao do Alexandre em 30/09): e comunicado da
+  // empresa, entao o cliente NAO recebe o "*Nome*" na primeira linha. Quem
+  // disparou continua gravado na mensagem (sender_name), so para uso interno.
+  if (ag.bulk_send_id) assinatura.prefixo = '';
 
   const corpo = ag.content || '';
   const conteudoFinal = assinatura.prefixo
@@ -385,6 +398,10 @@ async function limparOrfaos(supabase: any): Promise<number> {
     .select('id, storage_path')
     .in('status', ['canceled', 'failed'])
     .not('storage_path', 'is', null)
+    // Envio em lote: o PDF e UM arquivo para o lote inteiro. Apagar pelo
+    // cancelamento de um destinatario derrubaria o anexo dos outros, e as que
+    // ja sairam mostram esse mesmo arquivo na conversa. Fica no bucket.
+    .is('bulk_send_id', null)
     .lt('updated_at', limite)
     .limit(100);
 
@@ -429,8 +446,17 @@ Deno.serve(async (req) => {
   );
 
   try {
-    const { data: lote, error: claimErr } = await supabase
-      .rpc('fn_claim_due_scheduled_messages', { p_limit: LOTE });
+    let { data: lote, error: claimErr } = await supabase
+      .rpc('fn_claim_due_scheduled_messages', { p_limit: LOTE, p_antecedencia_s: ANTECEDENCIA_LOTE_S });
+
+    // Banco ainda sem a migration do envio em lote (20260930100200): a funcao
+    // so aceita p_limit e o PostgREST responde PGRST202. Cai na chamada antiga
+    // para as agendadas comuns nao pararem por ordem de publicacao.
+    if (claimErr && (claimErr as any).code === 'PGRST202') {
+      console.warn(`${LOG} claim sem p_antecedencia_s (migration do lote ainda nao aplicada)`);
+      ({ data: lote, error: claimErr } = await supabase
+        .rpc('fn_claim_due_scheduled_messages', { p_limit: LOTE }));
+    }
 
     if (claimErr) {
       console.error(`${LOG} claim falhou:`, claimErr);
@@ -439,11 +465,27 @@ Deno.serve(async (req) => {
       });
     }
 
-    const agendadas = (lote || []) as Agendada[];
+    // O `UPDATE ... RETURNING` do claim NAO devolve na ordem do ORDER BY da
+    // subconsulta. Sem ordenar aqui, a espera do lote (abaixo) aguardava a
+    // mais tardia primeiro e soltava as outras juntas depois -- visto no teste
+    // local de 30/09: 4 mensagens no mesmo segundo.
+    const agendadas = ((lote || []) as Agendada[])
+      .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
     let enviadas = 0;
+    let ultimoEnvioLote = 0;
     let falhas = 0;
 
     for (const ag of agendadas) {
+      // Linha de lote pega antes da hora: espera o horario dela. E nunca menos
+      // de PISO_LOTE_MS depois da anterior -- quando o motor chega atrasado
+      // (cron que falhou um tique, retentativa), varias ja estao vencidas e
+      // sairiam coladas.
+      if (ag.bulk_send_id) {
+        const alvo = Math.max(new Date(ag.scheduled_at).getTime(), ultimoEnvioLote + PISO_LOTE_MS);
+        const falta = alvo - Date.now();
+        if (falta > 0) await new Promise((r) => setTimeout(r, Math.min(falta, ANTECEDENCIA_LOTE_S * 1000)));
+        ultimoEnvioLote = Date.now();
+      }
       try {
         const r = await enviarUma(supabase, ag);
         if (r.ok) {

@@ -27,7 +27,7 @@ export default function AppLayout() {
   const location = useLocation();
   const isWhatsApp = location.pathname === "/whatsapp";
   // Telas que se viram sozinhas com a altura e rolam por dentro: sem padding do layout
-  const isFullBleed = isWhatsApp || location.pathname === "/whatsapp/contatos" || location.pathname === "/equipe";
+  const isFullBleed = isWhatsApp || location.pathname === "/whatsapp/contatos" || location.pathname === "/whatsapp/envio-lote" || location.pathname === "/equipe";
   const { profile } = useAuth();
   const canSeeDuplicates = profile?.role === 'admin' || profile?.role === 'head' || profile?.is_super_admin;
   const [dupOpen, setDupOpen] = useState(false);

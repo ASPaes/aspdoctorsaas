@@ -51,6 +51,7 @@ const SuperCatalogTemplates = lazyWithReload(() => import("@/pages/SuperCatalogT
 const PainelUso = lazyWithReload(() => import("@/pages/painel-uso/PainelUso"));
 const LimpezaUras = lazyWithReload(() => import("@/pages/admin/LimpezaUras"));
 const WhatsAppContatos = lazyWithReload(() => import("@/pages/WhatsAppContatos"));
+const WhatsAppEnvioLote = lazyWithReload(() => import("@/pages/WhatsAppEnvioLote"));
 const AtendimentoDashboard = lazyWithReload(() => import("@/pages/AtendimentoDashboard"));
 const OnboardingPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingPage"));
 const OnboardingConfigPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingConfigPage"));
@@ -147,6 +148,7 @@ const App = () => (
               <Route path="/atendimento/dashboard" element={<RequirePermission resource="nav.atendimento_dashboard"><Suspense fallback={<PageLoader />}><AtendimentoDashboard /></Suspense></RequirePermission>} />
               <Route path="/whatsapp" element={<RequirePermission resource="atendimento_chat"><WhatsApp /></RequirePermission>} />
               <Route path="/whatsapp/contatos" element={<RequirePermission resource="atendimento_chat"><WhatsAppContatos /></RequirePermission>} />
+              <Route path="/whatsapp/envio-lote" element={<RequirePermission resource="atendimento_chat"><WhatsAppEnvioLote /></RequirePermission>} />
               
               <Route path="/tickets" element={<RequirePermission resource="tickets"><SupportTickets /></RequirePermission>} />
               <Route path="/whatsapp/settings" element={<Navigate to="/configuracoes?tab=whatsapp" replace />} />

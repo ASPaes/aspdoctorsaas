@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2, RefreshCw, Pin } from "lucide-react";
+import { Search, Plus, MessageSquare, Users, X, FileSearch, ChevronRight, CheckCheck, Loader2, RefreshCw, Pin, Megaphone } from "lucide-react";
 import { MessageSearchModal } from "./MessageSearchModal";
 import { toast } from "sonner";
 import {
@@ -49,6 +49,7 @@ import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAgentAvailability } from "@/hooks/useAgentAvailability";
 import { usePortao } from "@/hooks/usePortao";
+import { useEnvioLoteAcesso } from "../envio-lote/useEnvioLote";
 import { MobileListHeader } from "@/components/chat-mobile/MobileListHeader";
 
 interface Props {
@@ -108,6 +109,8 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
   const navigate = useNavigate();
   // antes: sem restrição — agenda de contatos e busca nas mensagens abertas a todos.
   const podeContatos = usePortao("atend.contatos");
+  // Envio em lote (DEM-0492): admin/head, e só em empresa já liberada.
+  const { pode: podeEnvioLote } = useEnvioLoteAcesso();
   const podeBuscar = usePortao("atend.busca");
   // Mesmo portão de Configurações > Operação (onde mora a tela de grupos):
   // sem RBAC, só admin — ligar grupo muda o chat da empresa inteira.
@@ -893,6 +896,16 @@ export function ConversationsSidebar({ selectedId, onSelect, onSelectMessage, va
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Contatos</TooltipContent>
+              </Tooltip>
+            )}
+            {podeEnvioLote && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/whatsapp/envio-lote")} aria-label="Envio em lote">
+                    <Megaphone className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Envio em lote</TooltipContent>
               </Tooltip>
             )}
             <ConversationFiltersPopover filters={filters} onChange={setFilters} showGroupByAgent={activePill === "in_progress"} operatorFilterInactive={queueLikePills} />

@@ -44,7 +44,9 @@ Deno.serve(async (req) => {
     // `tenantId` sem conversa (15/09/2026): anexo da tela E-mails, onde não
     // existe conversa. O arquivo cai em <tenant>/emails/, e a send-email aceita
     // esse formato de caminho além do <tenant>/<conversa>/ do chat.
-    const { conversationId, tenantId: tenantPedido, mediaMimetype, fileName } = body || {};
+    // `pasta: 'lote'` (30/09/2026, DEM-0492): PDF do envio em lote, em
+    // <tenant>/lote/. Nao pode ir para emails/: a purge-email-anexos limpa ali.
+    const { conversationId, tenantId: tenantPedido, mediaMimetype, fileName, pasta } = body || {};
     if ((!conversationId && !tenantPedido) || !mediaMimetype) {
       return new Response(JSON.stringify({ error: 'Informe conversationId ou tenantId, e mediaMimetype' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -80,7 +82,7 @@ Deno.serve(async (req) => {
     const ext = extFor(String(mediaMimetype), fileName);
     const path = conversationId
       ? `${tenantDoArquivo}/${conversationId}/${crypto.randomUUID()}.${ext}`
-      : `${tenantDoArquivo}/emails/${crypto.randomUUID()}.${ext}`;
+      : `${tenantDoArquivo}/${pasta === 'lote' ? 'lote' : 'emails'}/${crypto.randomUUID()}.${ext}`;
 
     const { data, error } = await supabase.storage.from('whatsapp-media').createSignedUploadUrl(path);
     if (error || !data) {
