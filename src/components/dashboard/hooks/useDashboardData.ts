@@ -40,6 +40,10 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
   const { effectiveTenantId: tid } = useTenantFilter();
   const tf = (q: any) => tid ? q.eq('tenant_id', tid) : q;
+  // Contagem de cliente (ativos, novos, base do início, churn de logos) lê a
+  // lista SEM os clientes de evento único: eles pagam só o setup e não são
+  // carteira recorrente. As colunas são as mesmas da vw_clientes_financeiro.
+  const VW_RECORRENTES = 'vw_clientes_recorrentes' as 'vw_clientes_financeiro';
 
   const fetchSeqRef = useRef(0);
 
@@ -72,7 +76,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // === FIRE ALL FETCHES IN PARALLEL ===
       const clientesRawPromise = fetchAllRows<any>(() => {
         let q = supabase
-          .from('vw_clientes_financeiro')
+          .from(VW_RECORRENTES)
           .select('id, mensalidade, data_cadastro, data_venda_efetiva, data_ativacao, data_cancelamento, cancelado, valor_ativacao, custo_operacao, margem_contribuicao, lucro_bruto, unidade_base_id, fornecedor_id, estado_id, cidade_id, segmento_id, area_atuacao_id, origem_venda_id, motivo_cancelamento_id, funcionario_id, razao_social, nome_fantasia')
           .lte('data_venda_efetiva', periodoFimStr);
         if (tid) q = q.eq('tenant_id', tid);
@@ -81,7 +85,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       });
       const novosClientesPromise = fetchAllRows<any>(() => {
         let q = supabase
-          .from('vw_clientes_financeiro')
+          .from(VW_RECORRENTES)
           .select('id, mensalidade, valor_ativacao, data_venda_efetiva, cancelado, data_cancelamento, unidade_base_id, fornecedor_id, funcionario_id, origem_venda_id, razao_social, nome_fantasia')
           .gte('data_venda_efetiva', periodoInicioStr)
           .lte('data_venda_efetiva', periodoFimStr);
@@ -97,6 +101,8 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           .not('data_cancelamento', 'is', null)
           .gte('data_cancelamento', periodoInicioStr)
           .lte('data_cancelamento', periodoFimStr);
+        // Evento único não é carteira: não entra como cancelamento.
+        q = (q as any).eq('evento_unico', false);
         if (tid) q = q.eq('tenant_id', tid);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
@@ -112,7 +118,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       });
       const clientesInicioFullPromise = fetchAllRows<any>(() => {
         let q = supabase
-          .from('vw_clientes_financeiro')
+          .from(VW_RECORRENTES)
           .select('id, mensalidade, data_cancelamento, cancelado')
           .lt('data_venda_efetiva', periodoInicioStr);
         if (tid) q = q.eq('tenant_id', tid);
@@ -153,7 +159,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       const __prevMonthEndParallel = format(endOfMonth(subMonths(periodoInicio, 1)), 'yyyy-MM-dd');
       const prevNovosPromise = fetchAllRows<any>(() => {
         let prevNovosQuery = supabase
-          .from('vw_clientes_financeiro')
+          .from(VW_RECORRENTES)
           .select('id, mensalidade, valor_ativacao')
           .gte('data_venda_efetiva', __prevMonthStartParallel)
           .lte('data_venda_efetiva', __prevMonthEndParallel);
@@ -169,9 +175,30 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         .eq('status', 'ativo')
         .is('estornado_por', null)
         .is('estorno_de', null)));
+      // Cliente de evento único: fora das contagens, mas o setup dele é receita de
+      // ativação. Sem esta lista, com filtro de unidade ativo o movimento dele era
+      // descartado por não estar em nenhum conjunto de clientes.
+      const clientesEventoPromise = fetchAllRows<any>(() => {
+        let q = tf(supabase.from('vw_clientes_financeiro').select('id, unidade_base_id'))
+          .eq('evento_unico', true);
+        if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
+        return q;
+      });
+      // Setup lançado como venda avulsa (hoje, só o de evento único). Os movimentos da
+      // série mensal vêm filtrados por MRR_MOV_TIPOS, que não tem venda_avulsa: sem
+      // esta busca o gráfico mensal de ativação não batia com o card.
+      const ativacaoAvulsaPromise = fetchAllRows<any>(() => tf(supabase
+        .from('movimentos_mrr')
+        .select('cliente_id, vlr_ativacao, data_movimento')
+        .eq('tipo', 'venda_avulsa')
+        .gt('vlr_ativacao', 0)
+        .eq('status', 'ativo')
+        .is('estornado_por', null)
+        .is('estorno_de', null)
+        .lte('data_movimento', periodoFimStr)));
       const allClientesPromise = fetchAllRows<any>(() => {
         return tf(supabase
-          .from('vw_clientes_financeiro')
+          .from(VW_RECORRENTES)
           .select('id, mensalidade, valor_ativacao, data_cadastro, data_venda_efetiva, data_cancelamento, cancelado, unidade_base_id, fornecedor_id, motivo_cancelamento_id'));
       });
       // 1. Clientes ativos no fim do período — snapshot temporal
@@ -362,10 +389,14 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
 
       // Build set of ALL clients matching current filters (ativos + cancelados no período)
       // to correctly filter movimentos by fornecedor/unidade
+      // Cliente de evento não tem fornecedor: com filtro de fornecedor ele fica de fora.
+      const clientesEvento = await clientesEventoPromise;
+      const idsEventoNoFiltro: string[] = fornecedorClientIds ? [] : (clientesEvento || []).map((c: any) => c.id);
       const allClientesFiltered = new Set([
         ...(clientesAtivos || []).map(c => c.id),
         ...(cancelamentosFilt || []).map(c => c.id),
         ...(novosClientesFilt || []).map(c => c.id),
+        ...idsEventoNoFiltro,
       ]);
 
       const needsClientFilter = !!(filters.fornecedorIds?.length || filters.unidadeBaseId);
@@ -565,7 +596,14 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
                     && (!fornecedorClientIds || fornecedorClientIds.has(c.id)))
           .map(c => c.id)
       );
+      idsEventoNoFiltro.forEach(id => clientesNoFiltroSeries.add(id));
       const ativacaoMovPorMes: Record<string, number> = {};
+      const ativacaoAvulsa = await ativacaoAvulsaPromise;
+      (ativacaoAvulsa || []).forEach((m: any) => {
+        if (!m.data_movimento || !clientesNoFiltroSeries.has(m.cliente_id)) return;
+        const ym = String(m.data_movimento).slice(0, 7);
+        ativacaoMovPorMes[ym] = (ativacaoMovPorMes[ym] || 0) + (Number(m.vlr_ativacao) || 0);
+      });
       // Downsell por mês — a outra metade da perda de receita. O card "Churn Rate (Receita)"
       // é (cancelamento + downsell) ÷ MRR do início; a média mensal tem que somar o mesmo.
       const downsellPorMes: Record<string, number> = {};

@@ -386,6 +386,7 @@ export default function Clientes() {
       "id", "codigo_sequencial", "razao_social", "nome_fantasia", "cnpj", "produto_id", "qtde_produtos_ativos",
       "mensalidade", "data_ativacao", "data_cadastro", "cancelado", "data_venda", "data_venda_efetiva", "qtde_contratos_ativos", "unidade_base_id",
       "custo_operacao", "imposto_percentual", "custo_fixo_percentual", "telefone_whatsapp", "telefone_contato", "setup_completo",
+      "evento_unico",
     ].join(",");
 
     const pageSize = 1000;
@@ -453,14 +454,15 @@ export default function Clientes() {
     queryFn: async () => {
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows({ forNovosNoMes: true });
-        return rows.length;
+        // Cliente de evento único não é venda recorrente: fica fora de "Novos no Mês".
+        return rows.filter((r: any) => !r.evento_unico).length;
       }
 
       const now = new Date();
       const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
       const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
       let q = tf(supabase
-        .from("vw_clientes_financeiro")
+        .from("vw_clientes_recorrentes" as "vw_clientes_financeiro")
         .select("id", { count: "exact", head: true })) as any;
 
       q = q.gte("data_venda_efetiva", firstDay)
@@ -603,13 +605,14 @@ export default function Clientes() {
       let allRows: Array<{ id: string; mensalidade: number | null }>;
       if (hasDateOrValueFilters) {
         const rows = await fetchClientesFilteredRows();
-        allRows = rows.map((r: any) => ({ id: r.id, mensalidade: r.mensalidade }));
+        // Evento único tem mensalidade zero e diluiria o ticket.
+        allRows = rows.filter((r: any) => !r.evento_unico).map((r: any) => ({ id: r.id, mensalidade: r.mensalidade }));
       } else {
         // Buscar toda a base filtrada (apenas id + mensalidade) paginando
         const pageSize = 1000;
         const acc: Array<{ id: string; mensalidade: number | null }> = [];
         for (let offset = 0; ; offset += pageSize) {
-          let q = tf(supabase.from("vw_clientes_financeiro").select("id, mensalidade")) as any;
+          let q = tf(supabase.from("vw_clientes_recorrentes" as "vw_clientes_financeiro").select("id, mensalidade")) as any;
           if (status === "ativos") q = q.eq("cancelado", false);
           else if (status === "cancelados") q = q.eq("cancelado", true);
 

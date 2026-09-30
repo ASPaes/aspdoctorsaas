@@ -25,6 +25,7 @@ const CLIENTES = [
 
 const TABELAS: FakeTables = {
   vw_clientes_financeiro: CLIENTES,
+  vw_clientes_recorrentes: CLIENTES,
   clientes: CLIENTES,
   cliente_produtos: [
     { cliente_id: 'A', tenant_id: TID, fornecedor_id: 7, vlr_mensal: 1000, vlr_custo: 250, ativo: true, data_cancelamento: null },

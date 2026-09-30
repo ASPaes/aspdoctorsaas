@@ -86,7 +86,7 @@ export function useUnitEconomicsSeries(filters: DashboardFilters, rangeMonths = 
       const [allClientes, cpAll, movimentos, cacDespesas] = await Promise.all([
         fetchAllRows<any>(() => {
           let q = supabase
-            .from('vw_clientes_financeiro')
+            .from('vw_clientes_recorrentes' as 'vw_clientes_financeiro') // sem evento único
             .select('id, mensalidade, data_venda_efetiva, data_cancelamento, cancelado, custo_operacao, imposto_percentual, custo_fixo_percentual, unidade_base_id, fornecedor_id, valor_ativacao');
           if (tid) q = q.eq('tenant_id', tid);
           return q;

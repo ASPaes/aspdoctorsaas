@@ -41,7 +41,7 @@ export function useMargemContribuicaoDashboard(filters: DashboardFilters) {
       const [raw, cpAll, movimentos] = await Promise.all([
         fetchAllRows<any>(() => {
           let q = supabase
-            .from('vw_clientes_financeiro')
+            .from('vw_clientes_recorrentes' as 'vw_clientes_financeiro') // sem evento único
             .select('id, mensalidade, custo_operacao, data_venda_efetiva, data_cancelamento, cancelado')
             .lte('data_venda_efetiva', periodoFimStr);
           if (tid) q = q.eq('tenant_id', tid);

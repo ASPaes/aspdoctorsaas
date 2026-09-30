@@ -25,10 +25,14 @@ const TID = '955178ba-b367-498d-8443-cc5b7d1ee163';
 // B: entra em 10/04, dentro do período.
 // C: cancela em 20/06 — ainda contava em abril.
 const CLIENTES = [
-  { id: 'A', tenant_id: TID, mensalidade: 1000, data_venda_efetiva: '2025-01-10', data_cadastro: '2025-01-10', cancelado: false, data_cancelamento: null, unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente A' },
-  { id: 'B', tenant_id: TID, mensalidade: 500, data_venda_efetiva: '2026-04-10', data_cadastro: '2026-04-10', cancelado: false, data_cancelamento: null, unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente B' },
-  { id: 'C', tenant_id: TID, mensalidade: 0, data_venda_efetiva: '2025-03-01', data_cadastro: '2025-03-01', cancelado: true, data_cancelamento: '2026-06-20', unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente C' },
+  { id: 'A', tenant_id: TID, mensalidade: 1000, data_venda_efetiva: '2025-01-10', data_cadastro: '2025-01-10', cancelado: false, data_cancelamento: null, unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente A', evento_unico: false },
+  { id: 'B', tenant_id: TID, mensalidade: 500, data_venda_efetiva: '2026-04-10', data_cadastro: '2026-04-10', cancelado: false, data_cancelamento: null, unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente B', evento_unico: false },
+  { id: 'C', tenant_id: TID, mensalidade: 0, data_venda_efetiva: '2025-03-01', data_cadastro: '2025-03-01', cancelado: true, data_cancelamento: '2026-06-20', unidade_base_id: 1, valor_ativacao: 0, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Cliente C', evento_unico: false },
 ];
+
+// E: evento único vendido em 12/04 — sem contrato, sem produto, só o setup de 1990
+//    lançado como venda avulsa. Não é cliente da carteira; o setup é receita de ativação.
+const EVENTO = { id: 'E', tenant_id: TID, mensalidade: 0, data_venda_efetiva: '2026-04-12', data_cadastro: '2026-04-12', cancelado: false, data_cancelamento: null, unidade_base_id: 1, valor_ativacao: null, lucro_bruto: 0, margem_contribuicao: 0, custo_operacao: 0, razao_social: 'Evento E', evento_unico: true };
 
 const CLIENTE_PRODUTOS = [
   { cliente_id: 'A', tenant_id: TID, fornecedor_id: 7, vlr_mensal: 1000, ativo: true, data_cancelamento: null },
@@ -39,11 +43,13 @@ const CLIENTE_PRODUTOS = [
 
 const MOVIMENTOS = [
   { cliente_id: 'A', tenant_id: TID, tipo: 'upsell', valor_delta: 100, data_movimento: '2026-02-01', status: 'ativo', estornado_por: null, estorno_de: null, descricao: null },
+  { cliente_id: 'E', tenant_id: TID, tipo: 'venda_avulsa', valor_delta: 0, vlr_ativacao: 1990, data_movimento: '2026-04-12', status: 'ativo', estornado_por: null, estorno_de: null, descricao: 'Evento unico' },
 ];
 
 const TABELAS: FakeTables = {
-  vw_clientes_financeiro: CLIENTES,
-  clientes: CLIENTES,
+  vw_clientes_financeiro: [...CLIENTES, EVENTO],
+  vw_clientes_recorrentes: CLIENTES,
+  clientes: [...CLIENTES, EVENTO],
   cliente_produtos: CLIENTE_PRODUTOS,
   movimentos_mrr: MOVIMENTOS,
   unidades_base: [{ id: 1, nome: 'Matriz', tenant_id: TID }],
@@ -140,6 +146,25 @@ describe('useDashboardData — régua canônica do MRR', () => {
     expect(Number((marco.value as number).toFixed(2))).toBe(1800);
     // A linha por unidade tem que usar o mesmo corte da linha total.
     expect(Number((abril.mrr_1 as number).toFixed(2))).toBe(2300);
+  });
+
+  it('evento único: fora da contagem de clientes, setup dentro da ativação', async () => {
+    await renderHook(FILTROS);
+    const m = capturado!.metrics;
+    expect(m.clientesAtivos).toBe(3);
+    expect(m.novosClientes).toBe(1);
+    expect(Number(m.receitaAtivacao.toFixed(2))).toBe(1990);
+    const abril = capturado!.timeSeries.faturamentoEvolution.at(-1) as any;
+    expect(abril.ativacoes).toBe(1990);
+    expect(abril.vendas).toBe(1);
+  });
+
+  it('evento único: setup continua na ativação com filtro de unidade', async () => {
+    await renderHook({ ...FILTROS, unidadeBaseId: 1 } as DashboardFilters);
+    const m = capturado!.metrics;
+    expect(m.clientesAtivos).toBe(3);
+    expect(Number(m.receitaAtivacao.toFixed(2))).toBe(1990);
+    expect((capturado!.timeSeries.faturamentoEvolution.at(-1) as any).ativacoes).toBe(1990);
   });
 
   it('mantém a foto de hoje coerente: sem o produto que já saiu', async () => {
