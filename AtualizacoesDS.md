@@ -17,6 +17,14 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Setembro / 2026
 
+### 30/09
+
+- ⬆️ **Colar imagem no meio do texto do e-mail** — Em **E-mails**, ao escrever, responder ou encaminhar, dá para colar (Ctrl+V) ou arrastar uma imagem direto no texto e continuar escrevendo depois dela, como num programa de e-mail. A imagem chega ao cliente dentro do texto, não como anexo. Aceita PNG, JPG, GIF e WebP, até 5 MB cada.
+
+- ⬆️ **Remetente já vem escolhido** — Ao abrir a janela de e-mail (em **E-mails**, no chat ou no ticket), o **Remetente** já vem preenchido com a conta ligada ao seu usuário, ou com a única conta disponível. Antes era preciso escolher toda vez.
+
+- 🔧 **Código estranho no fim do assunto** — Os e-mails chegavam ao cliente com um código no fim do assunto, como "Teste [#V62G73GDBD]". O código saiu do assunto e continua funcionando por dentro: a resposta do cliente segue caindo no lugar certo.
+
 ### 29/09
 
 - 🔧 **Nova conversa com contato antigo abria pedindo "Reabrir atendimento"** — Em **Atendimento**, ao usar **Nova conversa** para um contato que já tinha conversado antes pelo mesmo número, o chat abria travado com o aviso "Atendimento encerrado. Reabra para voltar a falar com o cliente.", e era preciso clicar em **Reabrir atendimento** para conseguir escrever. Agora o atendimento já abre no seu nome e o chat chega pronto para digitar. Vale também para a Nova conversa aberta em **Contatos** e na **Visão 360°** do cliente. Um chat encerrado aberto por outro caminho continua pedindo Reabrir, como antes.
