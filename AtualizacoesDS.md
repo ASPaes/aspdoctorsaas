@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- 🔧 **Módulo novo soma na mensalidade em vez de substituí-la** — Quando um cliente que já tinha contrato com a mensalidade lançada direto no produto, sem módulos cadastrados, recebia o seu primeiro módulo pago (por um Up-Sell da calculadora ou pela ficha em **Clientes**), a mensalidade do produto era trocada pelo valor desse módulo. Num caso, um contrato de R$ 478,00 passou a mostrar R$ 36,00. Agora o valor do módulo novo entra nos **Movimentos de MRR** como upsell e soma na mensalidade. O cliente afetado já foi corrigido.
+
 - 🆕 **Acesso ao mobile por pessoa** — Em **Configurações › Equipe › Acessos & Permissões** há uma nova coluna **Mobile**, com Sim ou Não para cada pessoa. Quem está com Não faz login no mobile e vê o aviso de que não tem acesso e deve falar com o gestor da sua área. O acesso pelo computador não muda. Administradores começam com Sim; gestores e operadores começam com Não e são liberados pela coluna.
 
 - 🆕 **Permissão própria para a licença OEM** — Na coluna **Integração** de **Configurações › Equipe › Acessos & Permissões** entrou a opção **Licença OEM**, que controla quem pode trocar, ativar/desativar e bloquear/desbloquear a licença na ficha do cliente. Antes isso vinha junto com a permissão de Módulos; a nova opção começou com o mesmo valor que cada pessoa já tinha, e agora pode ser ajustada separadamente.
