@@ -38,6 +38,28 @@ export interface ItemEvolucao {
  *  não vista, ou novidade mais velha que isso; em_dia = nada não visto. */
 export type EstadoEvolucao = "pisca" | "numero" | "em_dia";
 
+/** Destaque sem prazo gravado fica isto, contado da publicação. */
+export const DIAS_DESTAQUE_PADRAO = 7;
+
+/**
+ * Prazo de cada destaque do carrossel (tabela `evolucao_destaques`, gravada pelo
+ * scripts/novidade/destacar.mjs). O feed do DoctorDev só diz se é destaque;
+ * até quando, mora aqui. Mapa release_id -> fim do destaque (ms).
+ */
+export function useEvolucaoPrazosDestaque() {
+  return useQuery({
+    queryKey: ["evolucao-ds-prazos-destaque"],
+    staleTime: 4 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<Map<string, number>> => {
+      const { data, error } = await (supabase.from("evolucao_destaques" as any) as any).select("release_id, destaque_ate");
+      // Tabela ainda não criada ou sem permissão: cai no padrão, não derruba a aba.
+      if (error) return new Map();
+      return new Map((data ?? []).map((r: any) => [r.release_id as string, new Date(r.destaque_ate).getTime()]));
+    },
+  });
+}
+
 export function useEvolucaoFeed() {
   const { effectiveTenantId } = useTenantFilter();
   return useQuery({

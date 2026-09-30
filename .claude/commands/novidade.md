@@ -87,7 +87,7 @@ Mande o link e pergunte:
 
 1. Publicar com vídeo e passo a passo
 2. Publicar **só o passo a passo com os prints**, sem vídeo (`--sem-video`)
-3. Publicar **em destaque** (topo da aba por 14 dias; só uma por vez)
+3. Publicar **em destaque** (carrossel no topo da aba, **7 dias** por padrão; pode haver vários ao mesmo tempo, e ele pode pedir outro prazo, ex.: 10 dias → `--dias 10`)
 4. Mudar algo antes (refaça só o pedaço pedido e mande o link de novo)
 
 Destaque e sem vídeo podem ir juntos.
@@ -96,11 +96,12 @@ Destaque e sem vídeo podem ir juntos.
 
 ```bash
 node scripts/novidade/publicar.mjs <pasta> <texto.json> DEM-0000 --simular    # confere
-node scripts/novidade/publicar.mjs <pasta> <texto.json> DEM-0000 [--destaque] [--sem-video]
+node scripts/novidade/publicar.mjs <pasta> <texto.json> DEM-0000 [--destaque [--dias N]] [--sem-video]
+node scripts/novidade/destacar.mjs DEM-0000 [--dias N] [--remover]   # só liga/desliga o destaque, sem regravar
 ```
 
 Escreve em produção no DoctorDev: sobe os arquivos no bucket `novidades` e preenche a
-release (`para_que_serve`, `passo_a_passo`, `video_url`, `destaque`). Release já publicada tem
+release (`para_que_serve`, `passo_a_passo`, `video_url`, `destaque`). O **prazo** do destaque não cabe no feed do DoctorDev: vai para `evolucao_destaques` no DoctorSaaS (sem linha = 7 dias da publicação). Destacar não tira os outros do carrossel. Release já publicada tem
 **título e resumo travados** no DoctorDev (o cliente já leu): o script mantém os de hoje e só envia
 a mídia. Não despublique para contornar.
 

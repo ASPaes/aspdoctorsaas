@@ -5,8 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { DestaqueCarrossel } from "@/components/evolucao/DestaqueCarrossel";
 import {
   useEvolucaoFeed,
+  useEvolucaoPrazosDestaque,
+  DIAS_DESTAQUE_PADRAO,
   useEvolucaoVistoEm,
   useMarcarEvolucaoVista,
   naoVisto,
@@ -255,6 +258,7 @@ function BlocoCorrecoes({
 
 export default function EvolucaoDS() {
   const feed = useEvolucaoFeed();
+  const prazos = useEvolucaoPrazosDestaque();
   const visto = useEvolucaoVistoEm();
   const marcarVista = useMarcarEvolucaoVista();
   const [filtro, setFiltro] = useState<Filtro>("tudo");
@@ -282,14 +286,17 @@ export default function EvolucaoDS() {
 
   const temPedidoDaEmpresa = itens.some((i) => i.pedido_pela_sua_empresa);
 
-  // Destaque do topo: a novidade marcada como destaque no /novidade, por 14 dias.
-  const emDestaque = useMemo(
-    () =>
-      itens.find(
-        (i) => i.destaque && temConteudo(i) && Date.now() - new Date(i.publicado_em).getTime() < 14 * 86400000,
-      ) ?? null,
-    [itens],
-  );
+  // Destaques do topo (carrossel, 30/09/2026): todas as marcadas como destaque no
+  // /novidade e ainda no prazo. O prazo é o gravado pelo destacar.mjs; sem ele,
+  // 7 dias contados da publicação. O feed já vem do mais recente para o mais antigo.
+  const emDestaque = useMemo(() => {
+    const agora = Date.now();
+    return itens.filter((i) => {
+      if (!i.destaque || !temConteudo(i)) return false;
+      const ate = prazos.data?.get(i.id) ?? new Date(i.publicado_em).getTime() + DIAS_DESTAQUE_PADRAO * 86400000;
+      return agora < ate;
+    });
+  }, [itens, prazos.data]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -349,33 +356,17 @@ export default function EvolucaoDS() {
         </div>
       </header>
 
-      {emDestaque && (
-        <section className="grid overflow-hidden rounded-2xl border bg-card md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          {emDestaque.video_url ? (
-            <video
-              src={emDestaque.video_url}
-              controls
-              playsInline
-              preload="metadata"
-              className="aspect-video h-full w-full min-w-0 bg-slate-950 object-contain"
-            />
-          ) : (
-            <img src={emDestaque.passo_a_passo?.[0]?.imagem_url} alt="" className="h-full w-full min-w-0 object-cover" />
-          )}
-          <div className="flex min-w-0 flex-col gap-2 p-5">
-            <span className="inline-flex w-max items-center gap-1.5 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800 dark:bg-green-950 dark:text-green-300">
-              <Sparkles className="h-3 w-3" />
-              Em destaque
-            </span>
-            <h2 className="text-xl font-bold leading-snug">{emDestaque.titulo}</h2>
-            <p className="text-sm text-muted-foreground">{emDestaque.resumo}</p>
-            {emDestaque.pedido_pela_sua_empresa && <SeloEmpresa />}
+      <DestaqueCarrossel
+        itens={emDestaque}
+        rodape={(item) => (
+          <>
+            {item.pedido_pela_sua_empresa && <SeloEmpresa />}
             <div className="mt-auto pt-2">
-              <BotaoComoFunciona item={emDestaque} onAbrir={() => setAberto(emDestaque)} />
+              <BotaoComoFunciona item={item} onAbrir={() => setAberto(item)} />
             </div>
-          </div>
-        </section>
-      )}
+          </>
+        )}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         {filtros.map((f) => (

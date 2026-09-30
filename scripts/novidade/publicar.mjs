@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Publica uma novidade gravada: sobe vídeo e prints para o DoctorDev e preenche a
 // release da demanda. A partir daí a Evolução DS de todos os clientes mostra o
-// botão "Ver como funciona" (e o destaque do topo, com --destaque).
+// botão "Ver como funciona" (e o carrossel de destaques do topo, com --destaque).
 //
-//   node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--sem-video] [--simular]
+//   node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque [--dias N]] [--sem-video] [--simular]
 //
 // <pasta>       saída do gravar.mjs (resultado.json, passo-N.png, video.webm)
 // <texto.json>  o mesmo do previa.mjs: titulo, resumo, para_que_serve
+// --destaque   entra no carrossel do topo por 7 dias (ou --dias N); não tira os outros
 // --sem-video   publica só o passo a passo com os prints (o vídeo gravado é ignorado)
 // --simular     mostra o que faria, sem gravar nada
 //
@@ -16,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { destacar, lerDias } from "./destacar.mjs";
 
 const REF = "luucsmybijcaejhfiwwr"; // DoctorDev
 const URL_DD = `https://${REF}.supabase.co`;
@@ -25,9 +27,10 @@ const args = process.argv.slice(2);
 const simular = args.includes("--simular");
 const destaque = args.includes("--destaque");
 const semVideo = args.includes("--sem-video");
-const [pasta, textoPath, demanda] = args.filter((a) => !a.startsWith("--"));
+const dias = lerDias(args);
+const [pasta, textoPath, demanda] = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--dias");
 if (!pasta || !textoPath || !/^DEM-\d+$/.test(demanda ?? "")) {
-  console.error("uso: node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque] [--sem-video] [--simular]");
+  console.error("uso: node scripts/novidade/publicar.mjs <pasta> <texto.json> <DEM-0000> [--destaque [--dias N]] [--sem-video] [--simular]");
   process.exit(2);
 }
 const resultado = JSON.parse(fs.readFileSync(path.join(pasta, "resultado.json"), "utf8"));
@@ -88,13 +91,14 @@ const campos = {
   para_que_serve: texto.para_que_serve?.length ? texto.para_que_serve : null,
   passo_a_passo: resultado.passos.map((p) => ({ passo: p.passo, legenda: p.legenda, imagem_url: publica(p.print) })),
   video_url: resultado.video ? publica(resultado.video) : null,
-  destaque,
+  // Sem --destaque o flag nao e tocado: republicar a midia nao tira do carrossel.
 };
 
 if (simular) {
   console.log("SIMULAÇÃO, nada foi gravado.");
   console.log(`subiria ${arquivos.length} arquivos para ${BUCKET}/${prefixo}/`);
   console.log(JSON.stringify(campos, null, 2));
+  if (destaque) await destacar({ demanda, releaseId: rel.id, dias, simular: true });
   process.exit(0);
 }
 
@@ -109,12 +113,13 @@ for (const a of arquivos) {
   console.log(`subiu ${a.nome} (${Math.round(corpo.length / 1024)} KB)`);
 }
 
-// Só uma novidade fica em destaque por vez.
-if (destaque) await rest(`releases?destaque=eq.true&id=neq.${rel.id}`, { method: "PATCH", body: JSON.stringify({ destaque: false }), headers: { "Content-Type": "application/json" } });
-
 await rest(`releases?id=eq.${rel.id}`, {
   method: "PATCH",
   headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
   body: JSON.stringify(campos),
 });
-console.log(`ok: ${demanda} publicada com ${resultado.passos.length} passos${resultado.video ? " e vídeo" : ""}${destaque ? ", em destaque" : ""}.`);
+console.log(`ok: ${demanda} publicada com ${resultado.passos.length} passos${resultado.video ? " e vídeo" : ""}.`);
+
+// Carrossel: pode haver varios destaques ao mesmo tempo (30/09/2026), entao
+// nao desmarca os outros. O prazo vai para o DoctorSaaS (evolucao_destaques).
+if (destaque) await destacar({ demanda, releaseId: rel.id, dias });
