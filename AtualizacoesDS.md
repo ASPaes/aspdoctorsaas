@@ -19,6 +19,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- 🆕 **Venda de evento único pela calculadora** — Quando a calculadora de vendas envia um cliente que paga só o setup, sem mensalidade (por exemplo, pontos de venda para um evento), o cliente é criado e a implantação abre normalmente com os módulos vendidos, mas **nenhum contrato mensal é criado**. O setup entra na **Receita de Ativação** e a Timeline do ticket avisa "Evento único". Antes, essa venda virava um contrato mensal de R$ 0 e, no fim do evento, aparecia como cancelamento. Venda marcada como mensal com mensalidade zero passa a ser recusada, com o motivo explicado.
+
+- 🔧 **Cliente de evento fora das contagens de carteira** — No **Dashboard** e na tela **Clientes** ("Novos no Mês" e "Ticket Médio"), cliente de evento único não conta mais como cliente ativo, cliente novo, cancelamento nem entra no ticket médio. Antes ele entrava com mensalidade zero e puxava o ticket médio para baixo. Ele continua aparecendo na lista de **Clientes**, e o setup dele continua somando na Receita de Ativação.
+
+- 🔧 **Setup de venda avulsa no gráfico de faturamento** — Em **Dashboard › Visão Geral**, o gráfico mensal de faturamento não somava o setup lançado como venda avulsa, e o mês mostrava menos ativação do que o card **Receita de Ativação**. Os dois passam a bater, também com o filtro de unidade.
+
 - ⬆️ **Tickets e "% sem ticket" no Scorecard por Agente** — Em **Atendimento › Dashboard**, na aba **Agentes**, o Scorecard ganhou duas colunas. **Tickets** mostra quantos tickets o agente tem como responsável no período: é o mesmo número da tela **Tickets** com o filtro do agente, e inclui os abertos por telefone. **% s/ ticket** mostra quantos atendimentos do agente terminaram sem ticket registrado, quase sempre fechados por inatividade, e fica amarelo a partir de 30%. Isso explica por que a tela Tickets e o Dashboard mostravam números diferentes para o mesmo agente: um conta tickets, o outro conta conversas. As duas colunas também saem no **Exportar XLSX**.
 
 - ⬆️ **Colar imagem no meio do texto do e-mail** — Em **E-mails**, ao escrever, responder ou encaminhar, dá para colar (Ctrl+V) ou arrastar uma imagem direto no texto e continuar escrevendo depois dela, como num programa de e-mail. A imagem chega ao cliente dentro do texto, não como anexo. Aceita PNG, JPG, GIF e WebP, até 5 MB cada.
