@@ -25,12 +25,16 @@ import {
 } from "@/components/ui/collapsible";
 import {
   ScrollText, Plus, Pencil, ChevronDown, ChevronRight,
-  ExternalLink, Loader2, XCircle, RefreshCw, AlertTriangle,
+  ExternalLink, Loader2, XCircle, RefreshCw, AlertTriangle, CalendarClock, Info,
 } from "lucide-react";
 import { NumericInput } from "@/components/ui/numeric-input";
 import { useProfile } from "@/hooks/useProfile";
 import { usePortao } from "@/hooks/usePortao";
 import EnviarContratoOmieButton from "./EnviarContratoOmieButton";
+import {
+  useCancelamentosAgendados, QuandoCancelar, SeloCancelamento, DesfazerAgendamento,
+  agendarCancelamento, amanhaISO, fmtDataBR, type CancelamentoAgendado,
+} from "./cancelamentoAgendado";
 
 interface Props {
   clienteId: string;
@@ -76,6 +80,7 @@ interface Contrato {
 interface ContratoItem {
   id: string;
   contrato_id: string;
+  cliente_produto_id: string | null;
   descricao: string | null;
   vlr_ativacao: number | null;
   vlr_mensal: number | null;
@@ -225,6 +230,25 @@ export default function ClienteContratosSection({ clienteId }: Props) {
     [contratosQuery.data]
   );
 
+  // DEM-0425: contrato com cancelamento agendado segue "ativo" no banco; o selo
+  // sai daqui. Produto agendado que é o único item leva o contrato junto.
+  const agendadosQuery = useCancelamentosAgendados(tid, clienteId);
+  const agendadoDoContrato = useMemo(() => {
+    const m: Record<string, { ag: CancelamentoAgendado; peloProduto: boolean }> = {};
+    for (const a of agendadosQuery.data ?? []) {
+      if (a.contrato_id) m[a.contrato_id] = { ag: a, peloProduto: false };
+    }
+    for (const a of agendadosQuery.data ?? []) {
+      if (!a.cliente_produto_id) continue;
+      for (const [cid, its] of Object.entries(itensByContrato)) {
+        if (its.length === 1 && its[0].cliente_produto_id === a.cliente_produto_id && !m[cid]) {
+          m[cid] = { ag: a, peloProduto: true };
+        }
+      }
+    }
+    return m;
+  }, [agendadosQuery.data, itensByContrato]);
+
   const ativosCount = useMemo(
     () => (contratosQuery.data ?? []).filter((c) => c.status === "ativo").length,
     [contratosQuery.data]
@@ -248,6 +272,7 @@ export default function ClienteContratosSection({ clienteId }: Props) {
     qc.invalidateQueries({ queryKey: ["unit-economics-saas"] });
     // Contrato eventos (timeline, histórico)
     qc.invalidateQueries({ queryKey: ["contrato_eventos"] });
+    qc.invalidateQueries({ queryKey: ["cancelamentos_agendados"] });
   };
 
   const isLoading = contratosQuery.isLoading;
@@ -318,12 +343,30 @@ export default function ClienteContratosSection({ clienteId }: Props) {
                         </Badge>
                       </div>
                       <div>
-                        <Badge
-                          variant={c.status === "ativo" ? "default" : "destructive"}
-                          className={c.status === "ativo" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
-                        >
-                          {c.status === "ativo" ? "Ativo" : "Cancelado"}
-                        </Badge>
+                        {c.status === "ativo" && agendadoDoContrato[c.id] ? (
+                          <div className="flex flex-col items-start gap-1">
+                            <SeloCancelamento
+                              texto="Em cancelamento"
+                              title={agendadoDoContrato[c.id].peloProduto
+                                ? "Agendado pelo cancelamento do produto, que é o único item. Para desfazer, use o produto."
+                                : undefined}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              efetivo em{" "}
+                              <strong className="text-foreground">{fmtDataBR(agendadoDoContrato[c.id].ag.data_efetiva)}</strong>
+                            </span>
+                            {!agendadoDoContrato[c.id].peloProduto && podeCancelar && (
+                              <DesfazerAgendamento ag={agendadoDoContrato[c.id].ag} onDone={invalidate} />
+                            )}
+                          </div>
+                        ) : (
+                          <Badge
+                            variant={c.status === "ativo" ? "default" : "destructive"}
+                            className={c.status === "ativo" ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                          >
+                            {c.status === "ativo" ? "Ativo" : "Cancelado"}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <Button
@@ -478,6 +521,11 @@ export default function ClienteContratosSection({ clienteId }: Props) {
         motivosCancelamento={motivosCancelamentoQuery.data ?? []}
         ativosCount={ativosCount}
         tid={tid}
+        dataAgendada={
+          cancelDialog.contrato && agendadoDoContrato[cancelDialog.contrato.id] && !agendadoDoContrato[cancelDialog.contrato.id].peloProduto
+            ? agendadoDoContrato[cancelDialog.contrato.id].ag.data_efetiva
+            : null
+        }
         onSuccess={() => {
           invalidate();
           setCancelDialog({ open: false, contrato: null });
@@ -888,22 +936,28 @@ interface CancelarContratoDialogProps {
   motivosCancelamento: Array<{ id: number; descricao: string }>;
   ativosCount: number;
   tid: string | null | undefined;
+  dataAgendada?: string | null;
   onSuccess: () => void;
 }
 
 function CancelarContratoDialog({
-  open, onOpenChange, contrato, motivosCancelamento, ativosCount, onSuccess,
+  open, onOpenChange, contrato, motivosCancelamento, ativosCount, dataAgendada, onSuccess,
 }: CancelarContratoDialogProps) {
   const [motivoId, setMotivoId] = useState<string>("");
   const [observacao, setObservacao] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [loading, setLoading] = useState(false);
+  // DEM-0425
+  const [modo, setModo] = useState<"agora" | "agendar">("agora");
+  const [dataCancel, setDataCancel] = useState("");
 
   useEffect(() => {
     if (open) {
       setMotivoId("");
       setObservacao("");
       setConfirmacao("");
+      setModo("agora");
+      setDataCancel(amanhaISO());
     }
   }, [open, contrato?.id]);
 
@@ -921,11 +975,34 @@ function CancelarContratoDialog({
 
   const isUltimoAtivo = ativosCount <= 1 && contrato?.status === "ativo";
   const matches = contrato ? confirmacao.trim() === contrato.numero.trim() : false;
-  const canSubmit = !!motivoId && matches && !loading && !!contrato;
+  const agendar = modo === "agendar";
+  const canSubmit = !!motivoId && matches && !loading && !!contrato
+    && (!agendar || (!!dataCancel && dataCancel >= amanhaISO()));
 
   const handleConfirm = async () => {
     if (!canSubmit || !contrato) return;
     setLoading(true);
+    if (agendar) {
+      try {
+        await agendarCancelamento({
+          alvo: "contrato",
+          id: contrato.id,
+          data: dataCancel,
+          motivoId: Number(motivoId),
+          observacao: observacao.trim() || null,
+        });
+        toast({
+          title: `Cancelamento agendado para ${fmtDataBR(dataCancel)}`,
+          description: "Até lá o contrato segue ativo. Na data, o sistema cancela sozinho.",
+        });
+        onSuccess();
+      } catch (err: any) {
+        toast({ title: "Não deu para agendar", description: err?.message, variant: "destructive" });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     try {
       const { data, error } = await (supabase.rpc as any)("cancelar_contrato", {
         p_contrato_id: contrato.id,
@@ -964,11 +1041,31 @@ function CancelarContratoDialog({
             Cancelar contrato {contrato.numero}
           </DialogTitle>
           <DialogDescription>
-            Esta ação cancela o contrato e inativa os produtos vinculados.
+            {agendar
+              ? "O contrato segue ativo até a data e é cancelado sozinho nela, inativando os produtos vinculados."
+              : "Esta ação cancela o contrato e inativa os produtos vinculados."}
           </DialogDescription>
         </DialogHeader>
 
-        {isUltimoAtivo && (
+        <QuandoCancelar
+          idPrefix="contrato"
+          modo={modo}
+          onModo={setModo}
+          data={dataCancel}
+          onData={setDataCancel}
+          dataAgendada={dataAgendada}
+        />
+
+        {agendar ? (
+          <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-3 flex gap-2">
+            <Info className="h-4 w-4 text-sky-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-sky-700 dark:text-sky-400">
+              Até <strong>{fmtDataBR(dataCancel)}</strong> nada muda: contrato e produtos seguem ativos e no MRR.
+              Em {fmtDataBR(dataCancel)} o contrato é cancelado com churn
+              {isUltimoAtivo ? " e, sendo o último contrato ativo, o cliente passa a contar como cancelado" : ""}.
+            </p>
+          </div>
+        ) : isUltimoAtivo && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 flex gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
@@ -1040,9 +1137,16 @@ function CancelarContratoDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             Voltar
           </Button>
-          <Button variant="destructive" onClick={handleConfirm} disabled={!canSubmit}>
-            <XCircle className="h-4 w-4 mr-2" />
-            {loading ? "Cancelando..." : "Cancelar contrato"}
+          <Button
+            variant="destructive"
+            className={agendar ? "bg-sky-700 text-white hover:bg-sky-600" : undefined}
+            onClick={handleConfirm}
+            disabled={!canSubmit}
+          >
+            {agendar ? <CalendarClock className="h-4 w-4 mr-2" /> : <XCircle className="h-4 w-4 mr-2" />}
+            {loading
+              ? (agendar ? "Agendando..." : "Cancelando...")
+              : agendar ? `Agendar para ${fmtDataBR(dataCancel)}` : "Cancelar contrato"}
           </Button>
         </DialogFooter>
       </DialogContent>

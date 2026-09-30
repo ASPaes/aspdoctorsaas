@@ -36,6 +36,7 @@ import {
 import {
   Package, Plus, Pencil, Trash2, ChevronDown, ChevronRight,
   ExternalLink, Loader2, Puzzle, Percent, AlertTriangle, Paperclip, X, XCircle, Clock, FileText,
+  CalendarClock, Info,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -44,6 +45,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 
 import SugestaoMRRDialog from "./SugestaoMRRDialog";
+import {
+  useCancelamentosAgendados, QuandoCancelar, SeloCancelamento, DesfazerAgendamento,
+  agendarCancelamento, amanhaISO, fmtDataBR, type CancelamentoAgendado,
+} from "./cancelamentoAgendado";
 import ReajusteModulosDialog from "./ReajusteModulosDialog";
 import EnviarOmieComPreviaButton from "./EnviarOmieComPreviaButton";
 import HistoricoModulosProduto from "./HistoricoModulosProduto";
@@ -311,6 +316,9 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const [cancelarProduto, setCancelarProduto] = useState<ClienteProduto | null>(null);
   const [motivoProdutoId, setMotivoProdutoId] = useState<string>("");
   const [obsCancelProduto, setObsCancelProduto] = useState("");
+  // DEM-0425: "agora" é o caminho de sempre; "agendar" só grava a data.
+  const [modoCancelProduto, setModoCancelProduto] = useState<"agora" | "agendar">("agora");
+  const [dataCancelProduto, setDataCancelProduto] = useState("");
   const [cancelandoProduto, setCancelandoProduto] = useState(false);
   // Somar unidade é a mesma escrita no OEM, ao contrário: a licença é gravada
   // inteira e o que muda é a quantidade do módulo.
@@ -339,6 +347,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   });
 
   const produtoIds = useMemo(() => (produtosQuery.data ?? []).map(p => p.id), [produtosQuery.data]);
+
+  const agendadosQuery = useCancelamentosAgendados(tid, clienteId);
+  const agendadoPorProduto = useMemo(() => {
+    const m: Record<string, CancelamentoAgendado> = {};
+    for (const a of agendadosQuery.data ?? []) if (a.cliente_produto_id) m[a.cliente_produto_id] = a;
+    return m;
+  }, [agendadosQuery.data]);
+  const agendadoPorContrato = useMemo(() => {
+    const m: Record<string, CancelamentoAgendado> = {};
+    for (const a of agendadosQuery.data ?? []) if (a.contrato_id) m[a.contrato_id] = a;
+    return m;
+  }, [agendadosQuery.data]);
 
   // Produto do cliente que tem licença no parceiro. É esta resposta — e não a
   // `origem` da linha do módulo — que decide se uma mexida pode ser gravada
@@ -584,6 +604,7 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
     qc.invalidateQueries({ queryKey: ["contratos_totais_check", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["has_non_implicit_contratos", tid, clienteId] });
     qc.invalidateQueries({ queryKey: ["oem_pendencias_cliente", clienteId] });
+    qc.invalidateQueries({ queryKey: ["cancelamentos_agendados"] });
   };
 
   // ---- Mutations ----
@@ -713,6 +734,28 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
   const cancelarProdutoAgora = async () => {
     if (!cancelarProduto || !motivoProdutoId) return;
     setCancelandoProduto(true);
+    if (modoCancelProduto === "agendar") {
+      try {
+        await agendarCancelamento({
+          alvo: "produto",
+          id: cancelarProduto.id,
+          data: dataCancelProduto,
+          motivoId: Number(motivoProdutoId),
+          observacao: obsCancelProduto.trim() || null,
+        });
+        toast({
+          title: `Cancelamento agendado para ${fmtDataBR(dataCancelProduto)}`,
+          description: "Até lá nada muda. Na data, o sistema cancela sozinho.",
+        });
+        setCancelarProduto(null);
+        invalidateAll();
+      } catch (e: any) {
+        toast({ variant: "destructive", title: "Não deu para agendar", description: e?.message });
+      } finally {
+        setCancelandoProduto(false);
+      }
+      return;
+    }
     try {
       const { data, error } = await (supabase.rpc as any)("cancel_cliente_produto", {
         p_cliente_produto_id: cancelarProduto.id,
@@ -914,6 +957,17 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                             Cancelado
                           </Badge>
                         )}
+                        {p.ativo && agendadoPorProduto[p.id] ? (
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <SeloCancelamento texto={`Cancela em ${fmtDataBR(agendadoPorProduto[p.id].data_efetiva)}`} />
+                            <DesfazerAgendamento ag={agendadoPorProduto[p.id]} onDone={invalidateAll} />
+                          </span>
+                        ) : p.ativo && contratoIdByCliProd[p.id] && agendadoPorContrato[contratoIdByCliProd[p.id]] ? (
+                          <SeloCancelamento
+                            texto={`Cancela em ${fmtDataBR(agendadoPorContrato[contratoIdByCliProd[p.id]].data_efetiva)}`}
+                            title="Vai junto com o cancelamento agendado do contrato. Para desfazer, use o contrato."
+                          />
+                        ) : null}
                         {/* Sem precisar expandir: é a identidade da licença no
                             OEM e a primeira coisa que se procura conferindo. */}
                         {oemAtivo === true && p.oem_codigo_filial && (
@@ -940,7 +994,11 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
                           <TooltipTrigger asChild>
                             <Button
                               type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-                              onClick={() => { setMotivoProdutoId(""); setObsCancelProduto(""); setCancelarProduto(p); }}
+                              onClick={() => {
+                                setMotivoProdutoId(""); setObsCancelProduto("");
+                                setModoCancelProduto("agora"); setDataCancelProduto(amanhaISO());
+                                setCancelarProduto(p);
+                              }}
                             >
                               <XCircle className="h-4 w-4" />
                             </Button>
@@ -1444,6 +1502,15 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               </span>
             </div>
 
+            <QuandoCancelar
+              idPrefix="produto"
+              modo={modoCancelProduto}
+              onModo={setModoCancelProduto}
+              data={dataCancelProduto}
+              onData={setDataCancelProduto}
+              dataAgendada={cancelarProduto ? agendadoPorProduto[cancelarProduto.id]?.data_efetiva ?? null : null}
+            />
+
             <div className="space-y-1.5">
               <Label>Motivo *</Label>
               <Select value={motivoProdutoId} onValueChange={setMotivoProdutoId}>
@@ -1474,6 +1541,28 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
 
             {cancelInfoQuery.isLoading ? (
               <Skeleton className="h-12 w-full" />
+            ) : modoCancelProduto === "agendar" ? (
+              <p className="flex items-start gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-700 dark:text-sky-400">
+                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                {cancelInfoQuery.data?.contratoId && (cancelInfoQuery.data?.itens ?? 0) <= 1 ? (
+                  <span>
+                    É o <strong>único item</strong> do contrato {cancelInfoQuery.data?.numero ?? ""}. Até{" "}
+                    <strong>{fmtDataBR(dataCancelProduto)}</strong> nada muda: produto, contrato e cliente seguem
+                    ativos. Em {fmtDataBR(dataCancelProduto)} o contrato é cancelado com churn no MRR e, sendo o
+                    último contrato ativo, o cliente passa a contar como cancelado.
+                  </span>
+                ) : cancelInfoQuery.data?.contratoId ? (
+                  <span>
+                    Até <strong>{fmtDataBR(dataCancelProduto)}</strong> nada muda. Na data, o produto sai do
+                    contrato {cancelInfoQuery.data?.numero ?? ""}, que continua ativo com os outros itens, e o
+                    downsell de R$ {fmtBRL(cancelarProduto?.vlr_mensal)}/mês é lançado no MRR.
+                  </span>
+                ) : (
+                  <span>
+                    Até <strong>{fmtDataBR(dataCancelProduto)}</strong> nada muda. Na data, o produto é inativado.
+                  </span>
+                )}
+              </p>
             ) : cancelInfoQuery.data?.contratoId && (cancelInfoQuery.data?.itens ?? 0) <= 1 ? (
               <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1511,12 +1600,18 @@ export default function ClienteProdutosSection({ clienteId }: Props) {
               Voltar
             </Button>
             <Button
-              type="button" variant="destructive" className="gap-1.5"
-              disabled={cancelandoProduto || !motivoProdutoId}
+              type="button" variant="destructive"
+              className={modoCancelProduto === "agendar" ? "gap-1.5 bg-sky-700 text-white hover:bg-sky-600" : "gap-1.5"}
+              disabled={
+                cancelandoProduto || !motivoProdutoId
+                || (modoCancelProduto === "agendar" && (!dataCancelProduto || dataCancelProduto < amanhaISO()))
+              }
               onClick={cancelarProdutoAgora}
             >
-              {cancelandoProduto ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-              Cancelar produto
+              {cancelandoProduto ? <Loader2 className="h-4 w-4 animate-spin" />
+                : modoCancelProduto === "agendar" ? <CalendarClock className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+              {modoCancelProduto === "agendar" && dataCancelProduto
+                ? `Agendar para ${fmtDataBR(dataCancelProduto)}` : "Cancelar produto"}
             </Button>
           </DialogFooter>
         </DialogContent>
