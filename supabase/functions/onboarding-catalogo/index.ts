@@ -9,6 +9,9 @@
 // produtos ativos daquele cliente e os módulos que ele já tem. É o que o
 // up-sell precisa — ver o comentário na leitura do parâmetro.
 //
+// 30/09/2026: CNPJ com mais de uma ficha devolve todas em `cliente.cadastros`,
+// para o vendedor escolher; a escolha volta na venda em cliente.cliente_id.
+//
 // Só leitura. Nunca escreve.
 //
 // Existe porque o sistema de propostas precisa mandar ID, não texto: dos 3 itens do
@@ -134,7 +137,7 @@ Deno.serve(async (req) => {
     ]);
 
     // Nomes de produto e de módulo saem das listas já carregadas acima — o
-    // cliente só acrescenta 2 consultas curtas, nenhuma em tabela de volume.
+    // cliente só acrescenta 3 consultas curtas, nenhuma em tabela de volume.
     let cliente: unknown = undefined;
     if (cnpj.length >= 11) {
       const nomeProduto = new Map((produtos as any[]).map((p) => [p.id, p.nome]));
@@ -145,23 +148,25 @@ Deno.serve(async (req) => {
       // caso e o cliente apareceria como "não encontrado", que é o pior
       // resultado possível: mentira silenciosa.
       //
-      // Ordena por created_at para ser determinístico. ⚠️ A fn_intake_proposta
-      // faz o mesmo lookup com LIMIT 1 e SEM ORDER BY, então num CNPJ duplicado
-      // ela pode gravar noutra linha. Por isso o `duplicados` vai na resposta:
-      // com mais de um, a tela tem que avisar em vez de confiar na escolha.
+      // 30/09/2026: com mais de uma ficha, `cadastros` traz TODAS, cada uma com
+      // os produtos dela, para o vendedor escolher. O escolhido volta na venda em
+      // cliente.cliente_id e a fn_intake_proposta grava nele, sem procurar pelo
+      // CNPJ. Antes só ia a mais antiga — no caso que motivou (15.201.538/0001-31
+      // na Digi) era a cancelada, e a ativa nem aparecia.
       const { data: achados } = await supabase
-        .from('clientes').select('id, razao_social, nome_fantasia, cancelado, created_at')
+        .from('clientes')
+        .select('id, codigo_sequencial, razao_social, nome_fantasia, cancelado, created_at')
         .eq('tenant_id', tenantId).eq('cnpj_digits', cnpj)
         .order('created_at', { ascending: true }).limit(20);
 
-      const cli = (achados ?? [])[0];
+      const fichas = (achados ?? []) as any[];
 
-      if (!cli) {
+      if (fichas.length === 0) {
         cliente = { encontrado: false, cnpj };
       } else {
         const { data: cps } = await supabase
-          .from('cliente_produtos').select('id, produto_id')
-          .eq('cliente_id', cli.id).eq('ativo', true);
+          .from('cliente_produtos').select('id, cliente_id, produto_id')
+          .in('cliente_id', fichas.map((f) => f.id)).eq('ativo', true);
 
         const ids = (cps ?? []).map((c: any) => c.id);
         const { data: mods } = ids.length
@@ -170,26 +175,39 @@ Deno.serve(async (req) => {
               .in('cliente_produto_id', ids).eq('ativo', true)
           : { data: [] as any[] };
 
+        const cadastros = fichas.map((f) => ({
+          cliente_id: f.id,
+          codigo: f.codigo_sequencial,
+          razao_social: f.razao_social,
+          nome_fantasia: f.nome_fantasia,
+          cancelado: f.cancelado === true,
+          produtos: (cps ?? [])
+            .filter((c: any) => c.cliente_id === f.id)
+            .map((c: any) => ({
+              produto_id: c.produto_id,
+              nome: nomeProduto.get(c.produto_id) ?? null,
+              modulos: (mods ?? [])
+                .filter((m: any) => m.cliente_produto_id === c.id)
+                .map((m: any) => ({
+                  modulo_id: m.modulo_id,
+                  nome: nomeModulo.get(m.modulo_id) ?? null,
+                  quantidade: m.quantidade,
+                })),
+            })),
+        }));
+
+        // Os campos soltos continuam para quem já lê o formato antigo. Com mais
+        // de uma ficha, eles mostram a primeira ATIVA (a mais antiga só se todas
+        // estiverem canceladas) — mas quem decide é o vendedor, pela lista.
+        const principal = cadastros.find((c) => !c.cancelado) ?? cadastros[0];
+
         cliente = {
           encontrado: true,
-          cliente_id: cli.id,
-          razao_social: cli.razao_social,
-          nome_fantasia: cli.nome_fantasia,
-          cancelado: cli.cancelado === true,
-          // > 1 significa CNPJ repetido no cadastro. Os produtos abaixo são só
-          // os do cadastro mais antigo; avise na tela em vez de seguir.
-          duplicados: (achados ?? []).length,
-          produtos: (cps ?? []).map((c: any) => ({
-            produto_id: c.produto_id,
-            nome: nomeProduto.get(c.produto_id) ?? null,
-            modulos: (mods ?? [])
-              .filter((m: any) => m.cliente_produto_id === c.id)
-              .map((m: any) => ({
-                modulo_id: m.modulo_id,
-                nome: nomeModulo.get(m.modulo_id) ?? null,
-                quantidade: m.quantidade,
-              })),
-          })),
+          ...principal,
+          // > 1 significa CNPJ repetido no cadastro: mostre `cadastros` e mande
+          // o escolhido em cliente.cliente_id na venda.
+          duplicados: cadastros.length,
+          cadastros,
         };
       }
     }
