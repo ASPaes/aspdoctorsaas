@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- ⬆️ **Implantação diluída da calculadora vira upsell** — Quando a venda na calculadora usa a moeda de troca **Implantação diluída**, o valor diluído na mensalidade agora chega ao DoctorSaaS separado dos módulos: entra nos **Movimentos de MRR** do cliente como um upsell próprio, com a descrição "Setup diluído", e soma na mensalidade. O setup cobrado de fato continua indo para a ativação. Vale para Novo Cliente e Up-Sell, e a informação também aparece na Timeline do ticket de implantação.
+
 - ⬆️ **Permissões detalhadas para E-mails** — Em **Configurações › Equipe › Permissões e perfis**, o módulo **E-mails** ganhou seis permissões além de abrir a tela: **Ver e-mails de todas as pessoas** (sem ela, a pessoa vê só os e-mails que enviou e as respostas), **Lixeira de e-mails**, **Resolver a triagem**, **Ler a caixa agora**, **Cadastrar macros de e-mail** e **Mexer no agendamento de outra pessoa**. As três últimas aparecem no nível 3 do módulo. Cada perfil começou exatamente com o acesso que já tinha; agora dá para ajustar perfil por perfil.
 
 - ⬆️ **Buscar permissão pelo nome** — Em **Configurações › Equipe › Permissões e perfis**, o campo **Buscar permissão** filtra a lista enquanto você digita: digite "e-mail" e aparece só o que tem a ver com e-mail, em todos os módulos, com o trecho encontrado destacado. Não importa acento nem hífen ("email" acha "E-mails"). Quando o termo está na explicação do item, ela já aparece aberta, e se algum resultado estiver escondido pelo nível do módulo (1 · 2 · 3), a tela avisa em vez de sumir com ele.
