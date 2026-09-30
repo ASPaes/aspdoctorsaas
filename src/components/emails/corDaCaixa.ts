@@ -36,7 +36,7 @@ export function estiloDaCaixa(conta: CorDaCaixa | null | undefined, selecionada 
   if (!hex) return { linha: undefined, faixa: undefined, email: undefined };
   if (conta?.cor_modo === "linha") {
     return {
-      linha: selecionada ? undefined : ({ backgroundColor: `${hex}24` } as CSSProperties),
+      linha: selecionada ? undefined : ({ backgroundColor: `${hex}3D` } as CSSProperties),
       faixa: faixa(hex),
       email: undefined,
     };
@@ -44,6 +44,6 @@ export function estiloDaCaixa(conta: CorDaCaixa | null | undefined, selecionada 
   return {
     linha: undefined,
     faixa: undefined,
-    email: { ...faixa(hex), backgroundColor: `${hex}33` } as CSSProperties,
+    email: { ...faixa(hex), backgroundColor: `${hex}40` } as CSSProperties,
   };
 }
