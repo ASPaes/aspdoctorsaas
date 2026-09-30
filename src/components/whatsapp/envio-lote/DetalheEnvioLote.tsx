@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Loader2, XCircle } from "lucide-react";
+import { Eye, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PreviaMensagemDialog } from "./PreviaMensagemDialog";
 import { useCancelarEnvioLote, useItensEnvioLote, type EnvioLote, type ItemEnvioLote } from "./useEnvioLote";
 
 const ROTULO: Record<ItemEnvioLote["status"], string> = {
@@ -51,6 +52,7 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
   const { data: itens = [], isLoading } = useItensEnvioLote(envio.id);
   const cancelar = useCancelarEnvioLote();
   const [confirmar, setConfirmar] = useState(false);
+  const [previa, setPrevia] = useState<ItemEnvioLote | null>(null);
 
   const c = (s: ItemEnvioLote["status"]) => itens.filter((i) => i.status === s).length;
   const total = itens.length || envio.total;
@@ -94,6 +96,7 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
                   <th className="px-3 py-2 font-semibold">Destinatário</th>
                   <th className="px-3 py-2 font-semibold">Horário</th>
                   <th className="px-3 py-2 font-semibold">Situação</th>
+                  <th className="w-10 px-3 py-2"><span className="sr-only">Ver mensagem</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -111,6 +114,11 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
                       {i.status === "pending" && i.attempts > 0 && (
                         <span className="ml-2 text-xs text-muted-foreground">nova tentativa ({i.attempts}/5)</span>
                       )}
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPrevia(i)} aria-label={`Ver mensagem enviada para ${i.nome}`} title="Ver mensagem">
+                        <Eye className="h-4 w-4" />
+                      </Button>
                     </td>
                   </tr>
                 ))}
@@ -133,6 +141,16 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
           </Button>
         )}
       </div>
+
+      <PreviaMensagemDialog
+        aberto={!!previa}
+        onFechar={() => setPrevia(null)}
+        titulo={previa?.nome ?? ""}
+        subtitulo={previa ? (previa.status === "sent" ? `Enviada em ${format(new Date(previa.sent_at || previa.scheduled_at), "dd/MM/yyyy HH:mm:ss")}` : `${ROTULO[previa.status]} · ${format(new Date(previa.scheduled_at), "dd/MM/yyyy HH:mm:ss")}`) : undefined}
+        conteudo={previa?.content ?? ""}
+        arquivo={previa?.media_file_name}
+        horario={previa?.sent_at || previa?.scheduled_at}
+      />
 
       <AlertDialog open={confirmar} onOpenChange={setConfirmar}>
         <AlertDialogContent>

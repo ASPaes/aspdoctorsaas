@@ -7,7 +7,7 @@
 // teste"). A regra de verdade está nas RPCs; aqui a tela só esconde.
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Loader2, Megaphone, Plus, Search } from "lucide-react";
+import { ArrowLeft, Eye, Loader2, Megaphone, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import AccessDenied from "@/pages/AccessDenied";
 import { useEnvioLoteAcesso, useEnviosLote } from "@/components/whatsapp/envio-lote/useEnvioLote";
 import { NovoEnvioLote } from "@/components/whatsapp/envio-lote/NovoEnvioLote";
+import { PreviaMensagemDialog } from "@/components/whatsapp/envio-lote/PreviaMensagemDialog";
+import type { EnvioLote } from "@/components/whatsapp/envio-lote/useEnvioLote";
 import { DetalheEnvioLote, situacaoDoEnvio } from "@/components/whatsapp/envio-lote/DetalheEnvioLote";
 
 export default function WhatsAppEnvioLote() {
@@ -25,6 +27,7 @@ export default function WhatsAppEnvioLote() {
   const [busca, setBusca] = useState("");
   // Contador da chave do formulário: "Novo" sempre abre um formulário limpo.
   const [novoKey, setNovoKey] = useState(0);
+  const [previa, setPrevia] = useState<EnvioLote | null>(null);
 
   const selecionado = params.get("envio");
   const abrir = (id: string | null) => {
@@ -79,18 +82,32 @@ export default function WhatsAppEnvioLote() {
             filtrados.map((e) => {
               const sit = situacaoDoEnvio(e);
               return (
-                <button
+                <div
                   key={e.id}
-                  type="button"
-                  onClick={() => abrir(e.id)}
-                  className={`flex w-full flex-col gap-1 border-b border-border px-3 py-2.5 text-left hover:bg-muted/60 ${e.id === selecionado ? "bg-muted/60 shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}`}
+                  className={`relative border-b border-border hover:bg-muted/60 ${e.id === selecionado ? "bg-muted/60 shadow-[inset_3px_0_0_hsl(var(--primary))]" : ""}`}
                 >
-                  <span className="truncate text-sm font-semibold">{e.titulo}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {e.total} destinatários · {format(new Date(e.created_at), "dd/MM HH:mm")}
-                  </span>
-                  <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${sit.classe}`}>{sit.rotulo}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => abrir(e.id)}
+                    className="flex w-full flex-col gap-1 px-3 py-2.5 pr-11 text-left"
+                  >
+                    <span className="truncate text-sm font-semibold">{e.titulo}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {e.total} destinatários · {format(new Date(e.created_at), "dd/MM HH:mm")}
+                    </span>
+                    <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${sit.classe}`}>{sit.rotulo}</span>
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute bottom-2 right-2 h-7 w-7"
+                    onClick={() => setPrevia(e)}
+                    aria-label={`Ver a mensagem de ${e.titulo}`}
+                    title="Ver mensagem"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
               );
             })
           )}
@@ -107,6 +124,17 @@ export default function WhatsAppEnvioLote() {
           <NovoEnvioLote key={novoKey} mudaRitmo={mudaRitmo} onCriado={(id) => abrir(id)} />
         )}
       </div>
+
+      <PreviaMensagemDialog
+        aberto={!!previa}
+        onFechar={() => setPrevia(null)}
+        titulo={previa?.titulo ?? ""}
+        subtitulo={previa ? `Mensagem como foi escrita · ${previa.total} destinatários. Cada um recebeu o próprio nome no lugar do destaque.` : undefined}
+        conteudo={previa?.content ?? ""}
+        arquivo={previa?.media_file_name}
+        horario={previa?.created_at}
+        modelo
+      />
     </div>
   );
 }

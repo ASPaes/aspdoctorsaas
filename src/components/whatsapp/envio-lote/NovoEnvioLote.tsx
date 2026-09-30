@@ -27,6 +27,11 @@ const RITMOS = [
 
 const PDF_MAX = 16 * 1024 * 1024;
 
+// "Começar agora" = daqui a 1 minuto. O motor olha a fila 1x por minuto e pega
+// a mensagem de lote até 55 s antes; começando em 15 s, a primeira podia ficar
+// para o tique seguinte e sair colada na segunda (visto no teste de 30/09: 3 s).
+const FOLGA_INICIO_MS = 60 * 1000;
+
 function duracaoTexto(seg: number) {
   const m = Math.round(seg / 60);
   if (m < 1) return "menos de 1 min";
@@ -62,7 +67,9 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
   const [enviando, setEnviando] = useState(false);
   const textoRef = useRef<HTMLTextAreaElement>(null);
 
-  const ativas = instances.filter((i: any) => i.is_active !== false);
+  // Número da API oficial da Meta fica de fora: ela não entrega em grupo e só
+  // aceita texto livre para quem escreveu nas últimas 24 h.
+  const ativas = instances.filter((i: any) => i.is_active !== false && i.provider_type !== "meta_cloud");
   useEffect(() => {
     if (!instanceId && ativas.length) {
       const conectada = ativas.find((i: any) => i.status === "connected") || ativas[0];
@@ -106,7 +113,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
   const ritmo = ritmoId === "custom" ? custom : RITMOS.find((r) => r.id === ritmoId)!;
   const ritmoValido = ritmo.min >= 2 && ritmo.max <= 600 && ritmo.min <= ritmo.max;
   const duracaoSeg = Math.max(0, n - 1) * ((ritmo.min + ritmo.max) / 2);
-  const inicio = quando === "agendar" && agendarPara ? new Date(agendarPara) : new Date();
+  const inicio = quando === "agendar" && agendarPara ? new Date(agendarPara) : new Date(Date.now() + FOLGA_INICIO_MS);
   const fim = addSeconds(inicio, duracaoSeg);
   const foraDoHorario = horario && (!dentroDoHorario(inicio, horario) || !dentroDoHorario(fim, horario));
   const proximoUtil = foraDoHorario ? proximoHorarioUtil(new Date(), horario) : null;
@@ -139,7 +146,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
         anexo,
         intervaloMin: ritmo.min,
         intervaloMax: ritmo.max,
-        inicioEm: quando === "agendar" && agendarPara ? new Date(agendarPara) : null,
+        inicioEm: quando === "agendar" && agendarPara ? new Date(agendarPara) : new Date(Date.now() + FOLGA_INICIO_MS),
       });
       toast.success(`Envio criado para ${r.total} destinatários.`);
       onCriado(r.bulk_send_id);
@@ -246,7 +253,11 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
             </div>
 
             <div className="max-h-[calc(100vh-24rem)] min-h-[200px] overflow-auto rounded-lg border border-border">
-              {carregandoDestinos ? (
+              {ativas.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  Nenhum número disponível para envio em lote. Números da API oficial da Meta não entram: ela não entrega em grupo e só aceita texto livre para quem escreveu nas últimas 24 horas.
+                </div>
+              ) : carregandoDestinos ? (
                 <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando conversas deste número...</div>
               ) : visiveis.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">Nenhuma conversa encontrada neste número.</div>
