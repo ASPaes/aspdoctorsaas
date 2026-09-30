@@ -19,6 +19,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- ⬆️ **Buscar permissão pelo nome** — Em **Configurações › Equipe › Permissões e perfis**, o campo **Buscar permissão** filtra a lista enquanto você digita: digite "e-mail" e aparece só o que tem a ver com e-mail, em todos os módulos, com o trecho encontrado destacado. Não importa acento nem hífen ("email" acha "E-mails"). Quando o termo está na explicação do item, ela já aparece aberta, e se algum resultado estiver escondido pelo nível do módulo (1 · 2 · 3), a tela avisa em vez de sumir com ele.
+
+- 🔧 **E-mails de volta em Permissões e perfis** — O acesso à tela **E-mails** não aparecia em **Configurações › Equipe › Permissões e perfis**, então quem tinha desligado para Gestor ou Operador não conseguia religar. Agora **E-mails** aparece como um módulo próprio na lista e pode ser liberado ou bloqueado por perfil. Nenhuma permissão já configurada foi alterada.
+
 - 🔧 **Setup de serviço somado à ativação do módulo** — Quando uma venda da calculadora juntava um módulo com mensalidade (como um ponto adicional) e um serviço sem mensalidade (como uma troca de adquirente), a **Aprovação OEM** em **Clientes** mostrava o setup dos dois somado na ativação do módulo. Agora o módulo fica só com o setup dele e o serviço entra na hora como uma venda avulsa própria, com o seu valor.
 
 - ⬆️ **Mais de uma novidade em destaque na Evolução DS** — O cartão **Em destaque** no topo da **Evolução DS** agora mostra várias novidades: aparece uma de cada vez, com a mais recente primeiro, e passa sozinho para a próxima a cada 8 segundos. Dá para ir e voltar pelas setas, pelas bolinhas embaixo do cartão ou arrastando com o dedo no celular. A troca para quando o mouse está sobre o cartão ou quando um vídeo está tocando.

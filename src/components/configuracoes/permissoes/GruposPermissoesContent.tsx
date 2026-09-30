@@ -5,6 +5,7 @@ import {
   type Nivel, type Acao, type RbacGrupo, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
 import LinhaRecurso, { ChipAcao } from "./LinhaRecurso";
+import { Realce, casa, termosDaBusca } from "./buscaPermissoes";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,7 +18,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Lock, Copy, Users, ChevronDown, ChevronRight, AlertTriangle, Pencil, Trash2, Check, X } from "lucide-react";
+import { Lock, Copy, Users, ChevronDown, ChevronRight, AlertTriangle, Pencil, Trash2, Check, X, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,6 +77,9 @@ export default function GruposPermissoesContent() {
   const [editando, setEditando] = useState<{ id: string; nome: string } | null>(null);
   const [excluindo, setExcluindo] = useState<RbacGrupo | null>(null);
   const [mostrarChaves, setMostrarChaves] = useState(false);
+  const [busca, setBusca] = useState("");
+  const termos = useMemo(() => termosDaBusca(busca), [busca]);
+  const buscando = termos.length > 0;
 
   const grupo = useMemo(
     () => config?.grupos.find((g) => g.id === grupoId) ?? config?.grupos[0],
@@ -101,6 +105,19 @@ export default function GruposPermissoesContent() {
     emArvore(config.recursos.filter((r) => r.module_id === moduleId && r.nivel <= nivel));
 
   const liberados = config.recursos.filter((r) => mapa.get(r.key)?.view).length;
+
+  // A busca olha tudo o que a linha mostra (nome, caminho, descrição, chave)
+  // e também o sub-item e o módulo: "Dashboard" traz o módulo inteiro.
+  const nomeModulo = new Map(config.modulos.map((m) => [m.id, m.nome]));
+  const casaRecurso = (r: RbacRecurso) =>
+    casa([r.label, r.caminho, r.descricao, r.key, r.grupo, nomeModulo.get(r.module_id)], termos);
+  const nivelModulo = new Map(config.modulos.map((m) => [m.id, m.nivel]));
+  const totalAchados = buscando
+    ? config.recursos.filter((r) => r.nivel <= (nivelModulo.get(r.module_id) ?? 1) && casaRecurso(r)).length
+    : 0;
+  const totalAcimaDoNivel = buscando
+    ? config.recursos.filter((r) => r.nivel > (nivelModulo.get(r.module_id) ?? 1) && casaRecurso(r)).length
+    : 0;
 
   const pedirNivel = (moduleId: string, nivel: Nivel) => {
     const atual = config.modulos.find((m) => m.id === moduleId)?.nivel ?? 1;
@@ -220,7 +237,26 @@ export default function GruposPermissoesContent() {
                 <b>{grupo.nivel_base}</b> · {grupo.is_system ? "não pode ser excluído" : "criado por cópia"}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") setBusca(""); }}
+                  placeholder="Buscar permissão (ex.: e-mail)"
+                  aria-label="Buscar permissão"
+                  className="h-8 pl-8 pr-7 text-xs"
+                />
+                {busca && (
+                  <button
+                    type="button"
+                    onClick={() => setBusca("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ><X className="h-3.5 w-3.5" /></button>
+                )}
+              </div>
               <label className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-muted-foreground">
                 <input
                   type="checkbox"
@@ -231,14 +267,29 @@ export default function GruposPermissoesContent() {
                 mostrar chaves técnicas
               </label>
               <p className="text-xs tabular-nums text-muted-foreground">
-                {liberados} de {config.recursos.length} liberados
+                {buscando
+                  ? `${totalAchados} ${totalAchados === 1 ? "encontrado" : "encontrados"}`
+                  : `${liberados} de ${config.recursos.length} liberados`}
               </p>
             </div>
           </div>
 
+          {buscando && totalAchados === 0 && totalAcimaDoNivel === 0 && (
+            <Card className="px-4 py-8 text-center text-sm text-muted-foreground">
+              Nenhuma permissão com “{busca.trim()}”.
+            </Card>
+          )}
+
           {config.modulos.map((mod) => {
             const itens = porModulo(mod.id, mod.nivel);
             const total = config.recursos.filter((r) => r.module_id === mod.id).length;
+            const achados = buscando ? itens.filter(casaRecurso).length : itens.length;
+            // Item que casa mas está acima do nível do módulo não aparece na
+            // matriz — só o aviso, senão a busca "some" com ele sem explicação.
+            const acimaDoNivel = buscando
+              ? config.recursos.filter((r) => r.module_id === mod.id && r.nivel > mod.nivel && casaRecurso(r)).length
+              : 0;
+            const visivel = (r: RbacRecurso) => !buscando || casaRecurso(r);
             // Só mostra a coluna de uma ação se o nível permite E algum item a aceita.
             // Todas as letras do nível, sempre: ação que não existe no item aparece
             // apagada, e as colunas de chips ficam alinhadas entre as linhas.
@@ -262,8 +313,10 @@ export default function GruposPermissoesContent() {
             ).sort((a, b) => a.ordem - b.ordem);
             // Sem entrada cadastrada (módulos internos), tudo segue alcançável.
             const entradaLigada = entrada ? !!mapa.get(entrada.key)?.view : true;
-            const fechado = fechados.has(mod.id);
+            // Buscando, tudo abre: o resultado não pode ficar dentro de um módulo fechado.
+            const fechado = !buscando && fechados.has(mod.id);
             if (total === 0) return null;
+            if (buscando && achados === 0 && acimaDoNivel === 0) return null;
             return (
               <Card key={mod.id} className="overflow-hidden">
                 <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-3 py-2">
@@ -276,10 +329,17 @@ export default function GruposPermissoesContent() {
                     }}
                   >
                     {fechado ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    {mod.nome}
+                    <Realce texto={mod.nome} termos={termos} />
                   </button>
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {itens.length} de {total} itens
+                    {buscando
+                      ? `${achados} ${achados === 1 ? "encontrado" : "encontrados"}`
+                      : `${itens.length} de ${total} itens`}
+                    {acimaDoNivel > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        {" "}· +{acimaDoNivel} acima do nível {mod.nivel}
+                      </span>
+                    )}
                   </span>
                   <div className="flex overflow-hidden rounded-md border">
                     {([1, 2, 3] as Nivel[]).map((n) => (
@@ -304,8 +364,14 @@ export default function GruposPermissoesContent() {
 
                 {!fechado && (
                   <CardContent className="p-0">
+                    {buscando && achados === 0 && (
+                      <p className="px-3 py-2.5 text-[11.5px] text-muted-foreground">
+                        {acimaDoNivel === 1 ? "O item encontrado só aparece" : `Os ${acimaDoNivel} itens encontrados só aparecem`}{" "}
+                        com o módulo em um nível mais detalhado — use os botões 1 · 2 · 3 acima.
+                      </p>
+                    )}
                     {/* A entrada: sem ela, nada no módulo é alcançável. */}
-                    {entrada && (
+                    {entrada && visivel(entrada) && (
                       <div className={cn(
                         "flex items-center gap-3 border-b px-3 py-2.5",
                         entradaLigada ? "bg-emerald-500/5" : "bg-muted/50",
@@ -333,7 +399,7 @@ export default function GruposPermissoesContent() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <span className="flex items-center gap-2 text-[13px] font-semibold">
-                            {entrada.label}
+                            <Realce texto={entrada.label} termos={termos} />
                             <Badge variant="outline" className="h-4 px-1 text-[9px] uppercase tracking-wide">entrada</Badge>
                           </span>
                           <span className="text-[11.5px] text-muted-foreground">
@@ -348,7 +414,9 @@ export default function GruposPermissoesContent() {
                     {gruposDoModulo.map(({ nome, itens: doGrupo }) => {
                       const entradaGrupo = doGrupo.find((r) => r.secao === "entrada");
                       const grupoLigado = entradaGrupo ? !!mapa.get(entradaGrupo.key)?.view : true;
-                      const demais = emArvore(doGrupo.filter((r) => r !== entradaGrupo));
+                      const demais = emArvore(doGrupo.filter((r) => r !== entradaGrupo)).filter(visivel);
+                      const mostraEntradaGrupo = !!entradaGrupo && visivel(entradaGrupo);
+                      if (!mostraEntradaGrupo && demais.length === 0) return null;
                       const linha = (r: RbacRecurso, alcancavel: boolean) => (
                         <LinhaRecurso
                           key={r.key}
@@ -357,6 +425,7 @@ export default function GruposPermissoesContent() {
                           acoesVisiveis={acoesDoModulo}
                           alcancavel={alcancavel}
                           mostrarChave={mostrarChaves}
+                          termos={termos}
                           travada={(acao) => travada(grupo, r.key, acao)}
                           onAcao={(acao, valor) =>
                             setPermissao.mutate({ groupId: grupo.id, key: r.key, acao, valor })
@@ -366,10 +435,10 @@ export default function GruposPermissoesContent() {
                       return (
                         <div key={nome}>
                           <div className="px-3 pb-1 pt-2.5 text-[9.5px] font-bold uppercase tracking-[.09em] text-muted-foreground">
-                            {nome}
+                            <Realce texto={nome} termos={termos} />
                           </div>
                           {/* A entrada do sub-item vem primeiro: desligada, o resto dele esmaece. */}
-                          {entradaGrupo && linha(entradaGrupo, entradaLigada)}
+                          {mostraEntradaGrupo && linha(entradaGrupo!, entradaLigada)}
                           {demais.map((r) => linha(r, entradaLigada && grupoLigado))}
                         </div>
                       );

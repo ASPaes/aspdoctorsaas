@@ -6,6 +6,7 @@ import {
   ACAO_LABEL, RECURSOS_SEM_PORTAO,
   type Acao, type RbacRecurso,
 } from "@/hooks/useRbacConfig";
+import { Realce, normalizar } from "./buscaPermissoes";
 
 const LETRA: Record<Acao, string> = { view: "V", insert: "I", update: "E", delete: "X" };
 
@@ -61,14 +62,20 @@ interface Props {
   alcancavel: boolean;
   travada: (acao: Acao) => boolean;
   mostrarChave: boolean;
+  /** Termos da busca (já normalizados), para realçar o que casou. */
+  termos?: string[];
   onAcao: (acao: Acao, valor: boolean) => void;
 }
 
 export default function LinhaRecurso({
-  r, estado, acoesVisiveis, alcancavel, travada, mostrarChave, onAcao,
+  r, estado, acoesVisiveis, alcancavel, travada, mostrarChave, termos = [], onAcao,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const semPortao = RECURSOS_SEM_PORTAO.has(r.key);
+  // Se a busca casou na descrição, ela abre sozinha: senão o item aparece
+  // na lista sem nada visível que explique por que ele está ali.
+  const descricaoCasou = !!r.descricao && termos.some((t) => normalizar(r.descricao!).includes(t));
+  const chaveCasou = termos.some((t) => normalizar(r.key).includes(t));
 
   return (
     <div className={cn(
@@ -87,7 +94,7 @@ export default function LinhaRecurso({
 
       <div className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium">
-          {r.label}
+          <Realce texto={r.label} termos={termos} />
           {semPortao && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -106,13 +113,19 @@ export default function LinhaRecurso({
         {r.caminho && (
           <span className="mt-0.5 flex items-center gap-1 text-[11.5px] text-muted-foreground">
             <MapPin className="h-3 w-3 shrink-0 opacity-60" />
-            {r.caminho}
+            <Realce texto={r.caminho} termos={termos} />
           </span>
         )}
-        {aberto && r.descricao && (
-          <p className="mt-1 max-w-prose text-[11.5px] leading-snug text-muted-foreground">{r.descricao}</p>
+        {(aberto || descricaoCasou) && r.descricao && (
+          <p className="mt-1 max-w-prose text-[11.5px] leading-snug text-muted-foreground">
+            <Realce texto={r.descricao} termos={termos} />
+          </p>
         )}
-        {mostrarChave && <span className="mt-0.5 block font-mono text-[10.5px] text-muted-foreground/70">{r.key}</span>}
+        {(mostrarChave || chaveCasou) && (
+          <span className="mt-0.5 block font-mono text-[10.5px] text-muted-foreground/70">
+            <Realce texto={r.key} termos={termos} />
+          </span>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-[3px]">
