@@ -23,6 +23,7 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
     "Vlr Ativação (R$)",
     "Vlr MRR (R$)",
     "Cancelado em",
+    "Tipo",
   ];
 
   const aoa: any[][] = [header];
@@ -37,6 +38,7 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
       numCell(c.valorAtivacao),
       numCell(c.mensalidade),
       c.canceladoEm ? dataCell(c.canceladoEm) : "",
+      c.eventoUnico ? "Evento único" : "Recorrente",
     ]);
   }
 
@@ -51,6 +53,7 @@ export function exportNovosClientesXlsx(items: NovoClienteListItem[]): void {
     { wch: 16 }, // Vlr Ativação
     { wch: 16 }, // Vlr MRR
     { wch: 12 }, // Cancelado em
+    { wch: 14 }, // Tipo
   ];
 
   // A data é um serial numérico, então o formato vai POR COLUNA. Varrer por

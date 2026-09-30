@@ -14,7 +14,7 @@ const defaultMetrics: KPIMetrics = {
   earlyChurnBase: 0, earlyChurnBaseInicio: null, churnCarteiraPercent: 0,
   churnCarteiraMediaMensal: null, churnReceitaMediaMensal: null, churnMesesNaMedia: null,
   clientesInicioCount: 0, mrrInicio: 0,
-  novosClientes: 0, newMrr: 0, totalImplantacao: 0,
+  novosClientes: 0, novosEventos: 0, newMrr: 0, totalImplantacao: 0,
   prevNovosClientes: null, prevNewMrr: null, prevTotalImplantacao: null, prevUpsellMrr: null, prevCrossSellMrr: null,
   netNewMrr: 0, nrr: 0, grr: 0, cacPayback: 0, margemContribuicao: 0, concentracaoTop10: 0, receitaAtivacao: 0,
   prevReceitaAtivacao: null,
@@ -179,7 +179,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // ativação. Sem esta lista, com filtro de unidade ativo o movimento dele era
       // descartado por não estar em nenhum conjunto de clientes.
       const clientesEventoPromise = fetchAllRows<any>(() => {
-        let q = tf(supabase.from('vw_clientes_financeiro').select('id, unidade_base_id'))
+        let q = tf(supabase.from('vw_clientes_financeiro').select('id, unidade_base_id, razao_social, nome_fantasia'))
           .eq('evento_unico', true);
         if (filters.unidadeBaseId) q = q.eq('unidade_base_id', filters.unidadeBaseId);
         return q;
@@ -189,7 +189,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // esta busca o gráfico mensal de ativação não batia com o card.
       const ativacaoAvulsaPromise = fetchAllRows<any>(() => tf(supabase
         .from('movimentos_mrr')
-        .select('cliente_id, vlr_ativacao, data_movimento')
+        .select('cliente_id, vlr_ativacao, data_movimento, funcionario_id, origem_venda')
         .eq('tipo', 'venda_avulsa')
         .gt('vlr_ativacao', 0)
         .eq('status', 'ativo')
@@ -392,6 +392,25 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
       // Cliente de evento não tem fornecedor: com filtro de fornecedor ele fica de fora.
       const clientesEvento = await clientesEventoPromise;
       const idsEventoNoFiltro: string[] = fornecedorClientIds ? [] : (clientesEvento || []).map((c: any) => c.id);
+      // Venda de evento único no período. Não tem contrato: a data e o vendedor da
+      // venda moram no movimento venda_avulsa que o intake grava. Um cliente por
+      // linha (soma o setup se tiver mais de um lançamento no período).
+      const eventoPorId = new Map<string, any>((clientesEvento || []).map((c: any) => [c.id, c]));
+      const idsEventoSet = new Set(idsEventoNoFiltro);
+      const eventosPeriodo = new Map<string, { cliente: any; data: string; funcionarioId: number | null; origem: string | null; setup: number }>();
+      ((await ativacaoAvulsaPromise) || []).forEach((m: any) => {
+        const d = String(m.data_movimento || '');
+        if (!idsEventoSet.has(m.cliente_id) || d < periodoInicioStr || d > periodoFimStr) return;
+        const atual = eventosPeriodo.get(m.cliente_id);
+        const v = Number(m.vlr_ativacao) || 0;
+        if (!atual) {
+          eventosPeriodo.set(m.cliente_id, { cliente: eventoPorId.get(m.cliente_id), data: d, funcionarioId: m.funcionario_id ?? null, origem: m.origem_venda ?? null, setup: v });
+        } else {
+          atual.setup += v;
+          if (d < atual.data) atual.data = d;
+          atual.funcionarioId = atual.funcionarioId ?? m.funcionario_id ?? null;
+        }
+      });
       const allClientesFiltered = new Set([
         ...(clientesAtivos || []).map(c => c.id),
         ...(cancelamentosFilt || []).map(c => c.id),
@@ -554,7 +573,7 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
         churnCarteiraMediaMensal: null, churnReceitaMediaMensal: null, churnMesesNaMedia: null,
         churnCarteiraPercent: (clientesInicioCount || 0) > 0 ? cancelamentosQtd / (clientesInicioCount || 1) : 0,
         clientesInicioCount, mrrInicio,
-        novosClientes: novosCount, newMrr, totalImplantacao,
+        novosClientes: novosCount, novosEventos: eventosPeriodo.size, newMrr, totalImplantacao,
         prevNovosClientes, prevNewMrr, prevTotalImplantacao,
         prevReceitaAtivacao: prevTotalImplantacao + prevAtivacaoMovimentos,
         prevUpsellMrr: prevUpsellMrr || null, prevCrossSellMrr: prevCrossSellMrr || null,
@@ -993,7 +1012,19 @@ export function useDashboardData(filters: DashboardFilters, ready: boolean = tru
           valorAtivacao: Number(c.valor_ativacao) || 0,
           mensalidade: mrrVendidoDe(c),
           canceladoEm: canceladoAteFim(c),
-        }))
+        } as NovoClienteListItem))
+        .concat(Array.from(eventosPeriodo.entries()).map(([id, e]) => ({
+          id,
+          razaoSocial: e.cliente?.razao_social || '(sem nome)',
+          nomeFantasia: e.cliente?.nome_fantasia || null,
+          dataVenda: e.data,
+          vendedor: e.funcionarioId ? (funcMap[e.funcionarioId] || '—') : '—',
+          origem: e.origem || '—',
+          valorAtivacao: e.setup,
+          mensalidade: 0,
+          canceladoEm: null,
+          eventoUnico: true,
+        })))
         .sort((a, b) => new Date(b.dataVenda).getTime() - new Date(a.dataVenda).getTime());
       if (seq !== fetchSeqRef.current) return;
       setNovosClientesList(novosListItems);

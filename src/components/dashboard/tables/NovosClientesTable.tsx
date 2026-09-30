@@ -328,6 +328,15 @@ export function NovosClientesTable({ items, tvMode }: Props) {
                   <TableCell>
                     <div>
                       <span className="font-medium text-foreground">{c.razaoSocial}</span>
+                      {c.eventoUnico && (
+                        <Badge
+                          variant="outline"
+                          className="ml-2 border-sky-500/40 bg-sky-500/10 px-1.5 py-0 text-[10px] font-medium text-sky-500"
+                          title="Evento único: paga só o setup, sem mensalidade. Fora da contagem de Novos Clientes."
+                        >
+                          Evento
+                        </Badge>
+                      )}
                       {c.nomeFantasia && (
                         <span className="block text-xs text-muted-foreground">{c.nomeFantasia}</span>
                       )}

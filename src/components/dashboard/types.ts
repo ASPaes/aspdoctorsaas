@@ -49,6 +49,8 @@ export interface KPIMetrics {
 
   // Vendas
   novosClientes: number;
+  /** Vendas de evento único no período: mostradas à parte ("54 + 2 eventos"), fora de novosClientes. */
+  novosEventos: number;
   newMrr: number;
   totalImplantacao: number;
 
@@ -168,4 +170,6 @@ export interface NovoClienteListItem {
   mensalidade: number;
   /** 'YYYY-MM-DD' quando o cliente já estava cancelado no fim do período; senão null. */
   canceladoEm: string | null;
+  /** Venda de evento único: só setup, sem MRR. Data e vendedor vêm do movimento venda_avulsa. */
+  eventoUnico?: boolean;
 }

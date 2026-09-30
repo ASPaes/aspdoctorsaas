@@ -188,6 +188,20 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
   const { data: faixas = [] } = useVendasExplorer(filters, faixaDet ? 'faixa_ticket_det' : 'faixa_ticket');
   const { data: ticketStats } = useVendasTicketStats(filters);
   const { data: mixProd = [] } = useVendasProdutos(filters);
+  // Evento único não passa pelo get_vendas_breakdown (sem contrato): entra aqui pelo
+  // vendedor do movimento, contado à parte e sem MRR. O RPC rotula pelo nome do
+  // funcionário e usa '(sem informação)' quando falta, então o casamento é pelo nome.
+  const eventosPorVend = new Map<string, number>();
+  novosClientesList.filter(c => c.eventoUnico).forEach(c => {
+    const nome = c.vendedor && c.vendedor !== '—' ? c.vendedor : '(sem informação)';
+    eventosPorVend.set(nome, (eventosPorVend.get(nome) || 0) + 1);
+  });
+  const rankVendComEventos = [
+    ...rankVend.map(r => ({ ...r, eventos: eventosPorVend.get(r.label) || 0 })),
+    ...Array.from(eventosPorVend.entries())
+      .filter(([nome]) => !rankVend.some(r => r.label === nome))
+      .map(([nome, eventos]) => ({ label: nome, qtd: 0, new_mrr: 0, custo: 0, margem_rs: 0, margem_pct: 0, ticket: 0, eventos })),
+  ];
   const totalVendMrr = rankVend.reduce((a, r) => a + (r.new_mrr || 0), 0) || 1;
   const FAIXA_ORDER_PADRAO = ['Até R$ 200', 'R$ 200–500', 'R$ 500–1k', 'Acima de R$ 1k'];
   const FAIXA_ORDER_DET = ['Até R$ 100','R$ 100–200','R$ 200–300','R$ 300–500','R$ 500–1k','R$ 1k–2k','Acima de R$ 2k'];
@@ -204,7 +218,7 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
     <div className="space-y-6">
       {/* KPIs Row 1 */}
       <div className={`grid gap-4 ${tvMode ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'}`}>
-        <KPICardEnhanced label="Novos Clientes" value={metrics.novosClientes.toString()} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="novos_clientes_vendas" trend={novosD.trend} trendValue={novosD.trendValue} />
+        <KPICardEnhanced label="Novos Clientes" value={metrics.novosEventos > 0 ? `${metrics.novosClientes} + ${metrics.novosEventos} ${metrics.novosEventos === 1 ? 'evento' : 'eventos'}` : metrics.novosClientes.toString()} icon={<Users className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="novos_clientes_vendas" trend={novosD.trend} trendValue={novosD.trendValue} />
         <KPICardEnhanced label="New MRR" value={fmt(metrics.newMrr)} icon={<DollarSign className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="new_mrr_vendas" trend={newMrrD.trend} trendValue={newMrrD.trendValue} />
         <KPICardEnhanced label="Receita de Ativação" value={fmt(metrics.receitaAtivacao)} icon={<Rocket className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-primary`} />} size={s} variant="dark" helpKey="receita_ativacao" trend={ativacaoD.trend} trendValue={ativacaoD.trendValue} />
         <KPICardEnhanced label="MRR Adicionado" value={fmt(mrrAdicionado)} icon={<TrendingUp className={`${tvMode ? 'h-8 w-8' : 'h-5 w-5'} text-green-500`} />} size={s} variant="success" helpKey="mrr_adicionado" trend={mrrAddD.trend} trendValue={mrrAddD.trendValue} />
@@ -369,18 +383,21 @@ export function VendasTab({ metrics, distributions, tvMode, novosClientesList, f
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {rankVend.length === 0 ? (
+          {rankVendComEventos.length === 0 ? (
             <div className="flex items-center justify-center h-[200px] text-muted-foreground">Sem dados disponíveis</div>
           ) : (
             <div className="space-y-2">
-              {[...rankVend].sort((a, b) => b.new_mrr - a.new_mrr).slice(0, 10).map((r, i) => {
+              {[...rankVendComEventos].sort((a, b) => b.new_mrr - a.new_mrr || b.eventos - a.eventos).slice(0, 10).map((r, i) => {
                 const pct = Math.round(r.new_mrr / totalVendMrr * 100);
                 return (
                   <div key={i} className="flex items-center gap-3 py-1.5 border-t border-border first:border-0">
                     <div className="flex-1 min-w-0">
-                      <div className="flex justify-between text-sm">
+                      <div className="flex justify-between gap-2 text-sm">
                         <span className="truncate">{r.label}</span>
-                        <span className="text-muted-foreground">{r.qtd} vendas · {fmt(r.new_mrr)} · <span className={margemCls(r.margem_pct)}>{Math.round(r.margem_pct * 100)}%</span></span>
+                        <span className="shrink-0 text-muted-foreground">
+                          {r.qtd > 0 && <>{r.qtd} vendas · {fmt(r.new_mrr)} · <span className={margemCls(r.margem_pct)}>{Math.round(r.margem_pct * 100)}%</span></>}
+                          {r.eventos > 0 && <span className="text-sky-500">{r.qtd > 0 ? ' + ' : ''}{r.eventos} {r.eventos === 1 ? 'evento' : 'eventos'}</span>}
+                        </span>
                       </div>
                       <div className="h-1.5 bg-muted rounded mt-1 overflow-hidden"><div className="h-full bg-primary" style={{ width: `${pct}%` }} /></div>
                     </div>
