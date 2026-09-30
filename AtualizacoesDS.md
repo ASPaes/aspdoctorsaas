@@ -19,6 +19,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- 🆕 **Acesso ao mobile por pessoa** — Em **Configurações › Equipe › Acessos & Permissões** há uma nova coluna **Mobile**, com Sim ou Não para cada pessoa. Quem está com Não faz login no mobile e vê o aviso de que não tem acesso e deve falar com o gestor da sua área. O acesso pelo computador não muda. Administradores começam com Sim; gestores e operadores começam com Não e são liberados pela coluna.
+
+- 🆕 **Permissão própria para a licença OEM** — Na coluna **Integração** de **Configurações › Equipe › Acessos & Permissões** entrou a opção **Licença OEM**, que controla quem pode trocar, ativar/desativar e bloquear/desbloquear a licença na ficha do cliente. Antes isso vinha junto com a permissão de Módulos; a nova opção começou com o mesmo valor que cada pessoa já tinha, e agora pode ser ajustada separadamente.
+
+- 🔧 **Sair do mobile não desconecta mais o computador** — Ao sair do DoctorSaaS pelo telefone, a pessoa era desconectada também do sistema aberto no computador. Agora sair de um lugar encerra só aquele acesso.
+
 - 🔧 **Trocar licença do OEM não cancela mais módulo pago** — Quando um módulo vendido (por exemplo, pela calculadora) tinha ido para a licença errada e alguém trocava a licença na ficha do cliente, o módulo aparecia como **Cancelado** e não chegava à licença certa. Agora, ao trocar a licença, os módulos que o cliente paga e que a licença nova ainda não tem continuam ativos e ganham um pedido na fila do OEM para a licença nova, aguardando aprovação em **Configurações › Integrações › OEM › Fila**. A tela avisa quais módulos foram pedidos e lembra de desligá-los na licença antiga pelo portal do OEM.
 
 - 🔧 **Up-Sell e Down-Sell com CNPJ em mais de um cadastro** — Quando o CNPJ do cliente estava em dois cadastros no DoctorSaaS, a calculadora avisava que havia duplicidade, mostrava só um deles (às vezes o cancelado) e não conseguia enviar a venda. Agora o ticket de Up-Sell e Down-Sell mostra o quadro **Cadastro no DoctorSaaS** com todos os cadastros daquele CNPJ, cada um com código, razão social, nome fantasia, se está cancelado e os produtos ativos. O vendedor escolhe em qual cadastro a venda entra, e ela vai direto para ele.

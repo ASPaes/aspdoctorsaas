@@ -56,13 +56,13 @@ const CAMPOS_LICENCA =
   "bloqueado_oem, desativa_em, mensalidade_ds, status_usuario, resolvido_em, " +
   "cnpj_norm, ds_customer_id, razao_ds";
 
-// A mesma permissão de Bloquear/Desativar (`OemLicencaEstadoBotoes`), por
-// decisão do Alexandre: quem mexe nos módulos do cliente troca a licença. No
-// banco é `pode_mexer_licenca_oem`, que confere a mesma chave e o tenant.
+// A mesma permissão de Bloquear/Desativar (`OemLicencaEstadoBotoes`):
+// `clientes.oem_licenca`, separada de Módulos desde 30/09/2026. No banco é
+// `pode_mexer_licenca_oem`, que confere a mesma chave e o tenant.
 // Esconder o botão aqui é conveniência; quem barra de verdade é o banco.
 function usePodeTrocarLicencaOem() {
   const { can } = usePermissions();
-  return can("clientes.modulos", "view");
+  return can("clientes.oem_licenca", "view");
 }
 
 // A IDADE DA LEITURA, EM TEXTO CURTO O SUFICIENTE PARA CABER NO CABEÇALHO.

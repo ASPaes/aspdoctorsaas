@@ -74,6 +74,8 @@ const LABEL_RECURSO: Record<string, string> = {
   "clientes.modulos": "Integração · Módulos",
   "clientes.oem_aprovacao": "Integração · Aprovação OEM",
   "clientes.modulos_valor": "Integração · Corrigir valor do módulo",
+  "clientes.oem_licenca": "Integração · Licença OEM",
+  "acesso.mobile": "Mobile",
 };
 
 const LABEL_EVENTO: Record<string, string> = {

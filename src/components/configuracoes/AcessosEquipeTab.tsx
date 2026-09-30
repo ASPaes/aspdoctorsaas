@@ -161,6 +161,15 @@ const ACESSOS_INTEGRACAO: AcessoIntegracao[] = [
       "Corrige o valor mensal de um módulo digitado errado, com motivo obrigatório. Muda o MRR sem lançar upsell/downsell e fica no Histórico de módulos.",
   },
   {
+    // Separada de Módulos em 30/09/2026. Nasceu copiando o valor de Módulos de
+    // cada pessoa, então marcar uma não mexe mais na outra.
+    key: "clientes.oem_licenca",
+    titulo: "Licença OEM",
+    descricao:
+      "Trocar licença, ativar/desativar e bloquear/desbloquear a licença do cliente no OEM, pela ficha do cliente.",
+    soComOem: true,
+  },
+  {
     key: RESOURCE_OEM_APROVACAO,
     titulo: "Aprovação OEM",
     descricao:
@@ -170,6 +179,12 @@ const ACESSOS_INTEGRACAO: AcessoIntegracao[] = [
 ];
 
 const RESOURCES_INTEGRACAO = ACESSOS_INTEGRACAO.map((a) => a.key);
+
+// Coluna Mobile: entrar pelo mobile.doctorsaas.com.br. Chave `hidden` (fora da
+// matriz de Perfis), então o valor é pessoa › papel no tenant › papel global,
+// igual ao `pode_usar_mobile()` do banco. Nasce Sim só para admin.
+const RESOURCE_MOBILE = "acesso.mobile";
+const RESOURCES_POR_PESSOA = [...RESOURCES_INTEGRACAO, RESOURCE_MOBILE];
 
 const accessEquipeQueryKeys = {
   users: (tenantId?: string) => ["tenant-access-users", tenantId] as const,
@@ -743,20 +758,20 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     defaults: Record<string, boolean>;
     byUser: Map<string, boolean>;
   }>({
-    queryKey: ["tenant-user-permissions", tenantId, RESOURCES_INTEGRACAO.join(",")],
+    queryKey: ["tenant-user-permissions", tenantId, RESOURCES_POR_PESSOA.join(",")],
     enabled: !!tenantId,
     queryFn: async () => {
       const [globalRes, tenantRes, userRes] = await Promise.all([
         (supabase.from("role_permissions" as any) as any)
           .select("role, resource_key, can_view")
-          .in("resource_key", RESOURCES_INTEGRACAO),
+          .in("resource_key", RESOURCES_POR_PESSOA),
         (supabase.from("tenant_role_permissions" as any) as any)
           .select("role, resource_key, can_view")
-          .in("resource_key", RESOURCES_INTEGRACAO)
+          .in("resource_key", RESOURCES_POR_PESSOA)
           .eq("tenant_id", tenantId!),
         (supabase.from("user_permissions" as any) as any)
           .select("user_id, resource_key, can_view")
-          .in("resource_key", RESOURCES_INTEGRACAO)
+          .in("resource_key", RESOURCES_POR_PESSOA)
           .eq("tenant_id", tenantId!),
       ]);
       if (globalRes.error) throw globalRes.error;
@@ -1120,6 +1135,7 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
     }: {
       userId: string;
       mudancas: Array<{ resourceKey: string; liberado: boolean }>;
+      mensagem?: string;
     }) => {
       if (mudancas.length === 0) return;
       const agora = new Date().toISOString();
@@ -1147,8 +1163,9 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
       if (vars.userId === profile?.user_id) {
         void queryClient.invalidateQueries({ queryKey: ["my-permissions"] });
         void queryClient.invalidateQueries({ queryKey: ["oem-aprovacao-pode"] });
+        void queryClient.invalidateQueries({ queryKey: ["pode-usar-mobile"] });
       }
-      sonnerToast.success("Acessos de integração atualizados.");
+      sonnerToast.success(vars.mensagem ?? "Acessos de integração atualizados.");
     },
     onError: (err: any) => sonnerToast.error(err.message),
   });
@@ -1559,8 +1576,20 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                             <TooltipTrigger className="cursor-help">Integração</TooltipTrigger>
                             <TooltipContent className="max-w-xs">
                               Acessos que valem por pessoa, não por papel: mexer nos módulos da
-                              ficha do cliente e aprovar os pedidos do OEM. Clique para escolher
-                              quais.
+                              ficha do cliente, na licença OEM e aprovar os pedidos do OEM.
+                              Clique para escolher quais.
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableHead>
+                      <TableHead>
+                        <TooltipProvider delayDuration={200}>
+                          <Tooltip>
+                            <TooltipTrigger className="cursor-help">Mobile</TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              Entrar pelo telefone (mobile.doctorsaas.com.br). Com Não, a pessoa
+                              faz login e vê o aviso de falar com o gestor. O acesso pelo
+                              computador não muda.
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
@@ -1812,6 +1841,33 @@ function UsersSection({ tenantId }: { tenantId: string | undefined }) {
                                 setIntegracaoPermMutation.mutate({ userId: u.user_id, mudancas })
                               }
                             />
+                          </TableCell>
+                          <TableCell>
+                            {u.is_super_admin ? (
+                              <Badge variant="outline" className="text-xs opacity-60">
+                                Sim
+                              </Badge>
+                            ) : (
+                              <Select
+                                value={integracaoLiberado(u, RESOURCE_MOBILE) ? "sim" : "nao"}
+                                disabled={setIntegracaoPermMutation.isPending}
+                                onValueChange={(v) =>
+                                  setIntegracaoPermMutation.mutate({
+                                    userId: u.user_id,
+                                    mudancas: [{ resourceKey: RESOURCE_MOBILE, liberado: v === "sim" }],
+                                    mensagem: "Acesso ao mobile atualizado.",
+                                  })
+                                }
+                              >
+                                <SelectTrigger className="h-8 w-[84px] text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="sim">Sim</SelectItem>
+                                  <SelectItem value="nao">Não</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
                           </TableCell>
                         </>
                       )}

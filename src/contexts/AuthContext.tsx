@@ -138,7 +138,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadedProfileUserId.current = null;
     setProfile(null);
     try { sessionStorage.removeItem("super-admin-tenant-filter"); } catch {}
-    await supabase.auth.signOut();
+    // `local`: encerra só ESTA sessão. O padrão do supabase-js é `global`, que
+    // revoga todas as sessões da pessoa, e sair do mobile.doctorsaas derrubava
+    // o app.doctorsaas aberto no computador (são origens diferentes, cada uma
+    // com o seu token; só a revogação no servidor alcança a outra).
+    await supabase.auth.signOut({ scope: "local" });
   }, []);
 
   return (

@@ -9,6 +9,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { PresenceHeartbeatProvider } from "@/contexts/PresenceHeartbeatProvider";
 import ChatMobileLayout from "@/components/chat-mobile/ChatMobileLayout";
 import ChatHostGuard from "@/components/chat-mobile/ChatHostGuard";
+import MobileAccessGuard from "@/components/chat-mobile/MobileAccessGuard";
 import MobileHome from "@/components/chat-mobile/MobileHome";
 import RequirePermission from "@/components/auth/RequirePermission";
 import OnboardingGuard from "@/components/OnboardingGuard";
@@ -58,15 +59,19 @@ export default function ChatHostRoutes() {
       <Route
         element={
           <AuthGuard>
-            <TenantFilterProvider>
-              <UnidadeFilterProvider>
-                <NotificationProvider>
-                  <PresenceHeartbeatProvider>
-                    <ChatMobileLayout />
-                  </PresenceHeartbeatProvider>
-                </NotificationProvider>
-              </UnidadeFilterProvider>
-            </TenantFilterProvider>
+            {/* Antes dos providers: quem está com Mobile = Não não liga
+                presença nem notificação, só vê o aviso. */}
+            <MobileAccessGuard>
+              <TenantFilterProvider>
+                <UnidadeFilterProvider>
+                  <NotificationProvider>
+                    <PresenceHeartbeatProvider>
+                      <ChatMobileLayout />
+                    </PresenceHeartbeatProvider>
+                  </NotificationProvider>
+                </UnidadeFilterProvider>
+              </TenantFilterProvider>
+            </MobileAccessGuard>
           </AuthGuard>
         }
       >

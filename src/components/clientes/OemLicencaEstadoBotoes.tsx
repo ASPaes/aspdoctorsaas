@@ -126,11 +126,11 @@ export default function OemLicencaEstadoBotoes({
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  // Mesma chave dos módulos: quem pode mexer nos módulos do cliente pode ligar
-  // e desligar a licença. A edge function confere de novo por dentro (a tela é
+  // Chave própria da licença (`clientes.oem_licenca`, coluna Integração da
+  // tela de Acessos). A edge function confere de novo por dentro (a tela é
   // conveniência, não portão). O `return null` fica LÁ EMBAIXO, depois dos
   // hooks: sair antes deles quebra a ordem de hooks entre um render e outro.
-  const podeMexer = can("clientes.modulos", "view");
+  const podeMexer = can("clientes.oem_licenca", "view");
 
   const desativado =
     licenca.status_oem === "Desativado" ? true : licenca.status_oem === "Ativo" ? false : null;

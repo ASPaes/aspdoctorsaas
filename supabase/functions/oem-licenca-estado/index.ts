@@ -138,19 +138,19 @@ Deno.serve(async (req) => {
 
     // --------------------------------------------------------- permissão
     //
-    // Mesma chave dos módulos (`clientes.modulos`), por decisão do Alexandre:
-    // quem pode mexer nos módulos do cliente pode ligar e desligar a licença.
-    // O nome e a descrição da chave foram atualizados junto (migration
-    // 20260901140000) para o "?" da tela de permissões dizer isso.
+    // Chave própria `clientes.oem_licenca` desde 30/09/2026 (migration
+    // 20260930220000). Até ali era a dos módulos (`clientes.modulos`); o
+    // Alexandre pediu a caixa separada na coluna Integração, e ela nasceu com o
+    // mesmo valor de Módulos para ninguém perder acesso no dia da troca.
     //
     // `get_my_permissions` roda COM O TOKEN DA PESSOA e já resolve super admin,
     // rbac desligado, papel e exceção por usuário — reimplementar a régua aqui
     // criaria uma segunda verdade que ia divergir da tela.
     const { data: perms, error: errPerm } = await comoUsuario.rpc("get_my_permissions");
     if (errPerm) return json({ ok: false, mensagem: `Não deu para conferir a permissão: ${errPerm.message}` }, 403);
-    const podeModulos = (perms ?? []).some(
+    const podeLicenca = (perms ?? []).some(
       (p: { resource_key: string; can_view: boolean }) =>
-        p.resource_key === "clientes.modulos" && p.can_view === true,
+        p.resource_key === "clientes.oem_licenca" && p.can_view === true,
     );
 
     // Permissão diz O QUE a pessoa pode fazer; o tenant diz EM QUEM. As duas
@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
       .eq("user_id", u.user.id)
       .maybeSingle();
     const mesmoTenant = perfil?.is_super_admin === true || perfil?.tenant_id === linha.tenant_id;
-    if (!podeModulos || !mesmoTenant) {
+    if (!podeLicenca || !mesmoTenant) {
       return json({ ok: false, mensagem: "Sem permissão para alterar a licença deste cliente no OEM." }, 403);
     }
 
