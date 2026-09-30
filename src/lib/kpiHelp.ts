@@ -1108,7 +1108,7 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     title: "Scorecard por Agente",
     definition: "Desempenho de cada agente: volume, pico de simultâneos, tempos e latência de resposta (mediana), CSAT, reabertura e mensagens por atendimento.",
     why_it_matters: undefined as any,
-    formula: "por agente no período: atendimentos, encerrados, pico simultâneo, TMA e 1ª resposta (mediana), latência de resposta (mediana do gap cliente→agente), CSAT, reabertura %, msgs/atend",
+    formula: "por agente no período: atendimentos, encerrados, tickets, % sem ticket, pico simultâneo, TMA e 1ª resposta (mediana), latência de resposta (mediana do gap cliente→agente), CSAT, reabertura %, msgs/atend",
   },
   atendimento_ag_total: {
     title: "Atendimentos (Atend.)",
@@ -1121,6 +1121,18 @@ const kpiHelp: Record<string, KpiHelpEntry> = {
     definition: "Atendimentos do agente que foram encerrados no período (fechados manualmente ou por inatividade).",
     why_it_matters: "Produtividade de saída do agente. É a base dos cálculos de reabertura e de mensagens por atendimento.",
     formula: "COUNT dos atendimentos do agente com status 'encerrado' ou 'encerrado por inatividade'",
+  },
+  atendimento_ag_tickets: {
+    title: "Tickets",
+    definition: "Tickets em que o agente é o responsável, abertos no período. É o mesmo número da tela Tickets com o filtro do agente, e inclui os abertos por telefone.",
+    why_it_matters: "Atendimento e ticket não são a mesma coisa: ligação vira ticket sem passar pelo chat, e chat fechado por inatividade não vira ticket. Ver os dois lado a lado explica por que as telas mostram números diferentes.",
+    formula: "COUNT dos tickets com responsável = agente e abertura no período, com os filtros de setor, turno, unidade e categoria da tela",
+  },
+  atendimento_ag_sem_ticket: {
+    title: "% sem ticket",
+    definition: "Parte dos atendimentos encerrados do agente que terminou sem ticket registrado.",
+    why_it_matters: "Atendimento sem ticket não aparece na tela Tickets nem nos relatórios por categoria. Percentual alto indica atendimento sem registro, quase sempre fechado por inatividade.",
+    formula: "encerrados sem ticket ÷ encerrados × 100",
   },
   atendimento_ag_pico: {
     title: "Pico de Simultâneos",

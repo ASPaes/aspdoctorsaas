@@ -132,6 +132,12 @@ export function AgentesTab() {
                         <KpiHelpPopover wrapLabel="Encerr." kpiKey="atendimento_ag_encerrados" labelSize="sm" />
                       </th>
                       <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="Tickets" kpiKey="atendimento_ag_tickets" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
+                        <KpiHelpPopover wrapLabel="% s/ ticket" kpiKey="atendimento_ag_sem_ticket" labelSize="sm" />
+                      </th>
+                      <th className="py-2 px-3 text-right">
                         <KpiHelpPopover wrapLabel="Pico" kpiKey="atendimento_ag_pico" labelSize="sm" />
                       </th>
                       <th className="py-2 px-3 text-right">
@@ -185,6 +191,15 @@ export function AgentesTab() {
                           </td>
                         )}
                         <td className="py-2 px-3 text-right tabular-nums">{a.encerrados}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{a.tickets}</td>
+                        <td
+                          className={cn(
+                            "py-2 px-3 text-right tabular-nums",
+                            a.sem_ticket_pct !== null && a.sem_ticket_pct >= 30 && "text-amber-600 dark:text-amber-400 font-medium",
+                          )}
+                        >
+                          {a.sem_ticket_pct !== null ? `${a.sem_ticket_pct}%` : "—"}
+                        </td>
                         <td className="py-2 px-3 text-right tabular-nums">{a.pico_simultaneos}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.tma_p50)}</td>
                         <td className="py-2 px-3 text-right tabular-nums">{dur(a.frt_p50)}</td>

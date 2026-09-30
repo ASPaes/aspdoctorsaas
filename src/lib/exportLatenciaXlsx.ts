@@ -53,7 +53,7 @@ export function exportScorecardAgentesXlsx(params: {
   const { rows, from, to } = params;
 
   const aoa: any[][] = [[
-    "Agente", "Atendimentos", "Encerrados", "Pico simultâneos",
+    "Agente", "Atendimentos", "Encerrados", "Tickets", "Sem ticket (%)", "Pico simultâneos",
     "TMA (s)", "TMA", "1ª resposta (s)", "1ª resposta",
     "Latência (s)", "Latência", "Faixa mais comum",
     "CSAT", "CSAT respostas", "CSAT enviadas", "Reabertura (%)", "Msgs por atendimento",
@@ -64,6 +64,8 @@ export function exportScorecardAgentesXlsx(params: {
       a.nome,
       a.total,
       a.encerrados,
+      a.tickets,
+      num(a.sem_ticket_pct),
       a.pico_simultaneos,
       num(a.tma_p50), fmtDur(a.tma_p50),
       num(a.frt_p50), fmtDur(a.frt_p50),
@@ -79,7 +81,7 @@ export function exportScorecardAgentesXlsx(params: {
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = [
-    { wch: 24 }, { wch: 13 }, { wch: 12 }, { wch: 16 },
+    { wch: 24 }, { wch: 13 }, { wch: 12 }, { wch: 9 }, { wch: 14 }, { wch: 16 },
     { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 },
     { wch: 12 }, { wch: 11 }, { wch: 16 },
     { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 15 }, { wch: 20 },

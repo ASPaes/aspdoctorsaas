@@ -19,6 +19,10 @@ export interface AgenteRow {
   latencia_p50: number | null;
   latencia_faixa: string | null;
   msgs_atend: number | null;
+  /** Tickets com o agente responsável (inclui telefone). DEM-0498. */
+  tickets: number;
+  /** % dos encerrados sem ticket. DEM-0498. */
+  sem_ticket_pct: number | null;
 }
 
 /** Célula do quadro Agente × Categoria. category_id null = sem ticket categorizado. */
@@ -98,6 +102,8 @@ export function useAtendimentoAgentes(opts: { ignorarCategoria?: boolean; enable
           latencia_p50: num(r.latencia_p50),
           latencia_faixa: r.latencia_faixa ?? null,
           msgs_atend: num(r.msgs_atend),
+          tickets: Number(r.tickets ?? 0),
+          sem_ticket_pct: num(r.sem_ticket_pct),
         })),
         por_categoria: ((d.por_categoria ?? []) as any[]).map((r) => ({
           agent_id: String(r.agent_id),

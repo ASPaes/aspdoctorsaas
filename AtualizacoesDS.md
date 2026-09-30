@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- ⬆️ **Tickets e "% sem ticket" no Scorecard por Agente** — Em **Atendimento › Dashboard**, na aba **Agentes**, o Scorecard ganhou duas colunas. **Tickets** mostra quantos tickets o agente tem como responsável no período: é o mesmo número da tela **Tickets** com o filtro do agente, e inclui os abertos por telefone. **% s/ ticket** mostra quantos atendimentos do agente terminaram sem ticket registrado, quase sempre fechados por inatividade, e fica amarelo a partir de 30%. Isso explica por que a tela Tickets e o Dashboard mostravam números diferentes para o mesmo agente: um conta tickets, o outro conta conversas. As duas colunas também saem no **Exportar XLSX**.
+
 - ⬆️ **Colar imagem no meio do texto do e-mail** — Em **E-mails**, ao escrever, responder ou encaminhar, dá para colar (Ctrl+V) ou arrastar uma imagem direto no texto e continuar escrevendo depois dela, como num programa de e-mail. A imagem chega ao cliente dentro do texto, não como anexo. Aceita PNG, JPG, GIF e WebP, até 5 MB cada.
 
 - ⬆️ **Remetente já vem escolhido** — Ao abrir a janela de e-mail (em **E-mails**, no chat ou no ticket), o **Remetente** já vem preenchido com a conta ligada ao seu usuário, ou com a única conta disponível. Antes era preciso escolher toda vez.
