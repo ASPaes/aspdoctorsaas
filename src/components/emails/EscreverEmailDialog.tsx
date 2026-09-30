@@ -515,13 +515,13 @@ export function EscreverEmailDialog({
           {mostrarCc && (
             <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
               <Label htmlFor="escrever-cc" className="font-normal text-muted-foreground">Cc</Label>
-              <CampoEmails id="escrever-cc" valores={cc} onChange={setCc} sugestoes={sugestoes} placeholder="Com cópia" />
+              <CampoEmails id="escrever-cc" valores={cc} onChange={setCc} sugestoes={sugestoes} placeholder="Com cópia" autoFocus />
             </div>
           )}
           {mostrarCco && (
             <div className="grid gap-1.5 sm:grid-cols-[96px_minmax(0,1fr)] sm:items-center sm:gap-3">
               <Label htmlFor="escrever-cco" className="font-normal text-muted-foreground">Cco</Label>
-              <CampoEmails id="escrever-cco" valores={cco} onChange={setCco} sugestoes={sugestoes} placeholder="Com cópia oculta" />
+              <CampoEmails id="escrever-cco" valores={cco} onChange={setCco} sugestoes={sugestoes} placeholder="Com cópia oculta" autoFocus />
             </div>
           )}
 
