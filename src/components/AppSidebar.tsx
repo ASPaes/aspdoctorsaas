@@ -42,6 +42,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEvolucaoDS } from "@/hooks/useEvolucaoDS";
 import { useRecebidosNaoLidos } from "@/components/emails/useNaoLidos";
+import { useEquipeNaoLidas, useEquipeTempoReal } from "@/components/equipe/useEquipe";
 
 
 const ROLE_LABELS: Record<string, string> = {
@@ -69,6 +70,9 @@ export function AppSidebar() {
   const { estado: evolucaoEstado, naoVistos: evolucaoNaoVistos } = useEvolucaoDS();
   // e-mail que chegou e ninguém abriu (DEM-0461); o RLS já recorta por pessoa
   const { data: emailsNaoLidos = 0 } = useRecebidosNaoLidos();
+  // Equipe DS (chat interno): o tempo real fica aqui porque o menu está sempre na tela
+  useEquipeTempoReal();
+  const equipeNaoLidas = useEquipeNaoLidas();
   const isSuperAdmin = profile?.is_super_admin === true;
   const { can } = usePermissions();
   const { canAccess: canOnboarding } = useOnboardingAccess();
@@ -350,7 +354,7 @@ export function AppSidebar() {
                     </Collapsible>
                   );
                 }
-                const naoLidos = item.resource === "nav.emails" ? emailsNaoLidos : 0;
+                const naoLidos = item.resource === "nav.emails" ? emailsNaoLidos : item.resource === "nav.equipe" ? equipeNaoLidas : 0;
                 const leaf = can(item.resource!, "view") ? (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton

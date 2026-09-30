@@ -426,3 +426,6 @@ verify_jwt = true
 
 [functions.colaborador-pauta-360]
 verify_jwt = true
+
+[functions.equipe-anexos]
+verify_jwt = true

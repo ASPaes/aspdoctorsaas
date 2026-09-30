@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { MessageCircle, Ticket, KanbanSquare, Mail, Sparkles, TrendingUp } from "lucide-react";
+import { MessageCircle, Ticket, KanbanSquare, Mail, Sparkles, TrendingUp, MessagesSquare } from "lucide-react";
+import { useEquipeNaoLidas, useEquipeTempoReal } from "@/components/equipe/useEquipe";
 import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
 import { usePortao } from "@/hooks/usePortao";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,10 @@ export default function MobileHome() {
   const podeTickets = usePortao("tickets");
   const podeImplantacao = usePortao("nav.onboarding");
   const podeEmails = usePortao("nav.emails");
+  const podeEquipe = usePortao("nav.equipe");
+  // Equipe DS: aqui não existe o menu lateral que mantém o tempo real ligado
+  useEquipeTempoReal();
+  const equipeNaoLidas = useEquipeNaoLidas({ soPessoal: true });
   // Sem portão: a Evolução DS é para todo mundo, como no menu do computador.
   const evolucao = useEvolucaoDS();
 
@@ -65,6 +70,16 @@ export default function MobileHome() {
       cor: "bg-primary/15 border-primary/30 text-primary",
       contagem: contadores.chat,
       liberado: podeChat,
+    },
+    {
+      chave: "equipe",
+      titulo: "Equipe",
+      descricao: "Chat interno da equipe",
+      destino: "/equipe",
+      icone: MessagesSquare,
+      cor: "bg-teal-500/15 border-teal-500/30 text-teal-400",
+      contagem: equipeNaoLidas,
+      liberado: podeEquipe,
     },
     {
       chave: "tickets",
@@ -112,7 +127,11 @@ export default function MobileHome() {
     },
   ];
 
-  const visiveis = atalhos.filter((a) => a.liberado);
+  const liberados = atalhos.filter((a) => a.liberado);
+  // Número ímpar de módulos deixaria um buraco na grade de 2 colunas: aí a
+  // Evolução DS deixa de ser deitada e ocupa a vaga.
+  const pequenos = liberados.filter((a) => !a.largo).length;
+  const visiveis = pequenos % 2 === 1 ? liberados.map((a) => ({ ...a, largo: false })) : liberados;
 
   return (
     <div className="h-full overflow-y-auto overscroll-contain">

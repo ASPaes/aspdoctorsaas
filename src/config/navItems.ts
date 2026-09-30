@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, ShieldCheck, HeadphonesIcon, MessageCircle,
-  TicketCheck, BarChart3, Settings, Headset, Gauge, Mail, type LucideIcon,
+  TicketCheck, BarChart3, Settings, Headset, Gauge, Mail, MessagesSquare, type LucideIcon,
 } from "lucide-react";
 
 export interface NavItem {
@@ -32,6 +32,7 @@ export const NAV_ITEMS: NavItem[] = [
   // `can(resource)`, e `superAdminOnly` não vale para ele — deixar aqui faria o
   // módulo aparecer para quem não deve.
   { title: "Certificados A1", url: "/certificados-a1", icon: ShieldCheck, resource: "nav.certificados_a1" },
+  { title: "Equipe", url: "/equipe", icon: MessagesSquare, resource: "nav.equipe" },
   { title: "E-mails", url: "/emails", icon: Mail, resource: "nav.emails" },
   { title: "Painel de Uso", url: "/painel-uso", icon: BarChart3, resource: "nav.painel_uso" },
   { title: "Configurações", url: "/configuracoes", icon: Settings, resource: "nav.configuracoes" },

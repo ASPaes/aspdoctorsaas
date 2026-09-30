@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play, Plus, Mail } from "lucide-react";
+import { Archive, MoreVertical, X, RotateCcw, PanelRightOpen, BellOff, Pencil, Ticket, ArrowLeftRight, XCircle, Brain, Building2, Moon, Link2, AlertTriangle, VolumeX, Trash2, CalendarClock, Users, FileSearch, ShieldOff, FileText, Search, Play, Plus, Mail, LifeBuoy } from "lucide-react";
+import { PedirAjudaDialog } from "@/components/equipe/PedirAjudaDialog";
 import { toast } from "sonner";
 import { InChatMessageSearchModal } from "./InChatMessageSearchModal";
 import { useAbrirEnvioEmail } from "./email/useAbrirEnvioEmail";
@@ -85,6 +86,7 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isManualTicketOpen, setIsManualTicketOpen] = useState(false);
+  const [pedirAjudaOpen, setPedirAjudaOpen] = useState(false);
   const [isChangeInstanceOpen, setIsChangeInstanceOpen] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showConfirmCliente, setShowConfirmCliente] = useState(false);
@@ -1208,6 +1210,11 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
                 <DropdownMenuItem onClick={() => markAsUnread(conversation.id)}>
                   <BellOff className="h-4 w-4 mr-2" /> Marcar como não lida
                 </DropdownMenuItem>
+                {activeAttendanceId && (
+                  <DropdownMenuItem onClick={() => setPedirAjudaOpen(true)}>
+                    <LifeBuoy className="h-4 w-4 mr-2" /> Pedir ajuda à equipe
+                  </DropdownMenuItem>
+                )}
                 {/* antes: sem restrição */}
                 {podeCriarTicket && (
                   <DropdownMenuItem onClick={() => setIsManualTicketOpen(true)}>
@@ -1421,6 +1428,10 @@ export function ChatHeader({ conversation, onToggleDetails, showDetails, onClose
         naFila={attendance?.status === "waiting" && !attendance?.assigned_to}
         onDepartmentTransferred={onDepartmentTransferred}
       />
+      {/* Equipe DS: montado só quando abre (a lista de colegas e canais não carrega à toa) */}
+      {pedirAjudaOpen && activeAttendanceId && (
+        <PedirAjudaDialog atendimentoId={activeAttendanceId} aberto={pedirAjudaOpen} onFechar={() => setPedirAjudaOpen(false)} />
+      )}
       <CreateCSTicketFromChat
         open={isManualTicketOpen}
         onOpenChange={setIsManualTicketOpen}

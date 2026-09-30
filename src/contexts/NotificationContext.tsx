@@ -16,6 +16,7 @@ import { mostrarNotificacaoDoSistema, marcarIconeDoApp, fecharAvisosDoSistema, p
 import { inscreverAparelho } from "@/lib/webPush";
 import { ChatToast } from "@/components/notifications/ChatToast";
 import { AlertaToast } from "@/components/notifications/AlertaToast";
+import { previaDe } from "@/components/equipe/equipeUtils";
 import { updateFaviconBadge } from "@/utils/notifications/favicon";
 import { useUserPreferences } from "@/hooks/useUserPreferences";
 import {
@@ -384,9 +385,19 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const isVisible = document.visibilityState === "visible";
       const notifConvId = (notif.metadata as any)?.conversation_id ?? null;
 
+      // Equipe DS (chat interno): o mesmo "já estou vendo", mas pela conversa da
+      // Equipe aberta na tela (/equipe?c=<canal>, e o fio em &f=<raiz>).
+      const meta = (notif.metadata ?? {}) as Record<string, any>;
+      const ehEquipe = (notif as any).type === "equipe_mensagem";
+      const equipeAberta =
+        ehEquipe && isVisible && loc.pathname === "/equipe" && (() => {
+          const q = new URLSearchParams(loc.search);
+          return q.get("c") === meta.canal_id && (!meta.raiz_id || q.get("f") === meta.raiz_id);
+        })();
+
       // CASO ESPECIAL: se a conversa já está aberta, marca como lido imediatamente
       // e não dispara som/toast (o user já está vendo)
-      if (notifConvId && notifConvId === currentConvId) {
+      if ((notifConvId && notifConvId === currentConvId) || equipeAberta) {
         await supabase.rpc("mark_notification_read" as any, {
           p_recipient_id: recipient.id,
         });
@@ -459,6 +470,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       }
 
+      // Equipe DS: o aviso não guarda o texto (a tabela notifications é legível
+      // pelo tenant inteiro). A prévia vem da própria mensagem, com a RLS de
+      // quem está vendo.
+      let corpo = notif.body || "";
+      if (ehEquipe && meta.mensagem_id && (wantsToast || wantsNative)) {
+        const { data: msg } = await (supabase.from("equipe_mensagens" as any) as any)
+          .select("corpo, anexos, refs, apagada_em")
+          .eq("id", meta.mensagem_id)
+          .maybeSingle();
+        if (msg) corpo = previaDe(msg) || corpo;
+      }
+
       if (wantsToast) {
         const abrir = () => {
           if (notif.action_url) navigate(notif.action_url);
@@ -473,7 +496,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         // id estável por conversa: a 2ª mensagem da mesma conversa ATUALIZA o
         // toast em vez de empilhar. O banco já coalesce e manda unread_count.
-        const toastId = notifConvId ? `conv-${notifConvId}` : `notif-${notif.id}`;
+        const toastId = notifConvId ? `conv-${notifConvId}`
+          : ehEquipe && meta.canal_id ? `equipe-${meta.canal_id}-${meta.raiz_id ?? ""}` : `notif-${notif.id}`;
 
         sonnerToast.custom(
           (id) =>
@@ -482,7 +506,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             dirigido ? (
               <AlertaToast
                 title={notif.title}
-                body={notif.body || ""}
+                body={corpo}
                 onOpen={() => {
                   sonnerToast.dismiss(id);
                   abrir();
@@ -492,7 +516,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             ) : (
               <ChatToast
                 title={notif.title}
-                body={notif.body || ""}
+                body={corpo}
                 unreadCount={Number((notif.metadata as any)?.unread_count ?? 1)}
                 onOpen={() => {
                   sonnerToast.dismiss(id);
@@ -514,8 +538,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         // lanca "Illegal constructor" e o aviso nunca chegava na barra do telefone.
         void mostrarNotificacaoDoSistema({
           titulo: notif.title,
-          corpo: notif.body || "",
-          tag: notifConvId ? `chat-${notifConvId}` : `notif-${notif.id}`,
+          corpo,
+          tag: notifConvId ? `chat-${notifConvId}`
+            : ehEquipe && meta.canal_id ? `equipe-${meta.canal_id}` : `notif-${notif.id}`,
           url: notif.action_url ?? "/",
         });
       }

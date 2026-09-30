@@ -36,6 +36,7 @@ const Configuracoes = lazyWithReload(() => import("@/pages/Configuracoes"));
 const CertificadosA1 = lazyWithReload(() => import("@/pages/CertificadosA1"));
 const Emails = lazyWithReload(() => import("@/pages/Emails"));
 const EvolucaoDS = lazyWithReload(() => import("@/pages/EvolucaoDS"));
+const Equipe = lazyWithReload(() => import("@/pages/Equipe"));
 const Financeiro = lazyWithReload(() => import("@/pages/Financeiro"));
 import FinanceiroGuard from "@/components/financeiro/FinanceiroGuard";
 const NotFound = lazyWithReload(() => import("@/pages/NotFound"));
@@ -130,6 +131,8 @@ const App = () => (
               <Route path="/cadastros" element={<Navigate to="/configuracoes?tab=cadastros" replace />} />
               <Route path="/certificados-a1" element={<RequirePermission resource="nav.certificados_a1"><CertificadosA1 /></RequirePermission>} />
               <Route path="/emails" element={<RequirePermission resource="nav.emails"><Emails /></RequirePermission>} />
+              {/* Equipe DS: chat interno. Quem vê cada conversa é decidido no banco (RLS + RPCs equipe_*). */}
+              <Route path="/equipe" element={<RequirePermission resource="nav.equipe"><Equipe /></RequirePermission>} />
               <Route path="/financeiro" element={<RequirePermission resource="nav.financeiro"><FinanceiroGuard><Financeiro /></FinanceiroGuard></RequirePermission>} />
               <Route path="/configuracoes" element={<RequirePermission resource="nav.configuracoes"><Configuracoes /></RequirePermission>} />
               <Route path="/configuracoes/notificacoes" element={<RequirePermission resource="nav.configuracoes"><ConfiguracoesNotificacoes /></RequirePermission>} />

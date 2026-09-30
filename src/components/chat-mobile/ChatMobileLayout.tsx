@@ -29,6 +29,7 @@ const TITULOS: Record<string, string> = {
   "/implantacao": "Implantação",
   "/emails": "E-mails",
   "/evolucao": "Evolução DS",
+  "/equipe": "Equipe",
 };
 
 export default function ChatMobileLayout() {
@@ -55,7 +56,8 @@ export default function ChatMobileLayout() {
 
   const emModulo = pathname !== "/";
   const tituloDoModulo = TITULOS[pathname] ?? "DS Mobile";
-  const gerenciaProprioScroll = pathname.startsWith("/whatsapp");
+  // A Equipe também: lista e conversa rolam por dentro, como no chat.
+  const gerenciaProprioScroll = pathname.startsWith("/whatsapp") || pathname === "/equipe";
 
   return (
     <DepartmentFilterProvider>

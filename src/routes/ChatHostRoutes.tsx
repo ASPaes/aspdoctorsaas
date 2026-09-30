@@ -26,6 +26,7 @@ const SupportTickets = lazyWithReload(() => import("@/pages/SupportTickets"));
 const Emails = lazyWithReload(() => import("@/pages/Emails"));
 const OnboardingPage = lazyWithReload(() => import("@/pages/onboarding/OnboardingPage"));
 const EvolucaoDS = lazyWithReload(() => import("@/pages/EvolucaoDS"));
+const Equipe = lazyWithReload(() => import("@/pages/Equipe"));
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center bg-background">
@@ -74,6 +75,15 @@ export default function ChatHostRoutes() {
             voltar do Android ter para onde voltar. */}
         <Route index element={<MobileHome />} />
         <Route path="/whatsapp" element={<ChatHostGuard><WhatsApp /></ChatHostGuard>} />
+        {/* Equipe DS: chat interno. É para onde o aviso (push) leva. */}
+        <Route
+          path="/equipe"
+          element={
+            <RequirePermission resource="nav.equipe">
+              <Suspense fallback={<PageLoader />}><Equipe /></Suspense>
+            </RequirePermission>
+          }
+        />
         <Route
           path="/tickets"
           element={
