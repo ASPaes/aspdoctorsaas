@@ -49,7 +49,7 @@ export interface Time360 {
 
 export const DIMENSOES: { chave: Dimensao; rotulo: string; peso: number; fonte: keyof Metricas360["pct"]; regra: string }[] = [
   { chave: "satisfacao", rotulo: "Satisfação", peso: 25, fonte: "csat", regra: "Média das notas de CSAT recebidas." },
-  { chave: "agilidade", rotulo: "Agilidade", peso: 20, fonte: "frt", regra: "Mediana da 1ª resposta. Quanto menor, melhor." },
+  { chave: "agilidade", rotulo: "Agilidade", peso: 20, fonte: "frt", regra: "Mediana da 1ª resposta, contando só o horário de atendimento do setor. Quanto menor, melhor." },
   { chave: "resolucao", rotulo: "Resolução", peso: 20, fonte: "fcr", regra: "Resolvidos no 1º contato: sem ticket, sem transferência e sem reabrir." },
   { chave: "produtividade", rotulo: "Produtividade", peso: 20, fonte: "encerrados", regra: "Atendimentos encerrados no período." },
   { chave: "qualidade", rotulo: "Qualidade", peso: 15, fonte: "qualidade", regra: "Sentimento das conversas lido pela IA no encerramento." },
