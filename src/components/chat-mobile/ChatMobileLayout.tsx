@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Suspense } from "react";
-import { ChevronLeft, Loader2, LogOut } from "lucide-react";
+import { Suspense, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, Loader2, LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DepartmentFilterProvider } from "@/contexts/DepartmentFilterContext";
@@ -37,6 +38,26 @@ export default function ChatMobileLayout() {
   const { signOut } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [atualizando, setAtualizando] = useState(false);
+
+  /**
+   * Botão de atualizar. Instalado na tela inicial (PWA) não existe o recarregar
+   * do navegador, e com a tela bloqueada o tempo real pode perder eventos.
+   * Rebusca os dados em vez de recarregar a página: tudo que a tela mostra vem
+   * do react-query, e assim a conversa aberta, a rolagem e o texto digitado
+   * ficam onde estavam. `invalidateQueries` rebusca na hora o que está na tela
+   * e marca o resto como velho, para vir novo quando for aberto.
+   */
+  async function atualizar() {
+    if (atualizando) return;
+    setAtualizando(true);
+    try {
+      await queryClient.invalidateQueries();
+    } finally {
+      setAtualizando(false);
+    }
+  }
 
   /**
    * Um passo atras, nao direto para o inicio. Estando dentro de uma conversa, a
@@ -97,6 +118,16 @@ export default function ChatMobileLayout() {
               <AgentPresenceButton />
             </div>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Atualizar"
+                disabled={atualizando}
+                onClick={atualizar}
+              >
+                <RefreshCw className={cn("h-4 w-4", atualizando && "animate-spin")} />
+              </Button>
               <NotificationBell />
               <Button
                 variant="ghost"
