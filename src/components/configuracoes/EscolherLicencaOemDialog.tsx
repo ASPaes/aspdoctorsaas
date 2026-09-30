@@ -133,7 +133,7 @@ export default function EscolherLicencaOemDialog({
       // recusa com pedido vivo na fila do OEM, que iria para a licença errada.
       // Licença de outro cliente sai da ficha dele pelo mesmo caminho.
       const aSoltar = cliente.soltar && cliente.soltar.id !== l.id ? cliente.soltar : null;
-      const { error } = await (supabase as any).rpc("trocar_filial_oem", {
+      const { data, error } = await (supabase as any).rpc("trocar_filial_oem", {
         p_cliente_id: cliente.id,
         p_recon_nova: l.id,
         p_recon_antiga: aSoltar?.id ?? null,
@@ -145,6 +145,19 @@ export default function EscolherLicencaOemDialog({
           ? `Filial ${l.filial_codigo} agora é de ${cliente.nome}, e a filial ${aSoltar.filial_codigo} voltou para a fila sem dono.`
           : `Filial ${l.filial_codigo} agora é de ${cliente.nome}. A decisão sobrevive às próximas sincronizações.`,
       });
+      // Módulo que o cliente paga e a licença nova não tem: a troca manteve na
+      // ficha e pediu à licença nova. A antiga continua com ele no parceiro.
+      const reenviados: { modulo: string | null }[] = data?.reenviados ?? [];
+      if (reenviados.length > 0) {
+        const nomes = reenviados.map((r) => r.modulo ?? "módulo").join(", ");
+        toast({
+          title: "Módulos pagos enviados para a licença nova",
+          description:
+            `${nomes}: pedido na fila do OEM aguardando aprovação (Configurações › Integrações › OEM › Fila).` +
+            (aSoltar ? ` Desligue no portal do OEM na filial ${aSoltar.filial_codigo}, que continua com eles.` : ""),
+          duration: 15000,
+        });
+      }
       setTrocar(null);
       onDecidido();
       onOpenChange(false);
