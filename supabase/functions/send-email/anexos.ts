@@ -126,6 +126,49 @@ export function validarAnexos(
   return { ok: true, anexos };
 }
 
+export const IMAGEM_COLADA_MAX = 20;
+const IMAGEM_COLADA_TIPOS = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+export interface ImagemColada {
+  path: string;
+  nome: string;
+  mime: string;
+  cid: string;
+}
+
+/**
+ * Imagem colada no corpo (29/09/2026): vai embutida por cid:, como a da
+ * assinatura, e não como anexo. Mora no mesmo lugar do anexo da tela E-mails
+ * (`<tenant>/emails/<uuid>.<ext>` no whatsapp-media) e é apagada igual depois
+ * do envio. O cid vem da tela, então só o formato que ela gera passa: é ele
+ * que vai parar no cabeçalho Content-ID.
+ */
+export function validarImagensColadas(
+  lista: unknown,
+  tenantId: string,
+): { ok: true; imagens: ImagemColada[] } | { ok: false; erro: string } {
+  if (lista === undefined || lista === null) return { ok: true, imagens: [] };
+  if (!Array.isArray(lista)) return { ok: false, erro: "Lista de imagens inválida." };
+  if (lista.length > IMAGEM_COLADA_MAX) {
+    return { ok: false, erro: `No máximo ${IMAGEM_COLADA_MAX} imagens coladas por e-mail.` };
+  }
+  const caminho = new RegExp(`^${tenantId}/emails/${UUID}\\.(png|jpe?g|gif|webp)$`, "i");
+  const imagens: ImagemColada[] = [];
+  const cids = new Set<string>();
+  for (const item of lista) {
+    const path = typeof item?.path === "string" ? item.path : "";
+    const mime = typeof item?.mime === "string" ? item.mime.trim().toLowerCase() : "";
+    const cid = typeof item?.cid === "string" ? item.cid : "";
+    if (!caminho.test(path)) return { ok: false, erro: "Imagem inválida: arquivo fora da área do seu tenant." };
+    if (!IMAGEM_COLADA_TIPOS.has(mime)) return { ok: false, erro: "Só dá para colar imagem PNG, JPG, GIF ou WebP." };
+    if (!/^ds-img-\d{1,2}$/.test(cid) || cids.has(cid)) return { ok: false, erro: "Imagem colada com identificação inválida." };
+    cids.add(cid);
+    const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1];
+    imagens.push({ path, mime, cid, nome: `imagem-${imagens.length + 1}.${ext}` });
+  }
+  return { ok: true, imagens };
+}
+
 /** base64 em pedaços: String.fromCharCode(...bytes) estoura a pilha em arquivo grande */
 export function bytesParaBase64(bytes: Uint8Array): string {
   let binario = "";

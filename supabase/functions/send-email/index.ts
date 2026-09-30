@@ -3,7 +3,7 @@ import { enviarSmtp, mensagemAmigavel, type EmailSecurity } from '../test-email-
 import { enderecoValido, montarMensagem, semQuebra } from './mime.ts';
 import { aplicarAssinatura, montarAssinatura } from './assinatura.ts';
 import { anexarHistorico } from './historico.ts';
-import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos } from './anexos.ts';
+import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos, validarImagensColadas } from './anexos.ts';
 
 /**
  * Porta única de saída de e-mail do DoctorSaaS.
@@ -22,6 +22,8 @@ import { ANEXO_BUCKET, ANEXO_MAX_TOTAL_BYTES, bytesParaBase64, validarAnexos } f
  * Anexos (`anexos`, 15/09/2026): arquivos já subidos no `whatsapp-media` pela
  * get-media-upload-url. Conferidos em anexos.ts, baixados, anexados e APAGADOS
  * depois do envio com sucesso (a purge-chat-media não alcança esses arquivos).
+ * Imagens coladas no corpo (`imagens`, 29/09/2026): mesmo lugar e mesma faxina
+ * dos anexos, mas vão embutidas por cid:, no meio do texto.
  * Assinatura da conta (`email_account_assinaturas`) entra no fim de todo e-mail.
  * Cada tentativa vira uma linha em `email_envios`, com ou sem sucesso.
  * O corpo VAI para `email_envios` desde 15/09/2026, para a tela E-mails abrir o
@@ -180,6 +182,9 @@ Deno.serve(async (req) => {
   const anexosValidados = validarAnexos(body.anexos, tenantId);
   if (!anexosValidados.ok) return json(400, { error: anexosValidados.erro });
   const anexosPedidos = anexosValidados.anexos;
+  const imagensValidadas = validarImagensColadas(body.imagens, tenantId);
+  if (!imagensValidadas.ok) return json(400, { error: imagensValidadas.erro });
+  const imagensPedidas = imagensValidadas.imagens;
 
   // ── por qual conta ──
   const pedidaConta = typeof body.account_id === 'string' && UUID.test(body.account_id) ? body.account_id : null;
@@ -266,10 +271,25 @@ Deno.serve(async (req) => {
     }
     arquivos.push({ nome: a.nome, mime: a.mime, base64: bytesParaBase64(new Uint8Array(await blob.arrayBuffer())) });
   }
+  // imagens coladas no corpo: entram no mesmo teto dos anexos, porque o e-mail é um só
+  const coladas: { cid: string; mime: string; nome: string; base64: string }[] = [];
+  for (const img of imagensPedidas) {
+    const { data: blob, error: baixarErr } = await supabase.storage.from(ANEXO_BUCKET).download(img.path);
+    if (baixarErr || !blob) {
+      return json(409, { error: 'Uma imagem colada no texto não foi encontrada. Tire e cole a imagem de novo.' });
+    }
+    bytesAnexos += blob.size;
+    if (bytesAnexos > ANEXO_MAX_TOTAL_BYTES) {
+      return json(400, { error: `Anexos e imagens passam de ${Math.round(ANEXO_MAX_TOTAL_BYTES / (1024 * 1024))} MB somados.` });
+    }
+    coladas.push({ cid: img.cid, mime: img.mime, nome: img.nome, base64: bytesParaBase64(new Uint8Array(await blob.arrayBuffer())) });
+  }
 
   // ── envio ──
-  // a resposta volta pelo endereço com sufixo; a marca no assunto é o plano B,
-  // para provedor que não entrega sufixo e para quem responde de outro jeito
+  // A resposta volta pelo endereço com sufixo; o plano B é o Message-ID, que
+  // carrega o código e toda resposta devolve no In-Reply-To/References.
+  // Até 29/09/2026 o plano B era "[#CÓDIGO]" no fim do assunto, que o cliente
+  // via e estranhava. O leitor ainda reconhece essa marca nos e-mails antigos.
   const replyToken = gerarReplyToken();
   const [contaLocal, contaDominio] = conta.email.split('@');
   const mensagem = montarMensagem({
@@ -277,10 +297,11 @@ Deno.serve(async (req) => {
     para,
     cc,
     responderPara: responderPara ?? `${contaLocal}+${replyToken}@${contaDominio}`,
-    assunto: `${assunto} [#${replyToken}]`,
+    assunto,
+    prefixoId: replyToken,
     html: corpo.html,
     texto: corpo.texto,
-    embutidas: corpo.embutidas,
+    embutidas: [...(corpo.embutidas ?? []), ...coladas],
     anexos: arquivos,
   });
 
@@ -325,7 +346,10 @@ Deno.serve(async (req) => {
       // a conversa completa entra no registro, sem a assinatura: abrir o e-mail
       // em Enviados mostra o que o cliente recebeu
       corpo_texto: texto ? [texto, historicoTexto].filter(Boolean).join('\n\n').slice(0, MAX_CORPO_GUARDADO) : null,
-      corpo_html: html ? (html + (historicoHtml ?? '')).slice(0, MAX_CORPO_GUARDADO) : null,
+      // a imagem colada é apagada depois do envio; guardada, vira só a marca
+      corpo_html: html
+        ? (html.replace(/<img\b[^>]*\bsrc="cid:ds-img-\d+"[^>]*>/gi, '<em style="color:#64748B">[imagem colada]</em>') + (historicoHtml ?? '')).slice(0, MAX_CORPO_GUARDADO)
+        : null,
       status: ok ? 'enviado' : 'erro',
       erro,
       message_id: mensagem.messageId,
@@ -350,7 +374,10 @@ Deno.serve(async (req) => {
   // fica, para a pessoa tentar de novo sem anexar outra vez.
   // O anexo de e-mail RECEBIDO (ticket-attachments) nunca entra aqui: ele é do
   // ticket, e encaminhar não pode apagar o arquivo do cliente.
-  const temporarios = anexosPedidos.filter((a) => a.bucket === ANEXO_BUCKET).map((a) => a.path);
+  const temporarios = [
+    ...anexosPedidos.filter((a) => a.bucket === ANEXO_BUCKET).map((a) => a.path),
+    ...imagensPedidas.map((i) => i.path),
+  ];
   if (ok && temporarios.length) {
     const { error: apagarErr } = await supabase.storage.from(ANEXO_BUCKET).remove(temporarios);
     if (apagarErr) console.error(`[send-email] anexos enviados mas não apagados: ${apagarErr.message}`);

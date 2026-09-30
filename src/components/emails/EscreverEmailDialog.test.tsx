@@ -15,6 +15,7 @@ vi.mock("@/contexts/TenantFilterContext", () => ({ useTenantFilter: () => ({ eff
 vi.mock("./useEmailsEnviados", () => ({ useOpcoesFiltro: () => ({ contas: [{ id: "c1", email: "suporte@x.com", rotulo: "Suporte" }] }) }));
 vi.mock("@/components/whatsapp/chat/email/useEmailChatDados", () => ({
   useContasDeEnvio: () => ({ data: { contas: [{ id: "c1", email: "suporte@x.com", rotulo: "Suporte" }] }, isLoading: false }),
+  contaInicial: (contas: { id: string }[]) => (contas.length === 1 ? contas[0].id : ""),
 }));
 // e-mail novo: a busca de cliente vira dois botões, e os e-mails de cada cliente são fixos
 const EMAILS_DO_CLIENTE: Record<string, { email: string; rotulo: string }[]> = {

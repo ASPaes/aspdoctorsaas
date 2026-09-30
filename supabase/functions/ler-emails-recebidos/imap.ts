@@ -400,6 +400,13 @@ export function acharToken(cab: Record<string, string>): string | null {
     .join(", ");
   const noEndereco = destinos.match(/\+([A-HJ-NP-Z2-9]{10})@/i);
   if (noEndereco) return noEndereco[1].toUpperCase();
+  // desde 29/09/2026 o código vai na frente do Message-ID (`<CODIGO.uuid@dominio>`)
+  // e toda resposta o devolve aqui; é o que substituiu a marca no assunto
+  const naResposta = `${cab["in-reply-to"] ?? ""} ${cab["references"] ?? ""}`.match(
+    /<([A-HJ-NP-Z2-9]{10})\.[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}@/i,
+  );
+  if (naResposta) return naResposta[1].toUpperCase();
+  // e-mail enviado antes disso ainda traz "[#CODIGO]" no assunto
   const noAssunto = decodificarCabecalho(cab["subject"] ?? "").match(/\[#([A-HJ-NP-Z2-9]{10})\]/i);
   return noAssunto ? noAssunto[1].toUpperCase() : null;
 }

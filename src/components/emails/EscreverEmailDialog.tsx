@@ -13,7 +13,7 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { EditorEmail } from "@/components/whatsapp/chat/email/EditorEmail";
 import { CampoEmails } from "@/components/whatsapp/chat/email/EnviarEmailChatDialog";
 import { BotaoAnexar, ListaAnexos, type AnexoNaTela } from "@/components/whatsapp/chat/email/AnexosEmail";
-import { useContasDeEnvio } from "@/components/whatsapp/chat/email/useEmailChatDados";
+import { contaInicial, useContasDeEnvio } from "@/components/whatsapp/chat/email/useEmailChatDados";
 import {
   ANEXO_MAX_ARQUIVOS,
   ANEXO_MAX_TOTAL_BYTES,
@@ -26,6 +26,10 @@ import { useOpcoesFiltro } from "./useEmailsEnviados";
 import { useEmailsDoCliente } from "./useEmailsDoCliente";
 import { ClienteSearchSelect, type SelectedCliente } from "@/components/whatsapp/contatos/ClienteSearchSelect";
 import { uploadAnexoEmail } from "@/components/whatsapp/chat/email/uploadAnexoEmail";
+import { prepararImagensColadas } from "@/components/whatsapp/chat/email/imagensColadas";
+
+/** por imagem colada; o total com os anexos a send-email confere */
+const IMAGEM_COLADA_MAX_BYTES = 5 * 1024 * 1024;
 import {
   ORIGEM_DO_MODO,
   ROTULO_MODO,
@@ -233,7 +237,7 @@ export function EscreverEmailDialog({
       setVersaoCorpo((v) => v + 1);
       setAnexos([]);
       setEnviando(false);
-      setContaId(contas.length === 1 ? contas[0].id : "");
+      setContaId(contaInicial(contas));
       return;
     }
     const original = pedido.original;
@@ -271,8 +275,16 @@ export function EscreverEmailDialog({
       toast.warning(`Não coube no encaminhamento: ${doOriginal.deixados.join("; ")}.`, { duration: 10000 });
     }
     setEnviando(false);
-    setContaId(contas.length === 1 ? contas[0].id : "");
+    setContaId(contaInicial(contas));
   }, [pedido, chaveAtual, contas, contasDoTenant]);
+
+  // as contas costumam chegar depois da abertura (a consulta só roda com a janela
+  // aberta): sem isto o Remetente ficava em "Escolha a conta" mesmo com uma só
+  useEffect(() => {
+    if (!aberto || contaId) return;
+    const inicial = contaInicial(contas);
+    if (inicial) setContaId(inicial);
+  }, [aberto, contaId, contas]);
 
   const adicionarAnexos = (arquivos: File[]) => {
     const recusados: string[] = [];
@@ -314,6 +326,14 @@ export function EscreverEmailDialog({
     }
   };
 
+  const colarImagem = async (arquivo: File): Promise<string> => {
+    if (!tid) throw new Error("Escolha a empresa antes de colar imagem.");
+    if (arquivo.size > IMAGEM_COLADA_MAX_BYTES) {
+      throw new Error(`A imagem passa de ${formatarTamanho(IMAGEM_COLADA_MAX_BYTES)}. Diminua a imagem ou envie pelo Anexar.`);
+    }
+    return (await uploadAnexoEmail(tid, arquivo)).storagePath;
+  };
+
   const enviar = async () => {
     if (enviando || !pedido || !tid) return;
     if (anexando) {
@@ -324,11 +344,17 @@ export function EscreverEmailDialog({
       toast.error("Tire os anexos que falharam antes de enviar.");
       return;
     }
+    // imagem colada no texto: cada uma vira cid: e vai embutida pela send-email
+    const coladas = prepararImagensColadas(corpoHtml);
+    if (coladas.pendentes > 0) {
+      toast.error("Espere as imagens coladas no texto terminarem de subir antes de enviar.");
+      return;
+    }
     const faltando: string[] = [];
     if (!contaId) faltando.push("o remetente");
     if (para.length === 0) faltando.push("pelo menos um destinatário");
     if (!assunto.trim()) faltando.push("o assunto");
-    if (!corpoTexto.trim()) faltando.push("o texto do e-mail");
+    if (!corpoTexto.trim() && coladas.imagens.length === 0) faltando.push("o texto do e-mail");
     if (faltando.length) {
       toast.error(`Falta preencher ${faltando.join(", ")}.`);
       return;
@@ -345,7 +371,8 @@ export function EscreverEmailDialog({
           bcc: cco,
           subject: assunto.trim(),
           text: corpoTexto.trim(),
-          html: htmlParaEmail(corpoHtml),
+          html: htmlParaEmail(coladas.html),
+          imagens: coladas.imagens,
           // 'avulso' entra na conferência de conta liberada da send-email, como o chat
           origem: novo ? "avulso" : ORIGEM_DO_MODO[modo],
           referencia_id: original?.referenciaId ?? null,
@@ -525,6 +552,7 @@ export function EscreverEmailDialog({
                 desabilitado={enviando}
                 placeholder={novo ? "Escreva o e-mail" : "Escreva a resposta"}
                 acaoAnexar={<BotaoAnexar desabilitado={enviando} onEscolher={adicionarAnexos} />}
+                onColarImagem={colarImagem}
                 rodape={
                   <p className="mb-1 mt-3 text-xs text-muted-foreground">
                     A assinatura da conta remetente entra automaticamente no envio.

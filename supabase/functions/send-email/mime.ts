@@ -93,11 +93,17 @@ export interface MensagemEntrada {
   assunto: string;
   html?: string | null;
   texto?: string | null;
-  /** imagens referenciadas no HTML por cid: (hoje, só a da assinatura) */
+  /** imagens referenciadas no HTML por cid: (a da assinatura e as coladas no corpo) */
   embutidas?: { cid: string; mime: string; nome: string; base64: string }[];
   /** arquivos anexados: viram multipart/mixed, com o corpo inteiro na 1ª parte */
   anexos?: { nome: string; mime: string; base64: string }[];
   agora?: Date;
+  /**
+   * Vai na frente do Message-ID (`<prefixo.uuid@dominio>`). A resposta do cliente
+   * devolve esse id no In-Reply-To/References, e o leitor da caixa tira dali o
+   * código do envio sem ele aparecer no assunto (29/09/2026).
+   */
+  prefixoId?: string;
 }
 
 export interface MensagemMontada {
@@ -107,7 +113,7 @@ export interface MensagemMontada {
 
 export function montarMensagem(m: MensagemEntrada): MensagemMontada {
   const dominio = m.de.email.split("@")[1] ?? "doctorsaas.com.br";
-  const messageId = `<${crypto.randomUUID()}@${dominio}>`;
+  const messageId = `<${m.prefixoId ? `${m.prefixoId}.` : ""}${crypto.randomUUID()}@${dominio}>`;
   const fronteira = `=_ds_${crypto.randomUUID().replace(/-/g, "")}`;
   // CRLF em tudo: SMTP não aceita LF solto
   const crlf = (s: string) => s.replace(/\r?\n/g, "\r\n");

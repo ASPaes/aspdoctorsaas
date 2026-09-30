@@ -12,6 +12,8 @@ export interface ContaDeEnvio {
   email: string;
   from_name: string | null;
   is_default: boolean;
+  /** ligada direto a quem envia (não só pelo setor): é a que vem escolhida */
+  pessoal?: boolean;
 }
 
 /**
@@ -65,8 +67,21 @@ export async function buscarContasDeEnvio(tenantId: string | null, userId: strin
         ...((setores.data ?? []) as any[]).filter((s) => meusSetores.has(s.setor_id)).map((s) => s.account_id),
       ]);
 
-      if (superAdmin) return { contas: todas };
-      return { contas: todas.filter((c) => ligadasIds.has(c.id)) };
+      const diretas = new Set(((usuarios.data ?? []) as any[]).filter((u) => u.user_id === userId).map((u) => u.account_id));
+      const marcadas = todas.map((c) => ({ ...c, pessoal: diretas.has(c.id) }));
+      if (superAdmin) return { contas: marcadas };
+      return { contas: marcadas.filter((c) => ligadasIds.has(c.id)) };
+}
+
+/**
+ * Remetente que já vem escolhido (29/09/2026): a conta ligada direto a quem
+ * envia, se for uma só; senão, a única disponível. Com várias e nenhuma
+ * pessoal, fica em branco e a pessoa escolhe.
+ */
+export function contaInicial(contas: ContaDeEnvio[]): string {
+  const pessoais = contas.filter((c) => c.pessoal);
+  if (pessoais.length === 1) return pessoais[0].id;
+  return contas.length === 1 ? contas[0].id : "";
 }
 
 export interface SugestaoEmail {

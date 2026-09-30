@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
 import {
   adaptarEmailChat,
+  contaInicial,
   corrigirEmailChat,
   enviarEmailChat,
   gerarEmailChat,
@@ -159,7 +160,7 @@ export function EnviarEmailTicketDialog({
 
   const contas = contasQuery.data?.contas ?? [];
   useEffect(() => {
-    if (open && !contaId && contas.length === 1) setContaId(contas[0].id);
+    if (open && !contaId && contaInicial(contas)) setContaId(contaInicial(contas));
   }, [open, contaId, contas]);
 
   const sugestoes = dados?.sugestoes ?? [];

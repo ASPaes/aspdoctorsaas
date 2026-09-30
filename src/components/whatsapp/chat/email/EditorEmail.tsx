@@ -6,6 +6,9 @@ import { StarterKit } from "@tiptap/starter-kit";
 import { Color, FontFamily, FontSize, TextStyle } from "@tiptap/extension-text-style";
 import { TextAlign } from "@tiptap/extension-text-align";
 import { Placeholder } from "@tiptap/extensions";
+import { Image } from "@tiptap/extension-image";
+import type { EditorView } from "@tiptap/pm/view";
+import { toast } from "sonner";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 import {
   AlignCenter,
@@ -45,6 +48,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { normalizarUrl } from "./travaEnvioEmail";
+import { TIPOS_IMAGEM_COLADA } from "./imagensColadas";
 
 export interface ConteudoEditor {
   html: string;
@@ -73,6 +77,40 @@ interface Props {
   destacarCampos?: boolean;
   /** o editor, para quem precisa inserir texto na posição do cursor */
   onEditor?: (editor: Editor | null) => void;
+  /**
+   * Sobe a imagem colada ou arrastada para o texto e devolve o caminho no
+   * Storage. Sem ele, colar imagem não faz nada (chat e ticket, por enquanto).
+   * Erro vira aviso e a imagem sai do texto.
+   */
+  onColarImagem?: (arquivo: File) => Promise<string>;
+}
+
+/**
+ * Imagem no meio do texto (29/09/2026). Na tela ela aparece pelo endereço do
+ * navegador; `data-caminho` guarda onde ela ficou no Storage depois de subir,
+ * e é ele que o envio usa (ver imagensColadas.ts).
+ */
+const ImagemColada = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      caminho: {
+        default: null,
+        parseHTML: (el) => el.getAttribute("data-caminho"),
+        renderHTML: (a) => (a.caminho ? { "data-caminho": a.caminho } : {}),
+      },
+    };
+  },
+}).configure({ inline: true, allowBase64: false });
+
+/** acha a imagem pelo endereço do navegador, que é único por colagem */
+function acharImagem(view: EditorView, src: string): { pos: number; attrs: Record<string, unknown> } | null {
+  let achada: { pos: number; attrs: Record<string, unknown> } | null = null;
+  view.state.doc.descendants((no, pos) => {
+    if (achada) return false;
+    if (no.type.name === "image" && no.attrs.src === src) achada = { pos, attrs: no.attrs };
+  });
+  return achada;
 }
 
 /** {{campo}} de macro pintado no editor, sem mudar o texto guardado */
@@ -157,6 +195,8 @@ const CONTEUDO = cn(
   "[&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-5",
   "[&_.ProseMirror_ol]:my-2 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-5",
   "[&_.ProseMirror_blockquote]:my-2 [&_.ProseMirror_blockquote]:border-l-2 [&_.ProseMirror_blockquote]:border-border [&_.ProseMirror_blockquote]:pl-3 [&_.ProseMirror_blockquote]:text-muted-foreground",
+  // imagem colada: cabe na largura, esmaecida enquanto sobe, contorno quando selecionada
+  "[&_.ProseMirror_img]:inline-block [&_.ProseMirror_img]:h-auto [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:rounded-sm [&_.ProseMirror_img.ProseMirror-selectednode]:ring-2 [&_.ProseMirror_img.ProseMirror-selectednode]:ring-ring [&_.ProseMirror_img[src^=blob]:not([data-caminho])]:opacity-50",
   "[&_.ProseMirror_a]:text-sky-600 [&_.ProseMirror_a]:underline dark:[&_.ProseMirror_a]:text-sky-400",
   "[&_.ProseMirror_p.is-editor-empty:first-child]:before:pointer-events-none [&_.ProseMirror_p.is-editor-empty:first-child]:before:float-left [&_.ProseMirror_p.is-editor-empty:first-child]:before:h-0 [&_.ProseMirror_p.is-editor-empty:first-child]:before:text-muted-foreground [&_.ProseMirror_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",
 );
@@ -175,16 +215,52 @@ export function EditorEmail({
   onBarra,
   destacarCampos = false,
   onEditor,
+  onColarImagem,
 }: Props) {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onBarraRef = useRef(onBarra);
   onBarraRef.current = onBarra;
+  const colarImagemRef = useRef(onColarImagem);
+  colarImagemRef.current = onColarImagem;
   const placeholderRef = useRef(placeholder);
   placeholderRef.current = placeholder;
   const [sublinharErros, setSublinharErros] = useState(true);
   const sublinharRef = useRef(sublinharErros);
   sublinharRef.current = sublinharErros;
+
+  /**
+   * Imagem colada ou arrastada: entra na hora pelo endereço do navegador e sobe
+   * em paralelo; quando termina, ganha o caminho no Storage. Falhou, sai do texto.
+   */
+  const inserirImagens = (view: EditorView, arquivos: File[], pos?: number): boolean => {
+    const subir = colarImagemRef.current;
+    const tipo = view.state.schema.nodes.image;
+    if (!subir || !tipo) return false;
+    const imagens = arquivos.filter((a) => TIPOS_IMAGEM_COLADA.includes(a.type));
+    if (imagens.length === 0) {
+      if (arquivos.length > 0) toast.error("Só dá para colar imagem PNG, JPG, GIF ou WebP no texto. Outros arquivos vão pelo Anexar.");
+      return arquivos.length > 0;
+    }
+    for (const arquivo of imagens) {
+      const src = URL.createObjectURL(arquivo);
+      const no = tipo.create({ src, caminho: null });
+      view.dispatch(pos === undefined ? view.state.tr.replaceSelectionWith(no) : view.state.tr.insert(pos, no));
+      subir(arquivo)
+        .then((caminho) => {
+          if (view.isDestroyed) return;
+          const achada = acharImagem(view, src);
+          if (achada) view.dispatch(view.state.tr.setNodeMarkup(achada.pos, undefined, { ...achada.attrs, caminho }));
+        })
+        .catch((err: any) => {
+          toast.error(err?.message || "Não foi possível colar a imagem.");
+          if (view.isDestroyed) return;
+          const achada = acharImagem(view, src);
+          if (achada) view.dispatch(view.state.tr.delete(achada.pos, achada.pos + 1));
+        });
+    }
+    return true;
+  };
 
   const editor = useEditor({
     extensions: [
@@ -207,9 +283,16 @@ export function EditorEmail({
       TextAlign.configure({ types: ["paragraph"] }),
       Placeholder.configure({ placeholder: () => placeholderRef.current }),
       ...(destacarCampos ? [DestaqueCampos] : []),
+      ...(onColarImagem ? [ImagemColada] : []),
     ],
     content: valor,
     editorProps: {
+      handlePaste: (view, evento) => inserirImagens(view, Array.from(evento.clipboardData?.files ?? [])),
+      handleDrop: (view, evento, _fatia, movido) => {
+        if (movido) return false;
+        const alvo = view.posAtCoords({ left: evento.clientX, top: evento.clientY })?.pos;
+        return inserirImagens(view, Array.from(evento.dataTransfer?.files ?? []), alvo);
+      },
       handleTextInput: (view, de, ate, texto) => {
         if (texto !== "/" || !onBarraRef.current || de !== ate) return false;
         if (view.state.selection.$from.parent.textContent.length > 0) return false;

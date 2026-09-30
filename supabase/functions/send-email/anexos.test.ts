@@ -3,7 +3,7 @@
  *   bun test supabase/functions/send-email/
  */
 import { describe, expect, test } from "bun:test";
-import { bytesParaBase64, tipoPermitido, validarAnexos, ANEXO_MAX_ARQUIVOS } from "./anexos.ts";
+import { bytesParaBase64, tipoPermitido, validarAnexos, validarImagensColadas, ANEXO_MAX_ARQUIVOS } from "./anexos.ts";
 import { montarMensagem, parametroFilename } from "./mime.ts";
 
 const TENANT = "a0000000-0000-0000-0000-000000000001";
@@ -154,5 +154,34 @@ describe("bytesParaBase64", () => {
     const pequeno = new Uint8Array([72, 105]);
     expect(bytesParaBase64(pequeno)).toBe(btoa("Hi"));
     expect(bytesParaBase64(bytes).length).toBe(Math.ceil(bytes.length / 3) * 4);
+  });
+});
+
+describe("imagem colada no corpo", () => {
+  const img = (ext = "png", tenant = TENANT) => `${tenant}/emails/1b0f7c6f-0000-4000-8000-000000000001.${ext}`;
+
+  test("aceita a imagem da tela E-mails e dá nome pelo tipo", () => {
+    const r = validarImagensColadas([{ path: img(), mime: "image/png", cid: "ds-img-1" }], TENANT);
+    expect(r).toEqual({ ok: true, imagens: [{ path: img(), mime: "image/png", cid: "ds-img-1", nome: "imagem-1.png" }] });
+  });
+
+  test("recusa arquivo de outro tenant, da pasta da conversa, tipo que não é imagem e cid fora do formato", () => {
+    const outro = "b0000000-0000-0000-0000-000000000002";
+    expect(validarImagensColadas([{ path: img("png", outro), mime: "image/png", cid: "ds-img-1" }], TENANT).ok).toBe(false);
+    expect(validarImagensColadas([{ path: caminho("png"), mime: "image/png", cid: "ds-img-1" }], TENANT).ok).toBe(false);
+    expect(validarImagensColadas([{ path: img("pdf"), mime: "application/pdf", cid: "ds-img-1" }], TENANT).ok).toBe(false);
+    expect(validarImagensColadas([{ path: img(), mime: "image/png", cid: "x>\r\nBcc: a@b.c" }], TENANT).ok).toBe(false);
+    // o mesmo cid duas vezes faria uma imagem aparecer no lugar da outra
+    const dupla = [
+      { path: img(), mime: "image/png", cid: "ds-img-1" },
+      { path: img("jpg"), mime: "image/jpeg", cid: "ds-img-1" },
+    ];
+    expect(validarImagensColadas(dupla, TENANT).ok).toBe(false);
+  });
+
+  test("o Message-ID leva o código na frente quando pedido", () => {
+    const m = montarMensagem({ de: { email: "a@empresa.com.br" }, para: ["c@d.com"], assunto: "x", texto: "x", prefixoId: "A2B3C4D5E6" });
+    expect(m.messageId).toMatch(/^<A2B3C4D5E6\.[0-9a-f-]{36}@empresa\.com\.br>$/);
+    expect(m.bruta).toContain("Subject: x\r\n");
   });
 });

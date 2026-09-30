@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import type { ConversationWithContact } from "../../hooks/useWhatsAppConversations";
 import {
   adaptarEmailChat,
+  contaInicial,
   reescreverEmailChat,
   corrigirEmailChat,
   enviarEmailChat,
@@ -139,7 +140,7 @@ export function EnviarEmailChatDialog({ open, onOpenChange, conversation }: Prop
   const contas = contasQuery.data?.contas ?? [];
   // uma conta só já vem escolhida; duas ou mais, a pessoa escolhe
   useEffect(() => {
-    if (open && !contaId && contas.length === 1) setContaId(contas[0].id);
+    if (open && !contaId && contaInicial(contas)) setContaId(contaInicial(contas));
   }, [open, contaId, contas]);
 
   const sugestoes = clienteQuery.data?.sugestoes ?? [];

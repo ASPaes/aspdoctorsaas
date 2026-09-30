@@ -242,6 +242,19 @@ describe("identificação do envio", () => {
     expect(acharToken({ to: "suporte@empresa.com.br", subject: "=?UTF-8?B?UmU6IEHDp8OjbyBbI0EyQjNDNEQ1RTZd?=" })).toBe("A2B3C4D5E6");
   });
 
+  test("acha o código no Message-ID que a resposta devolve (assunto sem marca, desde 29/09/2026)", () => {
+    const id = "<A2B3C4D5E6.1b0f7c6f-0000-4000-8000-000000000001@empresa.com.br>";
+    expect(acharToken({ to: "suporte@empresa.com.br", subject: "Re: Proposta", "in-reply-to": id })).toBe("A2B3C4D5E6");
+    // cliente que só manda References, com a conversa inteira empilhada
+    expect(
+      acharToken({ to: "suporte@empresa.com.br", references: `<outro@gmail.com> ${id.toLowerCase()}` }),
+    ).toBe("A2B3C4D5E6");
+    // Message-ID antigo, sem código: não inventa nada
+    expect(
+      acharToken({ to: "suporte@empresa.com.br", "in-reply-to": "<1b0f7c6f-0000-4000-8000-000000000001@empresa.com.br>" }),
+    ).toBeNull();
+  });
+
   test("sem identificação nenhuma devolve nulo", () => {
     expect(acharToken({ to: "suporte@empresa.com.br", subject: "Promoção imperdível" })).toBeNull();
   });
