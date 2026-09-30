@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Loader2, LogOut, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,8 @@ import { cn } from "@/lib/utils";
  * chat usa dentro do app (setor e alerta de fila), porque a lista de conversas
  * e a distribuição leem o setor daqui.
  *
- * A barra tem exatamente h-14 (3.5rem) porque a tela do chat se dimensiona com
- * `calc(100vh-3.5rem)`; mudar esta altura deixa faixa vazia embaixo do teclado.
+ * O chat e a Equipe ocupam o `main` com h-full (desde 30/09 não usam mais
+ * `calc(100vh-3.5rem)`, que ignorava o teclado e empurrava o topo para fora).
  */
 /** Nome de cada módulo no cabeçalho, para a pessoa saber onde está. */
 const TITULOS: Record<string, string> = {
@@ -33,8 +33,33 @@ const TITULOS: Record<string, string> = {
   "/equipe": "Equipe interna",
 };
 
+/**
+ * Área que o teclado deixa livre. O Chrome do Android (108+) e o Safari não
+ * encolhem a página quando o teclado abre, nem o `100dvh`: eles empurram a
+ * página inteira para cima para mostrar o campo, e a barra do topo e o nome da
+ * conversa saíam da tela. Seguindo o `visualViewport`, o layout encolhe e fica
+ * preso na parte visível, como no WhatsApp.
+ */
+function useAreaVisivel() {
+  const [area, setArea] = useState<{ altura: number; topo: number } | null>(null);
+  useEffect(() => {
+    const vv = typeof window !== "undefined" ? window.visualViewport : null;
+    if (!vv) return;
+    const medir = () => setArea({ altura: vv.height, topo: vv.offsetTop });
+    medir();
+    vv.addEventListener("resize", medir);
+    vv.addEventListener("scroll", medir);
+    return () => {
+      vv.removeEventListener("resize", medir);
+      vv.removeEventListener("scroll", medir);
+    };
+  }, []);
+  return area;
+}
+
 export default function ChatMobileLayout() {
   useAccentColorSync();
+  const area = useAreaVisivel();
   const { signOut } = useAuth();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -86,11 +111,13 @@ export default function ChatMobileLayout() {
         {/* Instalado na tela inicial (PWA), o app ocupa a tela inteira: sem as
             safe-areas a barra do topo some atrás do notch e o campo de mensagem
             fica embaixo da barra de gestos. No navegador comum esses valores
-            são zero, então nada muda. */}
+            são zero, então nada muda. Fixo na área visível (ver useAreaVisivel):
+            com o teclado aberto, o topo continua na tela. */}
         <div
-          className="flex w-full flex-col overflow-hidden bg-background"
+          className="fixed inset-x-0 flex flex-col overflow-hidden bg-background"
           style={{
-            height: "100dvh",
+            top: area ? `${area.topo}px` : 0,
+            height: area ? `${area.altura}px` : "100dvh",
             paddingTop: "env(safe-area-inset-top, 0px)",
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
             boxSizing: "border-box",
@@ -143,7 +170,7 @@ export default function ChatMobileLayout() {
           <FaixaPermitirAvisos />
 
           {/* Quem rola é o `main`, MENOS no chat.
-              O chat se dimensiona com `calc(100vh-3.5rem)` e gerencia a própria
+              O chat ocupa a altura do main (h-full) e gerencia a própria
               rolagem (lista de conversas e mensagens rolam por dentro); deixar o
               main rolar ali criaria duas barras concorrentes. Já as telas vindas
               do sistema — tickets, implantação, e-mails — foram feitas para rolar

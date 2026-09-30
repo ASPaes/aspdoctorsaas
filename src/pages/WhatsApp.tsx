@@ -9,7 +9,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCreateConversation } from "@/components/whatsapp/hooks/useCreateConversation";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { supabase } from "@/integrations/supabase/client";
-import { escapeLike } from "@/lib/utils";
+import { cn, escapeLike } from "@/lib/utils";
 import { toast } from "sonner";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useDepartmentFilter } from "@/contexts/DepartmentFilterContext";
@@ -318,9 +318,12 @@ function WhatsAppContent() {
   // largo: o endereço existe para ser o chat de celular, e testar nele sem o
   // layout de celular esconderia justamente o que precisa ser visto.
   if (isMobile || isChatHost()) {
+    // No chat.doctorsaas a altura vem do ChatMobileLayout, que encolhe junto com
+    // o teclado; com 100vh a tela ficava maior que a área visível e o topo sumia.
+    const alturaMobile = isChatHost() ? "h-full" : "h-[calc(100vh-3.5rem)]";
     if (selected) {
       return (
-        <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+        <div className={cn("flex flex-col", alturaMobile)}>
           <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
           <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
               <ChatAreaFull conversation={selected} highlightMessageId={highlightMessageId} onHighlightShown={() => setHighlightMessageId(null)} onClose={onFecharConversa} onNavigateToConversation={handleNavigateToConversation} onDepartmentTransferred={() => setSelected(null)} pendingAction={pendingAction} onPendingActionConsumed={() => setPendingAction(null)} />
@@ -330,7 +333,7 @@ function WhatsAppContent() {
       );
     }
     return (
-      <div className="flex flex-col h-[calc(100vh-3.5rem)]">
+      <div className={cn("flex flex-col", alturaMobile)}>
         <ScheduleReminderBanner onNavigate={handleNavigateToConversation} />
         <div className="flex-1 min-h-0 overflow-hidden bg-background relative">
             <div className="w-full h-full">
