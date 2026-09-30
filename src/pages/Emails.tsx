@@ -26,6 +26,23 @@ export default function Emails() {
   const queryClient = useQueryClient();
   // e-mail avulso (29/09/2026): fora de chat, ticket ou jornada
   const [escrita, setEscrita] = useState<PedidoEscrita | null>(null);
+  // DEM-0503: volta na última aba que a pessoa usou (por usuário, neste navegador)
+  const chaveAba = `emails:aba:${profile?.user_id ?? "anon"}`;
+  const [aba, setAba] = useState<string>(() => {
+    try {
+      return localStorage.getItem(chaveAba) === "recebidos" ? "recebidos" : "enviados";
+    } catch {
+      return "enviados";
+    }
+  });
+  const mudarAba = (valor: string) => {
+    setAba(valor);
+    try {
+      localStorage.setItem(chaveAba, valor);
+    } catch {
+      /* navegador sem storage: só não lembra */
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -42,7 +59,7 @@ export default function Emails() {
         </div>
       )}
 
-      <Tabs defaultValue="enviados">
+      <Tabs value={aba} onValueChange={mudarAba}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="enviados">Enviados</TabsTrigger>
