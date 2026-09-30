@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import EmailsEnviadosTab from "@/components/emails/EmailsEnviadosTab";
 import EmailsRecebidosTab from "@/components/emails/EmailsRecebidosTab";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -21,7 +22,7 @@ export default function Emails() {
   const { profile } = useAuth();
   // Quem filtra é o RLS (operador só recebe do banco o que é dele). O texto só
   // explica por que a lista do operador é menor que a do gestor.
-  const soOsProprios = profile?.role === "user" && profile?.is_super_admin !== true;
+  const soOsProprios = !usePortao("email.ver_todos", useEhAdminOuGestor());
   const noCelular = useIsMobile() || isChatHost();
   const queryClient = useQueryClient();
   // e-mail avulso (29/09/2026): fora de chat, ticket ou jornada

@@ -26,7 +26,7 @@ import { MenuPastas, MoverParaPasta } from "./MenuPastas";
 import { useMoverParaPasta } from "./usePastasEmail";
 import { subDays } from "date-fns";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePortao, useEhAdmin, useEhAdminOuGestor } from "@/hooks/usePortao";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
@@ -65,9 +65,13 @@ const dataHora = (iso: string) => {
 };
 
 export default function EmailsRecebidosTab() {
-  const { profile } = useAuth();
-  const ehAdmin = profile?.role === "admin" || profile?.is_super_admin === true;
-  const podeTriar = ehAdmin || profile?.role === "head";
+  const ehAdmin = useEhAdmin();
+  const ehAdminOuGestor = useEhAdminOuGestor();
+  // Permissões do módulo E-mails (30/09/2026). O segundo argumento é a regra de
+  // antes, que continua valendo na empresa sem sistema de permissões.
+  const podeLixeira = usePortao("email.lixeira", ehAdmin);
+  const podeLerAgora = usePortao("email.ler_agora", ehAdmin);
+  const podeTriar = usePortao("email.triagem", ehAdminOuGestor);
 
   const [buscaDigitada, setBuscaDigitada] = useState("");
   const [filtros, setFiltros] = useState<FiltrosRecebidos>({
@@ -336,22 +340,22 @@ export default function EmailsRecebidosTab() {
           <Archive className="mr-2 h-4 w-4" />
           Arquivadas
         </Button>
-        {ehAdmin && (
-          <>
-            <Button variant="outline" size="sm" className="h-9" onClick={lerCaixasAgora} disabled={lerAgora.isPending}>
-              {lerAgora.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              Ler agora
-            </Button>
-            <Button
-              variant={filtros.lixeira ? "default" : "outline"}
-              size="sm"
-              className="h-9"
-              onClick={() => mudarFiltro({ lixeira: !filtros.lixeira })}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Lixeira
-            </Button>
-          </>
+        {podeLerAgora && (
+          <Button variant="outline" size="sm" className="h-9" onClick={lerCaixasAgora} disabled={lerAgora.isPending}>
+            {lerAgora.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+            Ler agora
+          </Button>
+        )}
+        {podeLixeira && (
+          <Button
+            variant={filtros.lixeira ? "default" : "outline"}
+            size="sm"
+            className="h-9"
+            onClick={() => mudarFiltro({ lixeira: !filtros.lixeira })}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            Lixeira
+          </Button>
         )}
         </div>
       </div>
@@ -563,7 +567,7 @@ export default function EmailsRecebidosTab() {
           <Table>
             <TableHeader>
               <TableRow>
-                {ehAdmin && (
+                {podeLixeira && (
                   <TableHead className="w-10">
                     <Checkbox
                       checked={selecionados.length > 0 && selecionados.length === selecionaveis.length}
@@ -608,7 +612,7 @@ export default function EmailsRecebidosTab() {
                       naoLido && "bg-primary/[0.04]",
                     )}
                   >
-                    {ehAdmin && (
+                    {podeLixeira && (
                       <TableCell className="align-top" style={corCaixa.faixa}>
                         {ligado ? (
                           <TooltipProvider>
@@ -636,7 +640,7 @@ export default function EmailsRecebidosTab() {
                     )}
                     <TableCell
                       className={cn("whitespace-nowrap align-top font-mono text-xs", naoLido && "font-semibold text-foreground")}
-                      style={ehAdmin ? undefined : corCaixa.faixa}
+                      style={podeLixeira ? undefined : corCaixa.faixa}
                     >
                       {dia}
                       <span className={cn("block", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{hora}</span>

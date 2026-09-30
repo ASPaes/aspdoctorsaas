@@ -4,6 +4,7 @@ import { Copy, Paperclip, Pencil, Plus, Search, Trash2, Zap } from "lucide-react
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
+import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -26,13 +27,16 @@ const MacroEmailDialog = lazy(() => import("@/components/emails/macros/MacroEmai
 
 /**
  * Configurações › Atendimento › Canais › E-mail › Macros (mockup aprovado em
- * 17/09/2026). Cadastro só admin e gestor, igual às outras abas de e-mail; o
+ * 17/09/2026). Cadastro pela permissão "Cadastrar macros de e-mail" (admin e
+ * gestor nas empresas sem sistema de permissões); o
  * uso fica no botão Macros da tela Enviar e-mail.
  */
 export default function EmailMacrosTab() {
   const { effectiveTenantId: tid } = useTenantFilter();
   const macros = useEmailMacros(tid);
   const { alternarAtiva, apagar } = useSalvarMacro();
+  // Mesma permissão do botão Macros na tela Enviar e-mail: o banco só grava macro para quem a tem
+  const podeCadastrar = usePortao("email.macros", useEhAdminOuGestor());
   const setores = useQuery({
     queryKey: ["email-macro-setores", tid],
     enabled: !!tid,
@@ -104,11 +108,18 @@ export default function EmailMacrosTab() {
             ))}
           </SelectContent>
         </Select>
-        <Button className="h-9 gap-1.5" onClick={() => setEditando({ macro: null })}>
-          <Plus className="h-4 w-4" />
-          Nova macro
-        </Button>
+        {podeCadastrar && (
+          <Button className="h-9 gap-1.5" onClick={() => setEditando({ macro: null })}>
+            <Plus className="h-4 w-4" />
+            Nova macro
+          </Button>
+        )}
       </div>
+      {!podeCadastrar && (
+        <p className="text-xs text-muted-foreground">
+          Você vê as macros, mas não pode criar nem alterar: falta a permissão "Cadastrar macros de e-mail".
+        </p>
+      )}
 
       {macros.isLoading ? (
         <div className="space-y-2">
@@ -127,10 +138,12 @@ export default function EmailMacrosTab() {
               no botão Macros.
             </p>
           </div>
-          <Button className="gap-1.5" onClick={() => setEditando({ macro: null })}>
-            <Plus className="h-4 w-4" />
-            Nova macro
-          </Button>
+          {podeCadastrar && (
+            <Button className="gap-1.5" onClick={() => setEditando({ macro: null })}>
+              <Plus className="h-4 w-4" />
+              Nova macro
+            </Button>
+          )}
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -157,9 +170,13 @@ export default function EmailMacrosTab() {
                 lista.map((m) => (
                   <tr key={m.id} className="border-b last:border-0">
                     <td className="px-3 py-2.5">
-                      <button type="button" className="text-left font-medium hover:underline" onClick={() => setEditando({ macro: m })}>
-                        {m.titulo}
-                      </button>
+                      {podeCadastrar ? (
+                        <button type="button" className="text-left font-medium hover:underline" onClick={() => setEditando({ macro: m })}>
+                          {m.titulo}
+                        </button>
+                      ) : (
+                        <span className="font-medium">{m.titulo}</span>
+                      )}
                       {m.anexos.length > 0 && (
                         <span className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground" title="Anexos que entram junto">
                           <Paperclip className="h-3 w-3" />
@@ -186,6 +203,7 @@ export default function EmailMacrosTab() {
                     <td className="px-3 py-2.5">
                       <Switch
                         checked={m.ativo}
+                        disabled={!podeCadastrar}
                         aria-label={m.ativo ? "Desativar macro" : "Ativar macro"}
                         onCheckedChange={(v) =>
                           alternarAtiva.mutate(
@@ -196,28 +214,30 @@ export default function EmailMacrosTab() {
                       />
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="flex justify-end gap-0.5">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => setEditando({ macro: m })}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Duplicar"
-                          onClick={() =>
-                            setEditando({
-                              macro: null,
-                              inicial: { titulo: `${m.titulo} (cópia)`, assunto: m.assunto ?? "", corpo_html: m.corpo_html },
-                            })
-                          }
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Excluir" onClick={() => setExcluir(m)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {podeCadastrar && (
+                        <div className="flex justify-end gap-0.5">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="Editar" onClick={() => setEditando({ macro: m })}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Duplicar"
+                            onClick={() =>
+                              setEditando({
+                                macro: null,
+                                inicial: { titulo: `${m.titulo} (cópia)`, assunto: m.assunto ?? "", corpo_html: m.corpo_html },
+                              })
+                            }
+                          >
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" title="Excluir" onClick={() => setExcluir(m)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))

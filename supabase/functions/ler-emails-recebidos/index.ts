@@ -29,7 +29,7 @@ import { caminhoDoAnexo, extrairAnexos, selecionarAnexos, type AnexoEmail } from
  * e 3 falhas seguidas avisam os admins (fn_email_ingestao_resultado).
  *
  * Chamada pelo cron (todo minuto no comercial, de 5 em 5 fora) ou pela tela
- * (admin) para ler agora.
+ * (permissão "Ler a caixa agora") para ler agora.
  */
 
 const corsHeaders = {
@@ -109,7 +109,9 @@ Deno.serve(async (req) => {
   let tenantDoUsuario: string | null = null;
 
   if (!interno) {
-    // leitura sob demanda pela tela: só admin, e só das caixas do tenant dele
+    // leitura sob demanda pela tela: quem tem a permissão "Ler a caixa agora"
+    // (só admin nas empresas sem sistema de permissões), e só das caixas do
+    // tenant dele. `rbac_pode` roda com o JWT da pessoa: é ele que diz quem é.
     const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
     const { data: { user } } = await userClient.auth.getUser(token);
     if (!user) return json(401, { error: 'Não autorizado: token inválido.' });
@@ -118,8 +120,12 @@ Deno.serve(async (req) => {
       .select('tenant_id, role, is_super_admin')
       .eq('user_id', user.id)
       .maybeSingle();
-    if (!profile || (!profile.is_super_admin && profile.role !== 'admin')) {
-      return json(403, { error: 'Apenas administradores podem mandar ler a caixa.' });
+    const { data: pode } = await userClient.rpc('rbac_pode', {
+      p_chave: 'email.ler_agora',
+      p_papeis_de_hoje: ['admin'],
+    });
+    if (!profile || (!profile.is_super_admin && pode !== true)) {
+      return json(403, { error: 'Você não tem permissão para mandar ler a caixa.' });
     }
     tenantDoUsuario = profile.is_super_admin ? null : profile.tenant_id;
   }

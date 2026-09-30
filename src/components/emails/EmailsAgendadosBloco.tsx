@@ -10,6 +10,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import { cn } from "@/lib/utils";
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
 import { EscolherHorario, descreverHorario, lerHorario, problemaDoHorario } from "@/components/whatsapp/chat/email/EscolherHorario";
@@ -47,7 +48,9 @@ export function EmailsAgendadosBloco() {
 }
 
 function LinhaAgendado({ agendado: a }: { agendado: EmailAgendado }) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  // Agendamento de outra pessoa (permissão de 30/09/2026); o próprio, cada um sempre mexe
+  const mexeNoDosOutros = usePortao("email.agendados_outros", useEhAdminOuGestor());
   const acao = useAcaoAgendado();
   const horario = useBusinessHoursConfig();
   const [mudando, setMudando] = useState(false);
@@ -56,7 +59,7 @@ function LinhaAgendado({ agendado: a }: { agendado: EmailAgendado }) {
 
   const podeMexer =
     a.status === "agendado" &&
-    (profile?.is_super_admin === true || ["admin", "head"].includes(profile?.role ?? "") || a.agendado_por === user?.id);
+    (mexeNoDosOutros || a.agendado_por === user?.id);
   const quando = new Date(a.agendar_para);
   const novo = lerHorario(novoHorario);
 

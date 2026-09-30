@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import { useAgentDisplayName } from "@/hooks/useAgentDisplayName";
 import { montarValores, type DadosDaMacro, type ValoresMacro } from "./camposMacro";
 
@@ -22,7 +23,9 @@ export interface ContextoMacro {
 }
 
 export function useContextoMacro(ctx: ContextoMacro, enabled: boolean) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  // Cadastrar macro (permissão de 30/09/2026); sem sistema de permissões, admin e gestor, como antes
+  const podeCadastrar = usePortao("email.macros", useEhAdminOuGestor());
   const atendente = useAgentDisplayName();
 
   const consulta = useQuery({
@@ -84,13 +87,12 @@ export function useContextoMacro(ctx: ContextoMacro, enabled: boolean) {
   // a saudação e a data são as da hora em que a lista é aberta
   const valores: ValoresMacro = useMemo(() => montarValores(dados), [dados]);
 
-  const papel = profile?.role ?? "";
   return {
     valores,
     carregando: consulta.isLoading,
     meusSetores: consulta.data?.meusSetores ?? [],
     /** admin, gestor e super admin: veem todas e podem salvar macro */
-    podeCadastrar: profile?.is_super_admin === true || papel === "admin" || papel === "head",
+    podeCadastrar,
   };
 }
 

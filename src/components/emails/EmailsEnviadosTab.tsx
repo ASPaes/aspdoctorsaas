@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { subDays } from "date-fns";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { usePortao, useEhAdmin } from "@/hooks/usePortao";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isChatHost } from "@/lib/chatHost";
@@ -58,8 +58,8 @@ const dataHora = (iso: string) => {
 };
 
 export default function EmailsEnviadosTab() {
-  const { profile } = useAuth();
-  const podeExcluir = profile?.role === "admin" || profile?.is_super_admin === true;
+  // Lixeira de e-mails (permissão de 30/09/2026); sem sistema de permissões, só admin, como antes
+  const podeExcluir = usePortao("email.lixeira", useEhAdmin());
 
   const [buscaDigitada, setBuscaDigitada] = useState("");
   // No telefone a barra mostra so a busca; o resto entra pelos tres pontos.
