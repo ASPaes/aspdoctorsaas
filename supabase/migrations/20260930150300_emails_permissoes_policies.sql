@@ -17,6 +17,7 @@
 
 -- ------------------------------------------ Ver e-mails de todas as pessoas
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_envios_tenant_select on public.email_envios
   using (
     (select coalesce(public.is_super_admin(), false))
@@ -32,6 +33,7 @@ alter policy email_envios_tenant_select on public.email_envios
 commit;
 
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_recebidos_tenant_select on public.email_recebidos
   using (
     (select coalesce(public.is_super_admin(), false))
@@ -51,6 +53,7 @@ alter policy email_recebidos_tenant_select on public.email_recebidos
 commit;
 
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_agendados_select on public.email_agendados
   using (
     (select coalesce(public.is_super_admin(), false))
@@ -67,6 +70,7 @@ commit;
 
 -- ------------------------------------------------ Cadastrar macros de e-mail
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_macros_escrita on public.email_macros
   using (
     (select coalesce(public.is_super_admin(), false))
@@ -87,6 +91,7 @@ alter policy email_macros_escrita on public.email_macros
 commit;
 
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_macro_anexos_escrita on public.email_macro_anexos
   using (
     (select coalesce(public.is_super_admin(), false))
@@ -107,6 +112,7 @@ alter policy email_macro_anexos_escrita on public.email_macro_anexos
 commit;
 
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_macro_anexos_subir on storage.objects
   with check (
     bucket_id = 'email-macro-anexos'
@@ -122,6 +128,7 @@ alter policy email_macro_anexos_subir on storage.objects
 commit;
 
 begin;
+set local lock_timeout = '3s';  -- trava ocupada = falha rápida, não fila atrás de nós
 alter policy email_macro_anexos_apagar on storage.objects
   using (
     bucket_id = 'email-macro-anexos'
