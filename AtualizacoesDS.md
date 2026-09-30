@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- 🔧 **Trocar licença do OEM não cancela mais módulo pago** — Quando um módulo vendido (por exemplo, pela calculadora) tinha ido para a licença errada e alguém trocava a licença na ficha do cliente, o módulo aparecia como **Cancelado** e não chegava à licença certa. Agora, ao trocar a licença, os módulos que o cliente paga e que a licença nova ainda não tem continuam ativos e ganham um pedido na fila do OEM para a licença nova, aguardando aprovação em **Configurações › Integrações › OEM › Fila**. A tela avisa quais módulos foram pedidos e lembra de desligá-los na licença antiga pelo portal do OEM.
+
 - 🔧 **Up-Sell e Down-Sell com CNPJ em mais de um cadastro** — Quando o CNPJ do cliente estava em dois cadastros no DoctorSaaS, a calculadora avisava que havia duplicidade, mostrava só um deles (às vezes o cancelado) e não conseguia enviar a venda. Agora o ticket de Up-Sell e Down-Sell mostra o quadro **Cadastro no DoctorSaaS** com todos os cadastros daquele CNPJ, cada um com código, razão social, nome fantasia, se está cancelado e os produtos ativos. O vendedor escolhe em qual cadastro a venda entra, e ela vai direto para ele.
 
 - ⬆️ **Implantação diluída da calculadora vira upsell** — Quando a venda na calculadora usa a moeda de troca **Implantação diluída**, o valor diluído na mensalidade agora chega ao DoctorSaaS separado dos módulos: entra nos **Movimentos de MRR** do cliente como um upsell próprio, com a descrição "Setup diluído", e soma na mensalidade. O setup cobrado de fato continua indo para a ativação. Vale para Novo Cliente e Up-Sell, e a informação também aparece na Timeline do ticket de implantação.
