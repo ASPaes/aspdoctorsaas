@@ -134,6 +134,7 @@ export default function WhatsAppEnvioLote() {
         arquivo={previa?.media_file_name}
         horario={previa?.created_at}
         modelo
+        envioId={previa?.id}
       />
     </div>
   );

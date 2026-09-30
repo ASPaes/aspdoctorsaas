@@ -48,6 +48,8 @@ export interface ItemEnvioLote {
   /** Texto como o cliente recebeu: {nome_cliente} já trocado, sem assinatura. */
   content: string;
   media_file_name: string | null;
+  /** Mensagem gravada no chat quando saiu; é por ela que o PDF abre e baixa. */
+  sent_message_id: string | null;
 }
 
 export type OrigemDestino = "grupos" | "contatos" | "clientes";
@@ -122,7 +124,7 @@ export function useItensEnvioLote(envioId: string | null) {
     queryFn: async () => {
       const linhas = await fetchAllRows<any>(() =>
         (supabase.from("whatsapp_scheduled_messages" as any) as any)
-          .select("id, status, scheduled_at, sent_at, last_error, attempts, conversation_id, content, media_file_name, whatsapp_conversations(whatsapp_contacts(name))")
+          .select("id, status, scheduled_at, sent_at, last_error, attempts, conversation_id, content, media_file_name, sent_message_id, whatsapp_conversations(whatsapp_contacts(name))")
           .eq("bulk_send_id", envioId)
           .order("scheduled_at", { ascending: true }),
       );
@@ -137,6 +139,7 @@ export function useItensEnvioLote(envioId: string | null) {
         nome: l.whatsapp_conversations?.whatsapp_contacts?.name || "Sem nome",
         content: l.content || "",
         media_file_name: l.media_file_name ?? null,
+        sent_message_id: l.sent_message_id ?? null,
       }));
     },
     refetchInterval: (query) => {

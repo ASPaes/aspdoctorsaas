@@ -149,6 +149,8 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
         subtitulo={previa ? (previa.status === "sent" ? `Enviada em ${format(new Date(previa.sent_at || previa.scheduled_at), "dd/MM/yyyy HH:mm:ss")}` : `${ROTULO[previa.status]} · ${format(new Date(previa.scheduled_at), "dd/MM/yyyy HH:mm:ss")}`) : undefined}
         conteudo={previa?.content ?? ""}
         arquivo={previa?.media_file_name}
+        mensagemId={previa?.sent_message_id}
+        envioId={envio.id}
         horario={previa?.sent_at || previa?.scheduled_at}
       />
 
