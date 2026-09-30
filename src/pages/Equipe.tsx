@@ -174,6 +174,7 @@ export default function Equipe() {
             onAdicionarPessoas={() => setAdicionar(true)}
             onFechou={() => selecionar(null)}
             onBuscar={() => setBuscar(true)}
+            onConversarCom={abrirPessoa}
           />
         ) : (
           <div className="grid h-full place-items-center p-6 text-center text-sm text-muted-foreground">

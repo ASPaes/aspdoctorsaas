@@ -13,7 +13,7 @@ import { EquipeComposer, type ComposerHandle } from "./EquipeComposer";
 import { TextoFormatado } from "./TextoFormatado";
 import { mensagemDeErro, useEquipeAcoes, useFixadas, useMensagensDoCanal, useSalvos } from "./useEquipe";
 import { useAcoesDeMensagem } from "./useAcoesDeMensagem";
-import { horaCurta, montarLinhaDoTempo, nomeDaConversa, prefixoCanal, presencaDe } from "./equipeUtils";
+import { horaCurta, montarLinhaDoTempo, nomeDaConversa, prefixoCanal, presencaDe, type TomPresenca } from "./equipeUtils";
 import type { Anexo, Conversa, Mensagem, Pessoa, Ref } from "./tipos";
 
 interface Props {
@@ -33,6 +33,8 @@ interface Props {
   onAdicionarPessoas: () => void;
   onFechou: () => void;
   onBuscar: () => void;
+  /** Abre (ou cria) a conversa direta com o colega. */
+  onConversarCom: (userId: string) => void;
 }
 
 const PERTO_DO_FIM = 120;
@@ -70,20 +72,69 @@ function Fixadas({ canalId, mapa, onIrPara }: { canalId: string; mapa: Map<strin
   );
 }
 
-function Cabecalho({ c, mapa, podeGerir, onVoltar, onAdicionarPessoas, onFechou, onIrPara, onBuscar }: Pick<Props, "mapa" | "podeGerir" | "onVoltar" | "onAdicionarPessoas" | "onFechou" | "onIrPara" | "onBuscar"> & { c: Conversa }) {
+const ORDEM_PRESENCA: Record<TomPresenca, number> = { livre: 0, ocupado: 1, pausa: 2, offline: 3 };
+
+/** Subtítulo "N pessoas" clicável: mostra quem está na conversa e abre a direta com um clique. */
+function Membros({ texto, membros, eu, onConversarCom }: { texto: string; membros: Pessoa[]; eu: string; onConversarCom: (userId: string) => void }) {
+  const [aberto, setAberto] = useState(false);
+  const ordenados = [...membros].sort((a, b) =>
+    ORDEM_PRESENCA[presencaDe(a).tom] - ORDEM_PRESENCA[presencaDe(b).tom] || a.nome.localeCompare(b.nome, "pt-BR"));
+  return (
+    <Popover open={aberto} onOpenChange={setAberto}>
+      <PopoverTrigger asChild>
+        <button type="button" className="block max-w-full truncate text-left text-xs text-muted-foreground hover:text-foreground hover:underline" title="Ver quem está aqui">
+          {texto}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-0">
+        <div className="border-b px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {membros.length} {membros.length === 1 ? "pessoa" : "pessoas"}
+        </div>
+        <ul className="max-h-96 overflow-y-auto py-1">
+          {ordenados.map((p) => {
+            const souEu = p.user_id === eu;
+            return (
+              <li key={p.user_id}>
+                <button
+                  type="button"
+                  disabled={souEu}
+                  onClick={() => { setAberto(false); onConversarCom(p.user_id); }}
+                  className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                  title={souEu ? undefined : `Conversar com ${p.nome}`}
+                >
+                  <AvatarPessoa userId={p.user_id} pessoa={p} tamanho="sm" comPresenca />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{p.nome}{souEu && <span className="font-normal text-muted-foreground"> (você)</span>}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{[presencaDe(p).texto, p.cargo].filter(Boolean).join(" · ")}</span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function Cabecalho({ c, mapa, eu, podeGerir, onVoltar, onAdicionarPessoas, onFechou, onIrPara, onBuscar, onConversarCom }: Pick<Props, "mapa" | "eu" | "podeGerir" | "onVoltar" | "onAdicionarPessoas" | "onFechou" | "onIrPara" | "onBuscar" | "onConversarCom"> & { c: Conversa }) {
   const acoes = useEquipeAcoes();
   const nome = nomeDaConversa(c, mapa);
   const outro = c.tipo === "dm" ? mapa.get(c.outros[0] ?? "") : undefined;
 
   let sub = "";
+  let membros: Pessoa[] | null = null;
   if (c.tipo === "dm") {
     sub = [presencaDe(outro).texto, outro?.cargo, outro?.setor].filter(Boolean).join(" · ");
   } else if (c.tipo === "grupo") {
     sub = ["Você", ...c.outros.map((id) => mapa.get(id)?.nome ?? "Colaborador")].join(", ");
+    membros = [eu, ...c.outros].map((id) => mapa.get(id)).filter((p): p is Pessoa => !!p);
   } else if (c.tipo === "geral") {
     sub = `Toda a equipe · ${mapa.size} pessoas`;
+    membros = [...mapa.values()];
   } else if (c.tipo === "setor") {
-    const n = [...mapa.values()].filter((p) => p.department_id === c.department_id).length;
+    membros = [...mapa.values()].filter((p) => p.department_id === c.department_id);
+    const n = membros.length;
     sub = `Setor ${c.nome} · ${n} ${n === 1 ? "pessoa" : "pessoas"}`;
   } else {
     sub = [c.privado ? "Canal privado" : "Canal aberto", c.descricao].filter(Boolean).join(" · ");
@@ -113,7 +164,9 @@ function Cabecalho({ c, mapa, podeGerir, onVoltar, onAdicionarPessoas, onFechou,
         <h2 className="truncate text-base font-semibold leading-tight">
           {prefixoCanal(c) && <span className="text-muted-foreground">{prefixoCanal(c)}</span>}{nome}
         </h2>
-        <p className="truncate text-xs text-muted-foreground">{sub}</p>
+        {membros && membros.length > 0
+          ? <Membros texto={sub} membros={membros} eu={eu} onConversarCom={onConversarCom} />
+          : <p className="truncate text-xs text-muted-foreground">{sub}</p>}
       </div>
       {c.silenciado && <BellOff className="h-4 w-4 text-muted-foreground" aria-label="Avisos silenciados" />}
       <Fixadas canalId={c.id} mapa={mapa} onIrPara={onIrPara} />
@@ -300,7 +353,7 @@ export function EquipeConversa(props: Props) {
           Solte para anexar em {prefixoCanal(c)}{nomeDaConversa(c, mapa)}
         </div>
       )}
-      <Cabecalho c={c} mapa={mapa} podeGerir={podeGerir} onVoltar={props.onVoltar} onAdicionarPessoas={props.onAdicionarPessoas}
+      <Cabecalho c={c} mapa={mapa} eu={eu} podeGerir={podeGerir} onConversarCom={props.onConversarCom} onVoltar={props.onVoltar} onAdicionarPessoas={props.onAdicionarPessoas}
         onFechou={props.onFechou} onIrPara={props.onIrPara} onBuscar={props.onBuscar} />
 
       <div className="relative min-h-0 flex-1">
