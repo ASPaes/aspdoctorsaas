@@ -8,7 +8,7 @@
  */
 import { describe, expect, test } from "bun:test";
 import {
-  ClienteImap, acharToken, cortarCitacao, decodificarCabecalho, decodificarQuotedPrintable,
+  ClienteImap, acharToken, cortarCitacao, decodificarCabecalho, decodificarEntidades, decodificarQuotedPrintable,
   ehAutomatico, extrairEndereco, extrairTexto, lerCabecalhos, novosDesde, paraBinario, separarFetch,
 } from "./imap.ts";
 
@@ -270,5 +270,21 @@ describe("propaganda e automático", () => {
     [{ from: "Financeiro <financeiro@cliente.com.br>", "auto-submitted": "no" }, false],
   ])("%o", (cab, esperado) => {
     expect(ehAutomatico(cab as Record<string, string>)).toBe(esperado);
+  });
+});
+
+describe("entidades HTML no corpo (DEM-0505, Twygo e Windel)", () => {
+  test("text/plain com entidade sai com acento", () => {
+    const bruto = `Content-Type: text/plain; charset=utf-8${CRLF}${CRLF}Ol&aacute;, voc&ecirc; est&aacute; h&aacute; 15 dias. CEO&rsquo;s, avan&ccedil;ando`;
+    expect(extrairTexto(bruto)).toBe("Olá, você está há 15 dias. CEO’s, avançando");
+  });
+
+  test("HTML com entidade nomeada e numérica", () => {
+    const bruto = `Content-Type: text/html; charset=utf-8${CRLF}${CRLF}<p>Pend&ecirc;ncia N&ordm; 44229 &#8594; Testes &#xE9; &copy;</p>`;
+    expect(extrairTexto(bruto)).toBe("Pendência Nº 44229 → Testes é ©");
+  });
+
+  test("&lt;b&gt; escrito no texto continua texto, e nome desconhecido fica como veio", () => {
+    expect(decodificarEntidades("a &lt;b&gt; &foo; &amp;aacute;")).toBe("a <b> &foo; &aacute;");
   });
 });

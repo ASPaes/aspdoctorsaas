@@ -493,7 +493,7 @@ export default function EmailsRecebidosTab() {
                 </p>
                 {linha.corpo_texto && (
                   <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">
-                    {linha.corpo_texto.replace(/s+/g, " ").slice(0, 160)}
+                    {linha.corpo_texto.replace(/\s+/g, " ").slice(0, 160)}
                   </p>
                 )}
                 <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">

@@ -309,7 +309,11 @@ export function extrairTexto(bruto: string): string {
         ? decodificarQuotedPrintable(corpo)
         : enc.encode(corpo);
     const texto = new TextDecoder(charset.toLowerCase(), { fatal: false }).decode(bytes);
-    return (c["content-type"] ?? "").toLowerCase().includes("text/html") ? htmlParaTexto(texto) : texto;
+    // Entidade também no text/plain: Twygo e Windel mandam "Ol&aacute;" na parte
+    // de texto puro (DEM-0505, 30/09/2026).
+    return (c["content-type"] ?? "").toLowerCase().includes("text/html")
+      ? htmlParaTexto(texto)
+      : decodificarEntidades(texto);
   };
 
   if (tipo.startsWith("multipart/")) {
@@ -348,19 +352,51 @@ export function extrairTexto(bruto: string): string {
 }
 
 export function htmlParaTexto(html: string): string {
-  return html
+  const semTags = html
     .replace(/<(script|style)[\s\S]*?<\/\1>/gi, "")
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, "\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+    .replace(/<[^>]+>/g, "");
+  // depois de tirar as tags: um "&lt;b&gt;" escrito no texto não pode virar tag
+  return decodificarEntidades(semTags).replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/**
+ * Entidades HTML que aparecem em e-mail em português. Só as 6 básicas eram
+ * traduzidas e o texto chegava como "Ol&aacute;" (DEM-0505). Nome desconhecido
+ * fica como está; numérica (&#233; / &#xE9;) vale para qualquer caractere.
+ */
+const ENTIDADES: Record<string, string> = {
+  nbsp: " ", amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
+  aacute: "á", agrave: "à", acirc: "â", atilde: "ã", auml: "ä",
+  eacute: "é", egrave: "è", ecirc: "ê", euml: "ë",
+  iacute: "í", igrave: "ì", icirc: "î", iuml: "ï",
+  oacute: "ó", ograve: "ò", ocirc: "ô", otilde: "õ", ouml: "ö",
+  uacute: "ú", ugrave: "ù", ucirc: "û", uuml: "ü",
+  ccedil: "ç", ntilde: "ñ",
+  Aacute: "Á", Agrave: "À", Acirc: "Â", Atilde: "Ã", Auml: "Ä",
+  Eacute: "É", Egrave: "È", Ecirc: "Ê", Euml: "Ë",
+  Iacute: "Í", Igrave: "Ì", Icirc: "Î", Iuml: "Ï",
+  Oacute: "Ó", Ograve: "Ò", Ocirc: "Ô", Otilde: "Õ", Ouml: "Ö",
+  Uacute: "Ú", Ugrave: "Ù", Ucirc: "Û", Uuml: "Ü",
+  Ccedil: "Ç", Ntilde: "Ñ",
+  ordf: "ª", ordm: "º", deg: "°", sup1: "¹", sup2: "²", sup3: "³",
+  copy: "©", reg: "®", trade: "™", euro: "€", cent: "¢", pound: "£", sect: "§", para: "¶",
+  middot: "·", bull: "•", hellip: "…", laquo: "«", raquo: "»",
+  lsquo: "‘", rsquo: "’", sbquo: "‚", ldquo: "“", rdquo: "”", bdquo: "„",
+  ndash: "–", mdash: "—", times: "×", divide: "÷", plusmn: "±",
+  rarr: "→", larr: "←", uarr: "↑", darr: "↓", iexcl: "¡", iquest: "¿",
+  shy: "", zwj: "", zwnj: "", ensp: " ", emsp: " ", thinsp: " ",
+};
+
+export function decodificarEntidades(texto: string): string {
+  return texto.replace(/&(#x[0-9a-f]+|#\d+|[a-z][a-z0-9]*);/gi, (todo, corpo: string) => {
+    if (corpo[0] === "#") {
+      const n = corpo[1] === "x" || corpo[1] === "X" ? parseInt(corpo.slice(2), 16) : parseInt(corpo.slice(1), 10);
+      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : todo;
+    }
+    return ENTIDADES[corpo] ?? todo;
+  });
 }
 
 /**

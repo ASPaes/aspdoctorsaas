@@ -12,6 +12,7 @@ import { useArquivarEmails } from "./useArquivarEmails";
 import { MoverParaPasta } from "./MenuPastas";
 import { useMoverParaPasta } from "./usePastasEmail";
 import { useMarcarEmailLido } from "./useNaoLidos";
+import { decodificarEntidades } from "./entidadesHtml";
 import { EscreverEmailDialog, type PedidoEscrita } from "./EscreverEmailDialog";
 import type { ModoEscrita } from "./respostaEmail";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -132,6 +133,8 @@ export function LerEmailDialog({ tipo, id, onOpenChange }: Props) {
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
+      // recebido gravado antes de 30/09 pode ter "Ol&aacute;" (DEM-0505); vale também para a citação na resposta
+      if (data && tipo === "recebido" && data.corpo_texto) data.corpo_texto = decodificarEntidades(data.corpo_texto);
       return data as any;
     },
   });

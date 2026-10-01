@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { LISTA_AO_VIVO } from "./useEmailsEnviados";
+import { decodificarEntidades } from "./entidadesHtml";
 
 export type AcaoRecebido =
   | "pendente"
@@ -183,7 +184,10 @@ export function useEmailsRecebidos(filtros: FiltrosRecebidos, pagina: number) {
 
       const { data, error, count } = await q;
       if (error) throw error;
-      return { linhas: (data ?? []) as EmailRecebido[], total: count ?? 0 };
+      const linhas = ((data ?? []) as EmailRecebido[]).map((l) =>
+        l.corpo_texto ? { ...l, corpo_texto: decodificarEntidades(l.corpo_texto) } : l,
+      );
+      return { linhas, total: count ?? 0 };
     },
   });
 }
