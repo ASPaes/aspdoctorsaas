@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 30/09
 
+- ⬆️ **Venda de evento único aparece em Dashboard › Vendas** — O cliente de evento único, que paga só o setup e não tem mensalidade, não aparecia em **Dashboard › Vendas**, mesmo sendo uma venda com vendedor. Agora o card **Novos Clientes** mostra os eventos à parte (por exemplo, "54 + 2 eventos"), sem mexer na contagem de clientes da carteira. A tabela **Novos Clientes no Período** lista o evento com o selo **Evento**, o vendedor, o setup e mensalidade zero. O **Ranking de vendedores** mostra os eventos de cada vendedor ao lado das vendas, e a planilha exportada ganhou a coluna **Tipo**. Ticket Médio e New MRR continuam sem os eventos.
+
 - 🔧 **Módulo novo soma na mensalidade em vez de substituí-la** — Quando um cliente que já tinha contrato com a mensalidade lançada direto no produto, sem módulos cadastrados, recebia o seu primeiro módulo pago (por um Up-Sell da calculadora ou pela ficha em **Clientes**), a mensalidade do produto era trocada pelo valor desse módulo. Num caso, um contrato de R$ 478,00 passou a mostrar R$ 36,00. Agora o valor do módulo novo entra nos **Movimentos de MRR** como upsell e soma na mensalidade. O cliente afetado já foi corrigido.
 
 - 🆕 **Acesso ao mobile por pessoa** — Em **Configurações › Equipe › Acessos & Permissões** há uma nova coluna **Mobile**, com Sim ou Não para cada pessoa. Quem está com Não faz login no mobile e vê o aviso de que não tem acesso e deve falar com o gestor da sua área. O acesso pelo computador não muda. Administradores começam com Sim; gestores e operadores começam com Não e são liberados pela coluna.
