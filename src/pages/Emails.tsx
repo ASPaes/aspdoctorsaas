@@ -32,9 +32,9 @@ export default function Emails() {
   const chaveAba = `emails:aba:${profile?.user_id ?? "anon"}`;
   const [aba, setAba] = useState<string>(() => {
     try {
-      return localStorage.getItem(chaveAba) === "recebidos" ? "recebidos" : "enviados";
+      return localStorage.getItem(chaveAba) === "enviados" ? "enviados" : "recebidos";
     } catch {
-      return "enviados";
+      return "recebidos";
     }
   });
   const mudarAba = (valor: string) => {
@@ -64,8 +64,8 @@ export default function Emails() {
       <Tabs value={aba} onValueChange={mudarAba}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <TabsList className="flex-wrap h-auto gap-1">
+            <TabsTrigger value="recebidos">Caixa de entrada</TabsTrigger>
             <TabsTrigger value="enviados">Enviados</TabsTrigger>
-            <TabsTrigger value="recebidos">Recebidos</TabsTrigger>
           </TabsList>
           <Button className="gap-2" onClick={() => setEscrita({ modo: "novo", id: crypto.randomUUID() })}>
             <PenSquare className="h-4 w-4" />
