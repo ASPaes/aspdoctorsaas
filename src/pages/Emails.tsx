@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePortao, useEhAdminOuGestor } from "@/hooks/usePortao";
 import EmailsEnviadosTab from "@/components/emails/EmailsEnviadosTab";
 import EmailsRecebidosTab from "@/components/emails/EmailsRecebidosTab";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,9 +19,11 @@ import { EscreverEmailDialog, type PedidoEscrita } from "@/components/emails/Esc
  */
 export default function Emails() {
   const { profile } = useAuth();
-  // Quem filtra é o RLS (operador só recebe do banco o que é dele). O texto só
-  // explica por que a lista do operador é menor que a do gestor.
-  const soOsProprios = !usePortao("email.ver_todos", useEhAdminOuGestor());
+  // Quem filtra é o RLS, pela conta (01/10/2026): conta ligada a usuário ou
+  // setor só aparece para eles; sem vínculo, decidem as permissões. Admin e
+  // super admin veem tudo. O texto só explica por que a lista muda de pessoa
+  // para pessoa.
+  const veTudo = profile?.is_super_admin === true || profile?.role === "admin";
   const noCelular = useIsMobile() || isChatHost();
   const queryClient = useQueryClient();
   // e-mail avulso (29/09/2026): fora de chat, ticket ou jornada
@@ -53,9 +54,9 @@ export default function Emails() {
         <div>
           <h1 className="text-2xl font-bold">E-mails</h1>
           <p className="mt-1 text-muted-foreground">
-            {soOsProprios
-              ? "Os e-mails que você enviou aos clientes e as respostas deles."
-              : "Tudo que a operação enviou e recebeu dos clientes, de qualquer área."}
+            {veTudo
+              ? "Tudo que a operação enviou e recebeu dos clientes, de qualquer área."
+              : "O que foi enviado aos clientes e o que chegou deles, nas caixas que você acompanha."}
           </p>
         </div>
       )}
