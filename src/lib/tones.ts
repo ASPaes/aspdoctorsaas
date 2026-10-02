@@ -25,7 +25,9 @@ export type SoundEvent =
   | "message"
   | "group"
   | "assignment"
-  | "awaiting";
+  | "awaiting"
+  | "equipe_dm"
+  | "equipe_grupo";
 
 export const SOUND_EVENTS: Array<{ id: SoundEvent; label: string; hint: string }> = [
   {
@@ -53,7 +55,30 @@ export const SOUND_EVENTS: Array<{ id: SoundEvent; label: string; hint: string }
     label: "Lembrete de resposta",
     hint: 'O aviso "Aguardando você" de um chat parado.',
   },
+  {
+    id: "equipe_dm",
+    label: "Equipe interna: mensagem direta",
+    hint: "Um colega escreveu só para você.",
+  },
+  {
+    id: "equipe_grupo",
+    label: "Equipe interna: grupo e canal",
+    hint: "Mensagem em grupo, menção a você num canal ou resposta num fio seu.",
+  },
 ];
+
+/**
+ * Eventos que aceitam "Sem som". Ficou restrito à Equipe interna: na fila e no
+ * atendimento ao cliente, silenciar um aviso por engano é perder cliente, e a
+ * fila já tem o próprio liga/desliga nesta mesma tela.
+ */
+export const MUTABLE_EVENTS: ReadonlySet<SoundEvent> = new Set<SoundEvent>([
+  "equipe_dm",
+  "equipe_grupo",
+]);
+
+/** Id do "toque" que não toca nada. */
+export const SILENT_TONE = "nenhum";
 
 /** Toque de cada evento quando o usuário não escolhe nada. */
 export const DEFAULT_TONE: Record<SoundEvent, string> = {
@@ -62,6 +87,10 @@ export const DEFAULT_TONE: Record<SoundEvent, string> = {
   group: "padrao",
   assignment: "padrao",
   awaiting: "padrao",
+  // Diferentes entre si e do "padrao" do atendimento: quem ouve precisa saber,
+  // sem olhar a tela, se é colega ou cliente, e se a mensagem é só para ele.
+  equipe_dm: "marimba",
+  equipe_grupo: "curto",
 };
 
 /** Frase do "repetir" de cada evento: é ela que diz o que faz o toque parar. */
@@ -71,6 +100,8 @@ export const REPEAT_LABEL: Record<SoundEvent, string> = {
   group: "Repetir até você abrir a conversa",
   assignment: "Repetir até você abrir a conversa",
   awaiting: "Repetir até você abrir a conversa",
+  equipe_dm: "Repetir até você abrir a conversa",
+  equipe_grupo: "Repetir até você abrir a conversa",
 };
 
 /** Intervalo entre as repetições do toque contínuo. */
@@ -164,19 +195,31 @@ export const TONES: Tone[] = [
       { freq: 880, at: 0.1, dur: 0.26, type: "triangle", gain: 0.8 },
     ],
   },
+  // Mudo. Só aparece no seletor dos eventos de MUTABLE_EVENTS.
+  { id: SILENT_TONE, label: "Sem som", notes: [] },
 ];
 
 const TONE_IDS = new Set(TONES.map((t) => t.id));
 
-/** Devolve o toque salvo se ele existir no catálogo; senão, o padrão do evento. */
+/**
+ * Devolve o toque salvo se ele existir no catálogo; senão, o padrão do evento.
+ * "Sem som" salvo num evento que não aceita mudo também cai no padrão.
+ */
 export function resolveTone(event: SoundEvent, map: ToneMap): string {
   const escolha = map?.[event];
   const chosen = typeof escolha === "string" ? escolha : escolha?.toque;
+  if (chosen === SILENT_TONE && !MUTABLE_EVENTS.has(event)) return DEFAULT_TONE[event];
   return chosen && TONE_IDS.has(chosen) ? chosen : DEFAULT_TONE[event];
+}
+
+/** True quando o usuário desligou o som deste evento. */
+export function isMuted(event: SoundEvent, map: ToneMap): boolean {
+  return resolveTone(event, map) === SILENT_TONE;
 }
 
 /** True quando o evento está no modo contínuo. Padrão de todos é tocar uma vez. */
 export function resolveRepeat(event: SoundEvent, map: ToneMap): boolean {
+  if (isMuted(event, map)) return false;
   const escolha = map?.[event];
   return typeof escolha === "object" && escolha !== null && escolha.repetir === true;
 }

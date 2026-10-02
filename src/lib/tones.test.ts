@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DEFAULT_TONE, resolveRepeat, resolveTone } from "./tones";
+import { DEFAULT_TONE, SILENT_TONE, isMuted, resolveRepeat, resolveTone } from "./tones";
 
 /**
  * O formato salvo em `user_preferences.sound_by_event` mudou quando o toque
@@ -29,6 +29,23 @@ describe("resolveTone / resolveRepeat", () => {
     const map = { queue: { repetir: true } };
     expect(resolveTone("queue", map)).toBe(DEFAULT_TONE.queue);
     expect(resolveRepeat("queue", map)).toBe(true);
+  });
+
+  it("Equipe interna: DM e grupo nascem com toques diferentes", () => {
+    expect(resolveTone("equipe_dm", null)).not.toBe(resolveTone("equipe_grupo", null));
+    expect(resolveTone("equipe_dm", null)).not.toBe(DEFAULT_TONE.message);
+  });
+
+  it("Sem som vale só na Equipe interna e desliga o repetir", () => {
+    const map = {
+      equipe_dm: { toque: SILENT_TONE, repetir: true },
+      message: SILENT_TONE,
+    };
+    expect(isMuted("equipe_dm", map)).toBe(true);
+    expect(resolveRepeat("equipe_dm", map)).toBe(false);
+    // no atendimento ao cliente o mudo é ignorado: cai no padrão
+    expect(isMuted("message", map)).toBe(false);
+    expect(resolveTone("message", map)).toBe(DEFAULT_TONE.message);
   });
 
   it("ignora toque que não existe no catálogo", () => {

@@ -11,7 +11,9 @@ import {
 import { Play } from "lucide-react";
 import {
   DEFAULT_TONE,
+  MUTABLE_EVENTS,
   REPEAT_LABEL,
+  SILENT_TONE,
   SOUND_EVENTS,
   TONES,
   playTone,
@@ -33,6 +35,8 @@ interface Props {
 export function SoundByEventPicker({ value, onChange, volumeFor }: Props) {
   const gravar = (event: SoundEvent, tone: string, repetir: boolean) => {
     const next = { ...value };
+    // Sem som não repete: não sobra nada para repetir.
+    if (tone === SILENT_TONE) repetir = false;
     const noPadrao = tone === DEFAULT_TONE[event];
     // Voltar ao padrão é APAGAR a personalização, não gravar o id do padrão:
     // assim, se um dia o toque padrão de um evento mudar, quem nunca mexeu
@@ -58,6 +62,7 @@ export function SoundByEventPicker({ value, onChange, volumeFor }: Props) {
       <div className="space-y-3.5">
         {SOUND_EVENTS.map((evt) => {
           const atual = resolveTone(evt.id, value);
+          const mudo = atual === SILENT_TONE;
           const repetir = resolveRepeat(evt.id, value);
           return (
             <div key={evt.id} className="space-y-1.5">
@@ -76,7 +81,9 @@ export function SoundByEventPicker({ value, onChange, volumeFor }: Props) {
                       <SelectValue>{toneLabel(atual)}</SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {TONES.map((t) => (
+                      {TONES.filter(
+                        (t) => t.id !== SILENT_TONE || MUTABLE_EVENTS.has(evt.id)
+                      ).map((t) => (
                         <SelectItem key={t.id} value={t.id} className="text-xs">
                           {t.label}
                           {/* O toque "Padrão" já se anuncia pelo nome; o sufixo só
@@ -94,7 +101,8 @@ export function SoundByEventPicker({ value, onChange, volumeFor }: Props) {
                     variant="outline"
                     size="icon"
                     className="h-8 w-8 shrink-0"
-                    title={`Ouvir ${toneLabel(atual)}`}
+                    title={mudo ? "Sem som" : `Ouvir ${toneLabel(atual)}`}
+                    disabled={mudo}
                     onClick={() => playTone(atual, volumeFor(evt.id))}
                   >
                     <Play className="h-3.5 w-3.5" />
@@ -106,12 +114,17 @@ export function SoundByEventPicker({ value, onChange, volumeFor }: Props) {
                 <Checkbox
                   id={`repetir-${evt.id}`}
                   checked={repetir}
+                  disabled={mudo}
                   onCheckedChange={(c) => gravar(evt.id, atual, c === true)}
                 />
                 <label
                   htmlFor={`repetir-${evt.id}`}
-                  className={`text-xs cursor-pointer leading-none ${
-                    repetir ? "text-foreground" : "text-muted-foreground"
+                  className={`text-xs leading-none ${
+                    mudo
+                      ? "text-muted-foreground/50 cursor-not-allowed"
+                      : repetir
+                        ? "text-foreground cursor-pointer"
+                        : "text-muted-foreground cursor-pointer"
                   }`}
                 >
                   {REPEAT_LABEL[evt.id]}

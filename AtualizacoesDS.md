@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/10
 
+- ⬆️ **Som próprio para a Equipe interna** — Em **Preferências do Usuário › Toque por tipo de aviso**, a Equipe interna ganhou duas linhas: **mensagem direta** e **grupo e canal**. Cada uma tem toque próprio, diferente do som de mensagem de cliente, e por isso dá para saber pelo ouvido se é um colega, e se a mensagem é só para você. Dá para trocar o toque, ouvir antes, repetir até abrir a conversa ou escolher **Sem som**. Antes, mensagem da equipe tocava igual a mensagem de cliente.
+
 - 🆕 **Custo do WhatsApp Oficial no Painel de Uso** — Em **Painel de Uso**, a nova aba **Custo WhatsApp Oficial** mostra quanto a empresa gasta com mensagens na API Oficial da Meta, que desde 01/10 cobra também as respostas dentro da janela de 24h: custo no período, projeção do mês, uso da franquia de cada número, para onde vai o dinheiro (técnicos, URA, CSAT, avisos), quanto dá para evitar e sugestões por técnico e por automação, com atalho para a configuração. Períodos antes de 01/10 aparecem como simulação, porque essas respostas ainda eram grátis. Só aparece para empresas com número da API Oficial.
 
 - 🆕 **Custo do WhatsApp Oficial nas Visões 360°** — Na **Visão 360° do colaborador**, a aba **WhatsApp Oficial** mostra quantas mensagens a pessoa enviou, quantas foram picadas (enviadas logo depois de outra) e quantas por atendimento, comparando com a mediana do time, sem mostrar nomes. Em **Clientes › Visão 360°**, a aba **WhatsApp Oficial** mostra quanto o cliente custa em mensagens, quanto isso pesa na mensalidade dele e quem mais escreveu para ele.

@@ -24,6 +24,7 @@ import {
   REPEAT_MS,
   playTone,
   primeTones,
+  isMuted,
   resolveRepeat,
   resolveTone,
   type SoundEvent,
@@ -140,16 +141,43 @@ async function isGroupConversation(convId: string): Promise<boolean> {
 }
 
 /**
+ * Equipe interna: o aviso não diz se veio de DM (o metadata só traz o
+ * `canal_id`), então o tipo vem do canal. Tipo de canal nunca muda, então o
+ * cache vale a sessão inteira; a RLS de `equipe_canais` deixa o membro ler.
+ */
+const equipeDmCache = new Map<string, boolean>();
+
+async function isEquipeDm(canalId: string): Promise<boolean> {
+  const emCache = equipeDmCache.get(canalId);
+  if (emCache !== undefined) return emCache;
+  const { data } = await (supabase.from("equipe_canais" as any) as any)
+    .select("tipo")
+    .eq("id", canalId)
+    .maybeSingle();
+  const ehDm = data?.tipo === "dm";
+  if (equipeDmCache.size > 500) equipeDmCache.clear();
+  equipeDmCache.set(canalId, ehDm);
+  return ehDm;
+}
+
+/**
  * Tipo de aviso para escolha do toque. `null` = evento sem toque próprio
  * (alerta de ticket, integração, etc.), que segue no som padrão.
  */
 async function soundEventFor(
   type: string,
   convId: string | null,
-  map: ToneMap
+  map: ToneMap,
+  canalEquipe: string | null = null
 ): Promise<SoundEvent | null> {
   if (type === "chat_assignment") return "assignment";
   if (type === "chat_awaiting_reply") return "awaiting";
+  if (type === "equipe_mensagem") {
+    if (!canalEquipe) return "equipe_grupo";
+    // Mesmo toque nos dois = não precisa saber qual é.
+    if (resolveTone("equipe_dm", map) === resolveTone("equipe_grupo", map)) return "equipe_grupo";
+    return (await isEquipeDm(canalEquipe)) ? "equipe_dm" : "equipe_grupo";
+  }
   if (type !== "whatsapp_new_message") return null;
   if (!convId) return "message";
   const toqueGrupo = resolveTone("group", map);
@@ -462,11 +490,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const evt = await soundEventFor(
           (notif as any).type,
           notifConvId,
-          soundMapRef.current
+          soundMapRef.current,
+          ehEquipe ? meta.canal_id ?? null : null
         );
-        playSound(evt, vol);
-        if (evt && resolveRepeat(evt, soundMapRef.current)) {
-          repetirAviso(recipient.id, evt, notifConvId);
+        // "Sem som" pula o playSound inteiro: tocar o mudo gastaria a janela do
+        // throttle e engoliria o próximo aviso que tem som.
+        if (!(evt && isMuted(evt, soundMapRef.current))) {
+          playSound(evt, vol);
+          if (evt && resolveRepeat(evt, soundMapRef.current)) {
+            repetirAviso(recipient.id, evt, notifConvId);
+          }
         }
       }
 
