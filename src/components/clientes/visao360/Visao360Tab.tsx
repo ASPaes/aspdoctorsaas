@@ -5,7 +5,7 @@ import { endOfDay, formatDistanceStrict, parseISO, startOfDay, subDays, differen
 import { ptBR } from "date-fns/locale";
 import {
   Search, MessageCircle, Ticket, FileText, MapPin, TrendingUp, Star, Clock, AlertTriangle,
-  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone, Lock, Plus,
+  ShieldCheck, CalendarClock, Orbit, ChevronDown, Users, Receipt, Tag, UserRound, Megaphone, Lock, Plus, Frown,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -25,16 +25,16 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DateRangePicker, type PeriodoRange } from "@/components/ui/DateRangePicker";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useClienteNaCarteira, useFinanceiro360, useMinhaCarteira, useModulos360, useSaudePesos, useTickets360,
+  useAgentes360, useAtendimentos360, useCliente360, useContatos360, useContrato360, useClienteNaCarteira, useFinanceiro360, useMinhaCarteira, useModulos360, useOcorrencias360, useSaudePesos, useTickets360,
   type ClienteBusca,
 } from "./useVisao360";
 import {
-  brl, calcularSaude, dadosDaVenda, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
+  RECORRENCIA_MINIMO, brl, calcularSaude, contarOcorrencias, dadosDaVenda, kpisAtendimento, kpisCsat, kpisFinanceiro, kpisTicket, mapaDeContato, minutos, montarLinhaDoTempo, serieMrr12m,
   type Periodo,
 } from "./visao360Calc";
 import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
 import { LinhaDoTempo, MapaDeContato, ModulosContratados, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
-import { AtendimentosLista, AvaliacoesLista, TicketsLista } from "./Visao360Listas";
+import { AtendimentosLista, AvaliacoesLista, OcorrenciasLista, TicketsLista } from "./Visao360Listas";
 import { FinanceiroSubAba } from "./Visao360Financeiro";
 import { SaudeDoCliente } from "./Visao360Saude";
 import { TheoResumo } from "./Visao360Theo";
@@ -242,6 +242,7 @@ export default function Visao360Tab() {
   const contrato = useContrato360(clienteId, tid);
   const contatos = useContatos360(clienteId);
   const agentes = useAgentes360(tid);
+  const ocorr = useOcorrencias360(clienteId, tid);
 
   const c = cliente.data;
   const fin = useFinanceiro360(clienteId, c?.tenant_id ?? null);
@@ -256,6 +257,7 @@ export default function Visao360Tab() {
   const per: Periodo = useMemo(() => ({ from: periodo.from, to: periodo.to }), [periodo]);
   const listaAts = ats.data ?? [];
   const listaTks = tks.data ?? [];
+  const listaOc = useMemo(() => ocorr.data ?? [], [ocorr.data]);
   const produtos = contrato.data?.produtos ?? [];
   const movimentos = contrato.data?.movimentos ?? [];
   const idsProdutosAtivos = useMemo(() => produtos.filter((p) => p.ativo).map((p) => p.id), [produtos]);
@@ -284,15 +286,16 @@ export default function Visao360Tab() {
   // Nota de saúde: só depois que tudo que entra nela chegou, para o anel não
   // aparecer com um número e mudar para outro um segundo depois.
   const pesosQ = useSaudePesos(c?.tenant_id ?? null);
-  const pronto = !!c && ats.isSuccess && tks.isSuccess && contrato.isSuccess && !fin.isLoading && pesosQ.isSuccess;
+  // Ocorrências entram quando chegam; se a consulta falhar, a nota sai sem elas.
+  const pronto = !!c && ats.isSuccess && tks.isSuccess && contrato.isSuccess && !fin.isLoading && pesosQ.isSuccess && !ocorr.isLoading;
   const saude = useMemo(
     () => pronto
       ? calcularSaude({
           atendimentos: listaAts, tickets: listaTks, titulos, financeiroLigado: finHab,
-          mrrAtual, mrr12m: mrr12, cancelado: !!c?.cancelado, hoje: new Date(),
+          mrrAtual, mrr12m: mrr12, cancelado: !!c?.cancelado, hoje: new Date(), ocorrencias: listaOc,
         }, pesosQ.data!.pesos)
       : null,
-    [pronto, listaAts, listaTks, titulos, finHab, mrrAtual, mrr12, c?.cancelado, pesosQ.data],
+    [pronto, listaAts, listaTks, titulos, finHab, mrrAtual, mrr12, c?.cancelado, pesosQ.data, listaOc],
   );
 
   const proximos: ProximoEvento[] = useMemo(() => {
@@ -318,6 +321,18 @@ export default function Visao360Tab() {
   // O que pede atenção agora. Só aparece o que for verdade para este cliente.
   const alertas = useMemo(() => {
     const out: { tom: "ruim" | "alerta" | "info" | "ok"; Icon: typeof AlertTriangle; titulo: string; sub: string }[] = [];
+    // O que a IA percebeu vem primeiro: é o sinal mais forte de que o cliente pode sair.
+    const pedido = listaOc.find((o) => o.tipo === "churn" && differenceInCalendarDays(new Date(), parseISO(o.detectado_em)) <= 30);
+    if (pedido) out.push({
+      tom: pedido.alvo === "contrato" ? "ruim" : "alerta", Icon: AlertTriangle,
+      titulo: `${pedido.alvo === "contrato" ? "Pediu para cancelar" : "Falou em cancelar"} em ${format(parseISO(pedido.detectado_em), "dd/MM")}`,
+      sub: `"${pedido.trecho}"`,
+    });
+    const oc30 = contarOcorrencias(listaOc, subDays(new Date(), 30));
+    if (oc30.insatisfeito >= RECORRENCIA_MINIMO) {
+      const ultima = listaOc.find((o) => o.alvo === "atendimento" || o.alvo === "produto");
+      out.push({ tom: "ruim", Icon: Frown, titulo: `Insatisfeito em ${oc30.insatisfeito} atendimentos em 30 dias`, sub: ultima ? `"${ultima.trecho}"` : "" });
+    }
     const esperando = listaAts.filter((a) => a.status === "waiting").length;
     if (esperando) out.push({ tom: "alerta", Icon: Clock, titulo: `${esperando} atendimento${esperando > 1 ? "s" : ""} na fila agora`, sub: "O cliente está esperando alguém assumir." });
     if (kFin.vencidoQtd) out.push({
@@ -344,7 +359,7 @@ export default function Visao360Tab() {
       if (elogio) out.push({ tom: "ok", Icon: Star, titulo: "Elogio recente", sub: `"${elogio.csat_reason}"` });
     }
     return out.slice(0, 4);
-  }, [listaAts, listaTks, proximos, kFin]);
+  }, [listaAts, listaTks, listaOc, proximos, kFin]);
 
   // Conversas do cliente, da mais recente para a mais antiga, sem repetir.
   const conversas = useMemo(() => {
@@ -635,6 +650,7 @@ export default function Visao360Tab() {
             <SubAba valor="atendimentos" qtd={listaAts.length}>Atendimentos</SubAba>
             <SubAba valor="tickets" qtd={listaTks.length}>Tickets</SubAba>
             <SubAba valor="avaliacoes" qtd={listaAts.filter((a) => a.csat_score != null).length}>Avaliações</SubAba>
+            <SubAba valor="ocorrencias" qtd={listaOc.length}>Ocorrências</SubAba>
             {finHab && <SubAba valor="financeiro" qtd={kFin.abertoQtd}>Financeiro</SubAba>}
           </TabsList>
           <DateRangePicker dateRange={periodo} onDateRangeChange={(r) => setPeriodo(r)} allowAllTime align="end" />
@@ -667,6 +683,9 @@ export default function Visao360Tab() {
             </TabsContent>
             <TabsContent value="avaliacoes" className="mt-4">
               <AvaliacoesLista atendimentos={listaAts} periodo={per} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} />
+            </TabsContent>
+            <TabsContent value="ocorrencias" className="mt-4">
+              <OcorrenciasLista ocorrencias={listaOc} periodo={per} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} />
             </TabsContent>
             {finHab && (
               <TabsContent value="financeiro" className="mt-4">

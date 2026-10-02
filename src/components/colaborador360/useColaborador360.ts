@@ -61,6 +61,47 @@ const COLS_ATENDIMENTO = `id, attendance_code, status, opened_at, closed_at, fir
  * Só roda depois que a RPC liberou o acesso (`enabled`); o que cada um enxerga
  * das linhas continua sendo o RLS de support_attendances.
  */
+export interface InsatisfacaoColaborador {
+  id: string;
+  attendance_id: string;
+  trecho: string;
+  motivo: string | null;
+  detectado_em: string;
+  cliente: string | null;
+}
+
+/**
+ * Atendimentos em que o cliente se mostrou insatisfeito COM O ATENDIMENTO
+ * enquanto o chat era desta pessoa (`atendimento_ocorrencias.responsavel_id`).
+ * Irritação com o sistema ou com algo de fora nunca é atribuída a ninguém, e
+ * fila sem dono fica no setor — ver a migration da tabela.
+ */
+export function useInsatisfacaoColaborador(userId: string | null, de: Date, ate: Date, enabled: boolean) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  return useQuery<InsatisfacaoColaborador[]>({
+    queryKey: ["colaborador-360-insatisfacao", tid, userId, de.toISOString(), ate.toISOString()],
+    enabled: enabled && !!userId,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const rows = await fetchAllRows<any>(() => {
+        let q = (supabase.from("atendimento_ocorrencias" as any) as any)
+          .select("id, attendance_id, trecho, motivo, detectado_em, clientes:cliente_id(nome_fantasia, razao_social)")
+          .eq("responsavel_id", userId)
+          .eq("alvo", "atendimento")
+          .gte("detectado_em", de.toISOString())
+          .lte("detectado_em", ate.toISOString())
+          .order("detectado_em", { ascending: false });
+        if (tid) q = q.eq("tenant_id", tid);
+        return q;
+      });
+      return rows.map((r) => ({
+        id: r.id, attendance_id: r.attendance_id, trecho: r.trecho, motivo: r.motivo, detectado_em: r.detectado_em,
+        cliente: r.clientes?.nome_fantasia || r.clientes?.razao_social || null,
+      }));
+    },
+  });
+}
+
 export function useAtendimentosColaborador(userId: string | null, de: Date, ate: Date, enabled: boolean) {
   const { effectiveTenantId: tid } = useTenantFilter();
   return useQuery<Atendimento360[]>({

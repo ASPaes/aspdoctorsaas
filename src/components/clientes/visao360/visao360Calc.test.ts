@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, kpisFinanceiro, type Titulo360,
-  calcularSaude, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda, chaveTelefoneBR, mrrAntesDepois,
+  calcularSaude, contarOcorrencias, normalizarPesos, PESOS_SAUDE_PADRAO, legendaBoleto, textoSemAnexo, dadosDaVenda, chaveTelefoneBR, mrrAntesDepois,
   kpisAtendimento, kpisCsat, kpisTicket, mapaDeContato, montarLinhaDoTempo, mrrEm, periodoAnterior, serieMrr12m,
-  type Atendimento360, type Movimento360, type Produto360, type Ticket360,
+  type Atendimento360, type Movimento360, type Ocorrencia360, type Produto360, type Ticket360,
 } from "./visao360Calc";
 
 const prod = (o: Partial<Produto360>): Produto360 => ({
@@ -274,5 +274,37 @@ describe("movimentação de contrato", () => {
     expect(tags("b")).toContain("Sem vendedor");
     expect(tags("c").join()).not.toContain("endedor");
     expect(ev.find((e) => e.id === "m-a")!.mrr).toEqual({ antes: 230, depois: 260 });
+  });
+});
+
+describe("ocorrências na nota de saúde", () => {
+  const HOJE_OC = new Date("2026-10-01T15:00:00Z");
+  const base = { atendimentos: [], tickets: [], titulos: [], financeiroLigado: false, mrrAtual: 100, mrr12m: 100, cancelado: false, hoje: HOJE_OC };
+  const oc = (o: Partial<Ocorrencia360>): Ocorrencia360 => ({
+    id: Math.random().toString(), attendance_id: "a1", conversation_id: "c1", tipo: "irritacao", alvo: "atendimento",
+    trecho: "vocês demoram", motivo: null, responsavel_id: null, detectado_em: "2026-09-20T12:00:00Z", ...o,
+  });
+  const suporte = (ocorrencias: Ocorrencia360[]) =>
+    calcularSaude({ ...base, ocorrencias }, PESOS_SAUDE_PADRAO).fatores.find((f) => f.chave === "suporte")!;
+
+  it("conta atendimentos, não ocorrências repetidas", () => {
+    const c = contarOcorrencias([oc({}), oc({ alvo: "produto" }), oc({ attendance_id: "a2" }), oc({ attendance_id: "a3", alvo: "externo" })], new Date("2026-09-01"));
+    expect(c.insatisfeito).toBe(2);
+    expect(c.externo).toBe(1);
+  });
+
+  it("insatisfação tira 10 por atendimento, até 30", () => {
+    expect(suporte([oc({})]).nota).toBe(90);
+    expect(suporte(["a1", "a2", "a3", "a4"].map((id) => oc({ attendance_id: id }))).nota).toBe(70);
+  });
+
+  it("pedido de cancelamento tira 40; sem dizer o quê, 15", () => {
+    expect(suporte([oc({ tipo: "churn", alvo: "contrato" })]).nota).toBe(60);
+    expect(suporte([oc({ tipo: "churn", alvo: "indefinido" })]).nota).toBe(85);
+  });
+
+  it("irritação externa e ocorrência de mais de 90 dias não contam", () => {
+    expect(suporte([oc({ alvo: "externo" })]).nota).toBe(100);
+    expect(suporte([oc({ detectado_em: "2026-05-01T12:00:00Z" })]).nota).toBe(100);
   });
 });

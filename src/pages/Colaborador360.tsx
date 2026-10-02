@@ -17,7 +17,7 @@ import { NotaDoColaborador } from "@/components/colaborador360/NotaDoColaborador
 import { AtendimentosLista, AvaliacoesLista } from "@/components/clientes/visao360/Visao360Listas";
 import { AttendanceDetailModal } from "@/components/tickets/AttendanceDetailModal";
 import {
-  useAtendimentosColaborador, useColaborador360, useJornadaColaborador, useTicketsColaborador,
+  useAtendimentosColaborador, useColaborador360, useInsatisfacaoColaborador, useJornadaColaborador, useTicketsColaborador,
   type Alvo360, type MembroEquipe360,
 } from "@/components/colaborador360/useColaborador360";
 import {
@@ -29,6 +29,7 @@ import { Destaques, VisaoGeralColaborador } from "@/components/colaborador360/Vi
 import { JornadaColaborador } from "@/components/colaborador360/JornadaColaborador";
 import { LinhaDoTempoColaborador } from "@/components/colaborador360/LinhaDoTempoColaborador";
 import { TheoPauta } from "@/components/colaborador360/TheoPauta";
+import { InsatisfacaoColaborador } from "@/components/colaborador360/InsatisfacaoColaborador";
 
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 
@@ -51,6 +52,7 @@ export default function Colaborador360() {
   const agentes = useAgentes360(tid);
   const qc = useQueryClient();
   const jor = useJornadaColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  const insat = useInsatisfacaoColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
   const [subAba, setSubAba] = useState("geral");
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
@@ -63,8 +65,15 @@ export default function Colaborador360() {
   const pontos = useMemo(() => {
     const parados = (tks.data ?? []).filter((t) => t.responsavel_user_id === alvo?.user_id && !t.status_final
       && Date.now() - new Date(t.aberto_em).getTime() > 7 * 86_400_000).length;
-    return destaques(m, listaAts, periodo.from, periodo.to, jor.data, parados);
-  }, [m, listaAts, periodo, jor.data, tks.data, alvo?.user_id]);
+    const lista = destaques(m, listaAts, periodo.from, periodo.to, jor.data, parados);
+    // Mesma régua do aviso ao gestor sobre o cliente: 3 ou mais.
+    const n = insat.data?.length ?? 0;
+    if (n < 3) return lista;
+    // Entra como o primeiro ponto de atenção (a função devolve 2 fortes + 2 de atenção).
+    const fortes = lista.filter((x) => x.tom === "ok" || x.tom === "info");
+    const atencao = lista.filter((x) => x.tom === "alerta" || x.tom === "ruim");
+    return [...fortes, { tom: "ruim" as const, titulo: `Cliente insatisfeito em ${n} atendimentos`, sub: "com o atendimento, no período · veja a aba Clientes insatisfeitos" }, ...atencao.slice(0, 1)];
+  }, [m, listaAts, periodo, jor.data, tks.data, alvo?.user_id, insat.data]);
   const dias = useMemo(
     () => (alvo ? linhaDoTempo(listaAts, tks.data ?? [], jor.data, alvo.user_id, periodo.from, periodo.to) : []),
     [alvo, listaAts, tks.data, jor.data, periodo],
@@ -117,6 +126,7 @@ export default function Colaborador360() {
                 <SubAba valor="atendimentos" qtd={ats.data?.length}>Atendimentos</SubAba>
                 <SubAba valor="avaliacoes" qtd={ats.data ? avaliacoes : undefined}>Avaliações</SubAba>
                 <SubAba valor="tickets" qtd={tks.data ? ticketsAbertos : undefined}>Tickets</SubAba>
+                <SubAba valor="insatisfacao" qtd={insat.data?.length}>Clientes insatisfeitos</SubAba>
                 <SubAba valor="jornada">Jornada e pausas</SubAba>
                 <SubAba valor="linha">Linha do tempo</SubAba>
               </TabsList>
@@ -133,6 +143,13 @@ export default function Colaborador360() {
               <TabsContent value="avaliacoes" className="mt-4">
                 {ats.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
                   <AvaliacoesLista atendimentos={listaAts} periodo={periodo} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} comMeses={false} />
+                )}
+              </TabsContent>
+              <TabsContent value="insatisfacao" className="mt-4">
+                {insat.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : insat.isError ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Não foi possível carregar agora.</p>
+                ) : (
+                  <InsatisfacaoColaborador itens={insat.data ?? []} encerrados={m?.encerrados ?? null} onAbrir={setAtendimentoAberto} />
                 )}
               </TabsContent>
               <TabsContent value="jornada" className="mt-4">

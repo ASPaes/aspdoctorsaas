@@ -9,9 +9,9 @@ import { ColumnFilter, FiltroData, FiltroFaixa, FiltroOpcoes, FiltroTexto } from
 import { cn } from "@/lib/utils";
 import { Cartao, Chips, Estrelas, Etiqueta, Mini, Vazio } from "./Visao360Ui";
 import {
-  FILTROS_ATENDIMENTO_VAZIOS, filtrarOrdenarAtendimentos, filtroAtendimentoAtivo, kpisAtendimento, kpisCsat,
+  FILTROS_ATENDIMENTO_VAZIOS, ROTULO_OCORRENCIA, contarOcorrencias, filtrarOrdenarAtendimentos, filtroAtendimentoAtivo, kpisAtendimento, kpisCsat,
   kpisTicket, minutos, rotuloResolucao, valorOpcaoAtendimento,
-  type Atendimento360, type ColunaAtendimento, type FiltrosAtendimento, type Periodo, type Ticket360,
+  type Atendimento360, type ColunaAtendimento, type FiltrosAtendimento, type Ocorrencia360, type Periodo, type Ticket360,
 } from "./visao360Calc";
 
 function noPeriodo(iso: string | null, p: Periodo) {
@@ -428,6 +428,84 @@ export function AvaliacoesLista({
           </div>
         </Cartao>
       </div>
+    </div>
+  );
+}
+
+/**
+ * O que a IA percebeu nas conversas do cliente: pedido de cancelamento e
+ * irritação, cada um com a frase literal. Os números contam ATENDIMENTOS — a
+ * mesma irritação redetectada no mesmo atendimento é uma só.
+ */
+export function OcorrenciasLista({
+  ocorrencias, periodo, nomeAgente, onAbrir,
+}: {
+  ocorrencias: Ocorrencia360[];
+  periodo: Periodo;
+  nomeAgente: (uid: string | null) => string | null;
+  onAbrir: (attendanceId: string) => void;
+}) {
+  const [filtro, setFiltro] = useState<"todos" | "cancelamento" | "atendimento" | "produto" | "externo">("todos");
+  const [limite, setLimite] = useState(LOTE);
+  const doPeriodo = useMemo(() => ocorrencias.filter((o) => noPeriodo(o.detectado_em, periodo)), [ocorrencias, periodo]);
+  const c = contarOcorrencias(doPeriodo, new Date(0));
+  const lista = doPeriodo.filter((o) => filtro === "todos" || (filtro === "cancelamento" ? o.tipo === "churn" : o.alvo === filtro));
+  const plural = (n: number) => `atendimento${n === 1 ? "" : "s"} no período`;
+
+  return (
+    <div className="grid gap-3.5">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Mini rotulo="Pedidos de cancelamento" valor={c.contrato + c.indefinido} tom={c.contrato ? "ruim" : undefined}
+          sub={c.indefinido ? `${c.indefinido} sem dizer o quê` : plural(c.contrato)} />
+        <Mini rotulo="Insatisfeito com o atendimento" valor={c.atendimento} tom={c.atendimento ? "ruim" : undefined} sub={plural(c.atendimento)} />
+        <Mini rotulo="Insatisfeito com o sistema" valor={c.produto} sub={plural(c.produto)} />
+        <Mini rotulo="Irritado com algo de fora" valor={c.externo} sub="SEFAZ, banco… não conta na nota" />
+      </div>
+      <Cartao
+        titulo="Ocorrências"
+        sub="o que a IA percebeu nas conversas, com a frase do cliente"
+        acao={
+          <Chips
+            valor={filtro}
+            onChange={(v) => { setFiltro(v); setLimite(LOTE); }}
+            opcoes={[
+              { id: "todos", label: "Todas", qtd: doPeriodo.length },
+              { id: "cancelamento", label: "Cancelamento", qtd: c.contrato + c.indefinido },
+              { id: "atendimento", label: "Atendimento", qtd: c.atendimento },
+              { id: "produto", label: "Sistema", qtd: c.produto },
+              { id: "externo", label: "Externo", qtd: c.externo },
+            ]}
+          />
+        }
+      >
+        {lista.length === 0 ? (
+          <Vazio>{doPeriodo.length ? "Nenhuma ocorrência deste tipo no período." : "Nenhuma ocorrência no período. O cliente não pediu cancelamento nem se mostrou insatisfeito."}</Vazio>
+        ) : (
+          <ul className="px-4 pb-2">
+            {lista.slice(0, limite).map((o, i) => {
+              const r = ROTULO_OCORRENCIA[o.alvo];
+              const quem = o.alvo !== "atendimento" ? null
+                : o.responsavel_id ? `com ${nomeAgente(o.responsavel_id) ?? "agente"}` : "na fila, sem dono";
+              return (
+                <li key={o.id} className={cn("py-3", i > 0 && "border-t")}>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Etiqueta tom={r.tom}>{r.titulo}</Etiqueta>
+                    <span className="text-xs text-muted-foreground">
+                      {format(parseISO(o.detectado_em), "dd/MM/yy HH:mm")}{quem ? ` · ${quem}` : ""}
+                    </span>
+                    <Button variant="ghost" size="sm" className="ml-auto h-7 gap-1 px-2 text-xs" onClick={() => onAbrir(o.attendance_id)}>
+                      <SquareArrowOutUpRight className="h-3.5 w-3.5" />Ver atendimento
+                    </Button>
+                  </div>
+                  <p className="mt-1.5 break-words text-[13px] leading-snug">"{o.trecho}"</p>
+                  {o.motivo && <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{o.motivo}</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        <MaisLinhas total={lista.length} limite={limite} onMais={() => setLimite((l) => l + LOTE)} />
+      </Cartao>
     </div>
   );
 }

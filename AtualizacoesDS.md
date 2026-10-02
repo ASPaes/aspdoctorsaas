@@ -19,6 +19,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/10
 
+- 🆕 **Ocorrências do cliente na Visão 360°** — Em **Clientes › Visão 360°**, a nova aba **Ocorrências** lista o que a IA percebeu nas conversas: pedidos de cancelamento e momentos em que o cliente se mostrou insatisfeito com o atendimento, com o sistema ou com algo de fora (como SEFAZ ou banco), sempre com a frase do cliente e o atalho para o atendimento. Pedido de cancelamento e insatisfação dos últimos 90 dias passam a pesar na **nota de saúde** (fator Suporte); irritação com algo de fora não conta. Quem pediu para cancelar ou se mostrou insatisfeito em 3 atendimentos no mês aparece em **O que pede atenção**.
+
+- 🆕 **Clientes insatisfeitos na Visão 360° do colaborador** — Na **Visão 360° do colaborador**, a aba **Clientes insatisfeitos** mostra os atendimentos em que o cliente reclamou do atendimento enquanto a conversa era daquela pessoa, com a frase do cliente. Insatisfação com o sistema ou de quem esperava na fila sem dono não é atribuída a ninguém.
+
+- ⬆️ **Aviso de insatisfação só quando se repete** — O aviso de cliente insatisfeito deixou de chegar a cada reclamação. Agora ele vem como **🔁 Insatisfação recorrente** quando o mesmo cliente se mostra insatisfeito com o atendimento ou com o sistema em 3 atendimentos nos últimos 30 dias, com as frases de cada um, no máximo uma vez por semana por cliente. Quando o cliente pede "cancelamento" sem dizer de quê, chega o aviso **❓ Possível cancelamento — confira**.
+
 - 🔧 **Aviso de risco de churn só quando o cliente quer cancelar o contrato** — O aviso de **Risco de churn** disparava quando o cliente falava em cancelar qualquer coisa, inclusive uma nota fiscal ou uma venda durante o suporte. Agora a IA lê o atendimento inteiro e só avisa quando o pedido é para cancelar o sistema, o contrato ou o serviço. Quando o cliente está irritado com o atendimento ou com o sistema, o aviso chega com outro título: **Cliente insatisfeito**. Irritação com algo de fora, como SEFAZ fora do ar ou banco, não gera aviso.
 
 - ⬆️ **Caixa de entrada vem primeiro em E-mails** — Em **E-mails**, a aba **Recebidos** passou a se chamar **Caixa de entrada** e agora é a primeira, com **Enviados** ao lado. Quem abre a tela pela primeira vez cai direto na Caixa de entrada; quem já usava continua voltando na última aba que abriu.

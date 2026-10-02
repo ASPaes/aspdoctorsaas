@@ -552,6 +552,56 @@ export function montarLinhaDoTempo(
   return ev.sort((a, b) => (a.quando < b.quando ? 1 : a.quando > b.quando ? -1 : 0));
 }
 
+/* -------------------------------------------------------- ocorrências */
+
+/**
+ * O que a IA registrou nos atendimentos (tabela `atendimento_ocorrencias`):
+ * pedido de cancelamento e irritação, com a frase literal do cliente. Uma por
+ * atendimento e tipo — a recorrência é contada em atendimentos.
+ */
+export type AlvoOcorrencia = "contrato" | "indefinido" | "atendimento" | "produto" | "externo";
+export interface Ocorrencia360 {
+  id: string;
+  attendance_id: string;
+  conversation_id: string;
+  tipo: "churn" | "irritacao";
+  alvo: AlvoOcorrencia;
+  trecho: string;
+  motivo: string | null;
+  responsavel_id: string | null;
+  detectado_em: string;
+}
+
+export const ROTULO_OCORRENCIA: Record<AlvoOcorrencia, { titulo: string; curto: string; tom: "ruim" | "alerta" | "neutro" }> = {
+  contrato: { titulo: "Pediu para cancelar", curto: "Cancelamento", tom: "ruim" },
+  indefinido: { titulo: "Falou em cancelar", curto: "Possível cancelamento", tom: "alerta" },
+  atendimento: { titulo: "Insatisfeito com o atendimento", curto: "Atendimento", tom: "ruim" },
+  produto: { titulo: "Insatisfeito com o sistema", curto: "Sistema", tom: "alerta" },
+  externo: { titulo: "Irritado com algo de fora", curto: "Externo", tom: "neutro" },
+};
+
+/** Atendimentos (distintos) com ocorrência de cada alvo, a partir de `desde`. */
+export function contarOcorrencias(lista: Ocorrencia360[], desde: Date) {
+  const por: Record<AlvoOcorrencia, Set<string>> = {
+    contrato: new Set(), indefinido: new Set(), atendimento: new Set(), produto: new Set(), externo: new Set(),
+  };
+  const contraNos = new Set<string>();
+  for (const o of lista) {
+    if (new Date(o.detectado_em).getTime() < desde.getTime()) continue;
+    por[o.alvo]?.add(o.attendance_id);
+    if (o.alvo === "atendimento" || o.alvo === "produto") contraNos.add(o.attendance_id);
+  }
+  return {
+    contrato: por.contrato.size, indefinido: por.indefinido.size, atendimento: por.atendimento.size,
+    produto: por.produto.size, externo: por.externo.size,
+    /** Atendimentos em que o cliente se irritou com a gente (atendimento ou sistema). */
+    insatisfeito: contraNos.size,
+  };
+}
+
+/** Mesma régua do aviso por recorrência da edge function: 3+ atendimentos em 30 dias. */
+export const RECORRENCIA_MINIMO = 3;
+
 /* -------------------------------------------------------- nota de saúde */
 
 export type FatorSaude = "satisfacao" | "engajamento" | "financeiro" | "suporte" | "receita";
@@ -564,7 +614,7 @@ export const FATORES_SAUDE: { chave: FatorSaude; rotulo: string; regra: string }
   { chave: "satisfacao", rotulo: "Satisfação", regra: "Média das avaliações dos últimos 90 dias. 5 estrelas vale 100 e 1 estrela vale 0. Sem avaliação no período, fica em 70." },
   { chave: "engajamento", rotulo: "Engajamento", regra: "Há quanto tempo o cliente falou com a empresa. Até 30 dias vale 100; cai para 80 até 60 dias, 60 até 90, 40 até 180 e 20 depois disso." },
   { chave: "financeiro", rotulo: "Financeiro", regra: "Atraso de hoje e pontualidade dos últimos 12 meses. Nada vencido vale 100; vencido até 15 dias, 70; até 30, 50; até 60, 30; mais que isso, 10. Essa nota pesa 60% e a pontualidade 40%. Só conta nas empresas com o Financeiro ligado." },
-  { chave: "suporte", rotulo: "Suporte", regra: "Começa em 100 e perde 15 por ticket aberto há mais de 7 dias, 15 por avaliação de 1 ou 2 estrelas nos últimos 90 dias e até 30 pela parte dos atendimentos de 90 dias encerrados sem resolver." },
+  { chave: "suporte", rotulo: "Suporte", regra: "Começa em 100 e perde 15 por ticket aberto há mais de 7 dias, 15 por avaliação de 1 ou 2 estrelas nos últimos 90 dias e até 30 pela parte dos atendimentos de 90 dias encerrados sem resolver. Perde também 10 por atendimento de 90 dias em que o cliente se mostrou insatisfeito com o atendimento ou com o sistema (até 30), e 40 se pediu para cancelar o contrato nesse período (15 se falou em cancelar sem dizer o quê). Irritação com algo de fora, como SEFAZ ou banco, não conta." },
   { chave: "receita", rotulo: "Receita", regra: "MRR de hoje comparado com o de 12 meses atrás. Cresceu 5% ou mais vale 100; cresceu menos, 85; ficou igual, 75; caiu até 10%, 50; caiu mais, 25. Cliente cancelado vale 0." },
 ];
 
@@ -597,6 +647,8 @@ export interface EntradaSaude {
   mrr12m: number;
   cancelado: boolean;
   hoje: Date;
+  /** Ocorrências registradas pela IA. Ausente = nenhuma (a nota não depende delas para sair). */
+  ocorrencias?: Ocorrencia360[];
 }
 
 const limitar = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
@@ -652,15 +704,20 @@ export function calcularSaude(e: EntradaSaude, pesos: PesosSaude) {
   const detratores = e.atendimentos.filter((a) => a.csat_score != null && a.csat_score <= 2 && dentro(a.csat_respondido_em ?? a.closed_at ?? a.opened_at, p90)).length;
   const enc = e.atendimentos.filter((a) => a.status === "closed" && dentro(a.closed_at, p90) && a.resolucao);
   const naoRes = enc.filter((a) => a.resolucao === "nao_resolvido").length;
+  const oc = contarOcorrencias(e.ocorrencias ?? [], p90.from);
+  const perdaCancelamento = oc.contrato ? 40 : oc.indefinido ? 15 : 0;
   const pedacos = [
     velhos ? `${velhos} ticket${velhos > 1 ? "s" : ""} aberto${velhos > 1 ? "s" : ""} há mais de 7 dias` : null,
     detratores ? `${detratores} avaliaç${detratores > 1 ? "ões" : "ão"} ruim${detratores > 1 ? "s" : ""} em 90 dias` : null,
     naoRes ? `${naoRes} de ${enc.length} atendimentos sem resolver` : null,
+    oc.insatisfeito ? `insatisfeito em ${oc.insatisfeito} atendimento${oc.insatisfeito > 1 ? "s" : ""}` : null,
+    oc.contrato ? "pediu para cancelar o contrato" : oc.indefinido ? "falou em cancelar" : null,
   ].filter(Boolean);
   fatores.push({
     chave: "suporte", rotulo: "Suporte", aplica: true,
-    nota: limitar(100 - Math.min(45, velhos * 15) - Math.min(30, detratores * 15) - (enc.length ? (naoRes / enc.length) * 30 : 0)),
-    detalhe: pedacos.length ? `${pedacos.join(", ")}.` : "Nenhum ticket parado, avaliação ruim ou atendimento sem resolver.",
+    nota: limitar(100 - Math.min(45, velhos * 15) - Math.min(30, detratores * 15) - (enc.length ? (naoRes / enc.length) * 30 : 0)
+      - Math.min(30, oc.insatisfeito * 10) - perdaCancelamento),
+    detalhe: pedacos.length ? `${pedacos.join(", ")}.` : "Nenhum ticket parado, avaliação ruim, atendimento sem resolver ou cliente insatisfeito.",
   });
 
   // Receita

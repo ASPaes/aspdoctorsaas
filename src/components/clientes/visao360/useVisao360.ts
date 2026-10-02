@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchAllRows } from "@/lib/supabasePaginate";
-import { normalizarPesos, type Atendimento360, type Movimento360, type PesosSaude, type Produto360, type Ticket360, type Titulo360 } from "./visao360Calc";
+import { normalizarPesos, type Atendimento360, type Movimento360, type Ocorrencia360, type PesosSaude, type Produto360, type Ticket360, type Titulo360 } from "./visao360Calc";
 
 /**
  * Tudo o que a Visão 360° mostra de um cliente. Cada lista é buscada INTEIRA
@@ -102,6 +102,28 @@ export function useAtendimentos360(clienteId: string | null, tid: string | null)
           csat_reason: csat?.reason || null,
           csat_respondido_em: csat?.responded_at ?? null,
         };
+      });
+    },
+  });
+}
+
+/**
+ * Pedidos de cancelamento e irritações que a IA registrou nos atendimentos.
+ * Se a consulta falhar, a nota de saúde sai sem elas (quem usa trata como lista vazia).
+ */
+export function useOcorrencias360(clienteId: string | null, tid: string | null) {
+  return useQuery({
+    queryKey: ["visao360_ocorrencias", clienteId, tid],
+    enabled: !!clienteId,
+    staleTime: STALE,
+    queryFn: async (): Promise<Ocorrencia360[]> => {
+      return fetchAllRows<Ocorrencia360>(() => {
+        let q = (supabase.from("atendimento_ocorrencias" as any) as any)
+          .select("id, attendance_id, conversation_id, tipo, alvo, trecho, motivo, responsavel_id, detectado_em")
+          .eq("cliente_id", clienteId)
+          .order("detectado_em", { ascending: false });
+        if (tid) q = q.eq("tenant_id", tid);
+        return q;
       });
     },
   });
