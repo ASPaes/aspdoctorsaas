@@ -30,6 +30,8 @@ import { JornadaColaborador } from "@/components/colaborador360/JornadaColaborad
 import { LinhaDoTempoColaborador } from "@/components/colaborador360/LinhaDoTempoColaborador";
 import { TheoPauta } from "@/components/colaborador360/TheoPauta";
 import { InsatisfacaoColaborador } from "@/components/colaborador360/InsatisfacaoColaborador";
+import { WhatsappOficialColaborador } from "@/components/colaborador360/WhatsappOficialColaborador";
+import { useTemWhatsappOficial } from "@/components/whatsappCusto/useWhatsappCusto";
 
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
 
@@ -53,6 +55,9 @@ export default function Colaborador360() {
   const qc = useQueryClient();
   const jor = useJornadaColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
   const insat = useInsatisfacaoColaborador(alvo?.user_id ?? null, periodo.from, periodo.to, q.isSuccess);
+  // Aba de custo só para empresa com número da API Oficial. Quem vê quem é a
+  // regra da própria 360°, conferida de novo no servidor.
+  const temWaOficial = useTemWhatsappOficial(tid).data === true;
   const [subAba, setSubAba] = useState("geral");
   const [atendimentoAberto, setAtendimentoAberto] = useState<string | null>(null);
   const [ticketAberto, setTicketAberto] = useState<string | null>(null);
@@ -120,7 +125,7 @@ export default function Colaborador360() {
           <Numeros m={m} t={d?.time ?? null} alvo={alvo} carregando={q.isLoading} />
           {alvo && <Destaques itens={pontos} />}
           {alvo && (
-            <Tabs value={subAba} onValueChange={setSubAba}>
+            <Tabs value={subAba} onValueChange={setSubAba} className="min-w-0">
               <TabsList className="h-auto w-full justify-start gap-0.5 overflow-x-auto rounded-none border-b bg-transparent p-0">
                 <SubAba valor="geral">Visão geral</SubAba>
                 <SubAba valor="atendimentos" qtd={ats.data?.length}>Atendimentos</SubAba>
@@ -129,6 +134,7 @@ export default function Colaborador360() {
                 <SubAba valor="insatisfacao" qtd={insat.data?.length}>Clientes insatisfeitos</SubAba>
                 <SubAba valor="jornada">Jornada e pausas</SubAba>
                 <SubAba valor="linha">Linha do tempo</SubAba>
+                {temWaOficial && <SubAba valor="whatsapp">WhatsApp Oficial</SubAba>}
               </TabsList>
               <TabsContent value="geral" className="mt-4">
                 {ats.isLoading ? <Skeleton className="h-64 w-full rounded-xl" /> : (
@@ -162,6 +168,11 @@ export default function Colaborador360() {
                   <LinhaDoTempoColaborador dias={dias} onAbrirAtendimento={setAtendimentoAberto} onAbrirTicket={setTicketAberto} />
                 )}
               </TabsContent>
+              {temWaOficial && (
+                <TabsContent value="whatsapp" className="mt-4">
+                  <WhatsappOficialColaborador tenantId={tid} userId={alvo.user_id} de={periodo.from} ate={periodo.to} />
+                </TabsContent>
+              )}
               <TabsContent value="atendimentos" className="mt-4">
                 {ats.isLoading ? (
                   <Skeleton className="h-64 w-full rounded-xl" />

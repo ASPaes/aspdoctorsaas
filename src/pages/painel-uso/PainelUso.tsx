@@ -16,25 +16,38 @@ import { useTenantUsageData } from './hooks/useTenantUsageData';
 import { MiniBar } from '@/pages/monitor/shared/MiniBar';
 import { HelpTooltip } from '@/pages/monitor/shared/HelpTooltip';
 import { parseBRDate, formatBRDate } from '@/pages/monitor/shared/dateUtils';
+import { useEhAdmin, usePortao } from '@/hooks/usePortao';
+import { CustoWhatsappTab } from '@/components/whatsappCusto/CustoWhatsappTab';
+import { useTemWhatsappOficial } from '@/components/whatsappCusto/useWhatsappCusto';
 
 export default function PainelUso() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { effectiveTenantId } = useTenantFilter();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [activeTab, setActiveTab] = useState<'overview' | 'details'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'details' | 'custo_wa'>('overview');
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
     from: startOfMonth(new Date()),
     to: new Date(),
   });
 
-  // Permissão: só admin do tenant ou super admin
+  // Quem abre o Painel é a permissão "Abrir o Painel de Uso" (02/10/2026). Antes
+  // era só admin, fixo no código — o admin ligava a permissão para o gestor e a
+  // tela mandava ele de volta. A regra de hoje (só admin) continua valendo nas
+  // empresas sem RBAC e enquanto as permissões carregam: a rota usa can() puro,
+  // que nessas empresas libera tudo.
+  const ehAdmin = useEhAdmin();
+  const podeAbrir = usePortao('nav.painel_uso', ehAdmin);
   useEffect(() => {
-    if (profile && (profile as any).role !== 'admin' && !(profile as any).is_super_admin) {
+    if (profile && !podeAbrir) {
       navigate('/dashboard', { replace: true });
     }
-  }, [profile, navigate]);
+  }, [profile, podeAbrir, navigate]);
+
+  const podeVerCustoWa = usePortao('painel_uso.custo_whatsapp', ehAdmin);
+  const temWaOficial = useTemWhatsappOficial(effectiveTenantId);
+  const mostraCustoWa = podeVerCustoWa && temWaOficial.data === true;
 
   // Nome do tenant (independente do contexto)
   const { data: tenantInfo } = useQuery({
@@ -176,6 +189,7 @@ export default function PainelUso() {
         {([
           { key: 'overview' as const, label: 'Visão Geral' },
           { key: 'details' as const, label: 'Detalhes' },
+          ...(mostraCustoWa ? [{ key: 'custo_wa' as const, label: 'Custo WhatsApp Oficial' }] : []),
         ]).map(t => (
           <button key={t.key} type="button" onClick={() => setActiveTab(t.key)}
             style={{
@@ -416,6 +430,10 @@ export default function PainelUso() {
           })()}
         </div>
       </>)}
+
+      {activeTab === 'custo_wa' && mostraCustoWa && effectiveTenantId && dateRange.from && dateRange.to && (
+        <CustoWhatsappTab tenantId={effectiveTenantId} de={dateRange.from} ate={dateRange.to} />
+      )}
     </div>
   );
 }

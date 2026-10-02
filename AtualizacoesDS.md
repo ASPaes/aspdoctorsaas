@@ -19,6 +19,12 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/10
 
+- 🆕 **Custo do WhatsApp Oficial no Painel de Uso** — Em **Painel de Uso**, a nova aba **Custo WhatsApp Oficial** mostra quanto a empresa gasta com mensagens na API Oficial da Meta, que desde 01/10 cobra também as respostas dentro da janela de 24h: custo no período, projeção do mês, uso da franquia de cada número, para onde vai o dinheiro (técnicos, URA, CSAT, avisos), quanto dá para evitar e sugestões por técnico e por automação, com atalho para a configuração. Períodos antes de 01/10 aparecem como simulação, porque essas respostas ainda eram grátis. Só aparece para empresas com número da API Oficial.
+
+- 🆕 **Custo do WhatsApp Oficial nas Visões 360°** — Na **Visão 360° do colaborador**, a aba **WhatsApp Oficial** mostra quantas mensagens a pessoa enviou, quantas foram picadas (enviadas logo depois de outra) e quantas por atendimento, comparando com a mediana do time, sem mostrar nomes. Em **Clientes › Visão 360°**, a aba **WhatsApp Oficial** mostra quanto o cliente custa em mensagens, quanto isso pesa na mensalidade dele e quem mais escreveu para ele.
+
+- ⬆️ **Painel de Uso e custo do WhatsApp decididos nas permissões** — Em **Configurações › Equipe › Permissões e perfis**, a nova permissão **Ver custo do WhatsApp Oficial** decide quem vê o custo da empresa; ela nasce ligada só para o Administrador. E **Abrir o Painel de Uso** passa a valer de verdade: antes, mesmo ligada para o Gestor, a tela mandava ele de volta para o Dashboard.
+
 - 🆕 **Ocorrências do cliente na Visão 360°** — Em **Clientes › Visão 360°**, a nova aba **Ocorrências** lista o que a IA percebeu nas conversas: pedidos de cancelamento e momentos em que o cliente se mostrou insatisfeito com o atendimento, com o sistema ou com algo de fora (como SEFAZ ou banco), sempre com a frase do cliente e o atalho para o atendimento. Pedido de cancelamento e insatisfação dos últimos 90 dias passam a pesar na **nota de saúde** (fator Suporte); irritação com algo de fora não conta. Quem pediu para cancelar ou se mostrou insatisfeito em 3 atendimentos no mês aparece em **O que pede atenção**.
 
 - 🆕 **Clientes insatisfeitos na Visão 360° do colaborador** — Na **Visão 360° do colaborador**, a aba **Clientes insatisfeitos** mostra os atendimentos em que o cliente reclamou do atendimento enquanto a conversa era daquela pessoa, com a frase do cliente. Insatisfação com o sistema ou de quem esperava na fila sem dono não é atribuída a ninguém.

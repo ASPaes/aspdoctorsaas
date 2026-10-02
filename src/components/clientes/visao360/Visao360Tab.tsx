@@ -36,6 +36,8 @@ import { EASE, MiniBarras, Sparkline } from "./Visao360Ui";
 import { LinhaDoTempo, MapaDeContato, ModulosContratados, OQueUsa, ProximosEventos, QuemFala, type ProximoEvento } from "./Visao360LinhaDoTempo";
 import { AtendimentosLista, AvaliacoesLista, OcorrenciasLista, TicketsLista } from "./Visao360Listas";
 import { FinanceiroSubAba } from "./Visao360Financeiro";
+import { Visao360WhatsappOficial } from "./Visao360WhatsappOficial";
+import { useTemWhatsappOficial } from "@/components/whatsappCusto/useWhatsappCusto";
 import { SaudeDoCliente } from "./Visao360Saude";
 import { TheoResumo } from "./Visao360Theo";
 import { EnviarSegundaViaDialog } from "./EnviarSegundaViaDialog";
@@ -249,6 +251,11 @@ export default function Visao360Tab() {
   const finHab = fin.data?.habilitado === true;
   const titulos = useMemo(() => fin.data?.titulos ?? [], [fin.data]);
   const kFin = useMemo(() => kpisFinanceiro(titulos, new Date()), [titulos]);
+  // Custo do WhatsApp Oficial: empresa com número da API Oficial E a permissão
+  // "Ver custo do WhatsApp Oficial" (a mesma da aba do Painel de Uso).
+  const podeCustoWa = usePortao("painel_uso.custo_whatsapp", ehAdmin);
+  const temWaOficial = useTemWhatsappOficial(c?.tenant_id ?? tid).data === true;
+  const custoWaHab = podeCustoWa && temWaOficial;
   useEffect(() => {
     if (c) gravarRecente({ id: c.id, nome: nomeDoCliente(c), cancelado: c.cancelado });
   }, [c]);
@@ -652,6 +659,7 @@ export default function Visao360Tab() {
             <SubAba valor="avaliacoes" qtd={listaAts.filter((a) => a.csat_score != null).length}>Avaliações</SubAba>
             <SubAba valor="ocorrencias" qtd={listaOc.length}>Ocorrências</SubAba>
             {finHab && <SubAba valor="financeiro" qtd={kFin.abertoQtd}>Financeiro</SubAba>}
+            {custoWaHab && <SubAba valor="whatsapp">WhatsApp Oficial</SubAba>}
           </TabsList>
           <DateRangePicker dateRange={periodo} onDateRangeChange={(r) => setPeriodo(r)} allowAllTime align="end" />
         </div>
@@ -687,6 +695,16 @@ export default function Visao360Tab() {
             <TabsContent value="ocorrencias" className="mt-4">
               <OcorrenciasLista ocorrencias={listaOc} periodo={per} nomeAgente={nomeAgente} onAbrir={setAtendimentoAberto} />
             </TabsContent>
+            {custoWaHab && clienteId && (
+              <TabsContent value="whatsapp" className="mt-4">
+                <Visao360WhatsappOficial
+                  clienteId={clienteId}
+                  de={periodo.allTime ? undefined : periodo.from}
+                  ate={periodo.to}
+                  mrrAtual={mrrAtual}
+                />
+              </TabsContent>
+            )}
             {finHab && (
               <TabsContent value="financeiro" className="mt-4">
                 <FinanceiroSubAba titulos={titulos} atualizadoEm={fin.data?.atualizadoEm ?? null} onEnviar={podeChat ? (id) => setSegundaVia({ aberto: true, titulo: id }) : undefined} />
