@@ -26,6 +26,9 @@ export interface SupportConfig {
   support_ura_invalid_option_template: string;
   billing_skip_ura_enabled: boolean;
   billing_skip_ura_minutes: number;
+  /** Compositor nos números da API Oficial (cada mensagem é cobrada). */
+  meta_compose_mode: 'agrupar' | 'enter_quebra_linha' | 'alerta' | 'desligado';
+  meta_compose_group_seconds: number;
 }
 
 const DEFAULTS: SupportConfig = {
@@ -53,6 +56,8 @@ const DEFAULTS: SupportConfig = {
   support_ura_invalid_option_template: 'Não entendi sua resposta 😅. Por favor, envie apenas o número de uma das opções acima.',
   billing_skip_ura_enabled: true,
   billing_skip_ura_minutes: 60,
+  meta_compose_mode: 'agrupar',
+  meta_compose_group_seconds: 4,
 };
 
 const SELECT_FIELDS = [
@@ -78,6 +83,8 @@ const SELECT_FIELDS = [
   'support_ura_invalid_option_template',
   'billing_skip_ura_enabled',
   'billing_skip_ura_minutes',
+  'meta_compose_mode',
+  'meta_compose_group_seconds',
 ].join(', ');
 
 /**

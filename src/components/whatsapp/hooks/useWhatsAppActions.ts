@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTenantFilter } from '@/contexts/TenantFilterContext';
 import { patchConversationInCache, mapConversationsInCache } from './conversationsCache';
+import { descarregarPendente } from '../chat/composerOficial';
 
 /**
  * Helper: optimistically patch a conversation in all sidebar query caches.
@@ -135,6 +136,9 @@ export const useWhatsAppActions = () => {
 
   const closeMutation = useMutation({
     mutationFn: async ({ conversationId, generateSummary, skipCsat, skipClosureMessage, isGroup }: { conversationId: string; generateSummary: boolean; skipCsat?: boolean; skipClosureMessage?: boolean; isGroup?: boolean }) => {
+      // API Oficial no modo "agrupar": o que estiver pendente sai ANTES de
+      // encerrar. Depois, o servidor recusaria (atendimento fechado).
+      await descarregarPendente(conversationId);
       // Fetch active attendance early so we can scope the summary
       const { data: activeAtt } = await supabase
         .from('support_attendances')

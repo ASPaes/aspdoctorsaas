@@ -12,6 +12,7 @@ import { useConversationAssignment } from "../hooks/useConversationAssignment";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { supabase } from "@/integrations/supabase/client";
+import { descarregarPendente } from "./composerOficial";
 
 interface TransferDialogProps {
   open: boolean;
@@ -89,16 +90,20 @@ export function TransferDialog({ open, onOpenChange, conversationId, currentAssi
   const availableAgents = agents.filter(a => a.user_id !== currentAssignee);
   const selectedAgent = availableAgents.find(a => a.user_id === selectedUser);
 
-  const handleTransferAgent = () => {
+  // API Oficial no modo "agrupar": a mensagem pendente sai antes de transferir,
+  // senão chegaria ao cliente já no nome de outra pessoa.
+  const handleTransferAgent = async () => {
     if (!selectedUser) return;
+    await descarregarPendente(conversationId);
     transferConversation(
       { conversationId, newAssignee: selectedUser, reason: reason || undefined },
       { onSuccess: () => { onOpenChange(false); setSelectedUser(""); setReason(""); } }
     );
   };
 
-  const handleTransferDept = () => {
+  const handleTransferDept = async () => {
     if (!selectedDept) return;
+    await descarregarPendente(conversationId);
     transferToDepartment(
       { conversationId, departmentId: selectedDept, reason: reason || undefined },
       {

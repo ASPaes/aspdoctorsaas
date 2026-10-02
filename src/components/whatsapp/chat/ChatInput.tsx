@@ -18,6 +18,10 @@ import { MacroSuggestions } from "./input/MacroSuggestions";
 import { MacroFillCard } from "./input/MacroFillCard";
 import { SmartReplySuggestions } from "./input/SmartReplySuggestions";
 import { ReplyPreview } from "./input/ReplyPreview";
+import { PendenteOficial } from "./input/PendenteOficial";
+import { useAgrupadorOficial } from "./useAgrupadorOficial";
+import { lerJanelaMs, lerModo, registrarEnvioAlerta, textoDaPendente, type ModoCompositor, type Pendente } from "./composerOficial";
+import { useSupportConfig } from "@/hooks/useSupportConfig";
 import { AttachmentChip } from "./input/AttachmentChip";
 import { MediaSendPreviewDialog } from "./input/MediaSendPreviewDialog";
 import { useWhatsAppMacros, macroAnexos, macroVisibleForDepartment, macroDepartmentId, type MacroAnexo } from "../hooks/useWhatsAppMacros";
@@ -309,6 +313,48 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   const { data: metaWindow } = useMetaWindow(conversationId);
   const isMeta = metaWindow?.isMeta === true;
   const requiresTemplate = metaWindow?.requiresTemplate === true;
+
+  // --- API Oficial: cada mensagem é cobrada (desde 01/10/2026) ---------------
+  // O modo vem de configuracoes.meta_compose_mode, por empresa. Só vale para
+  // mensagem ao cliente num número Meta; Evolution/Z-API seguem como sempre.
+  const { data: supportCfg } = useSupportConfig();
+  const modoOficial: ModoCompositor = isMeta && !isGroup ? lerModo(supportCfg?.meta_compose_mode) : "desligado";
+  const agrupa = modoOficial === "agrupar" && mode === "message";
+  const enterQuebraLinha = modoOficial === "enter_quebra_linha" && mode === "message";
+  const alertaRef = useRef(new Map<string, { envios: number[]; ultimoAlertaEm: number | null }>());
+  const conversaAtualRef = useRef(conversationId);
+  conversaAtualRef.current = conversationId;
+
+  const enviarPendente = useCallback(async (p: Pendente) => {
+    const texto = textoDaPendente(p);
+    try {
+      await sendMutation.mutateAsync({
+        conversationId: p.conversationId,
+        content: texto,
+        messageType: "text",
+        quotedMessageId: p.quotedMessageId,
+      });
+    } catch (err: any) {
+      // Não perde o que a pessoa escreveu: volta para o campo se ela ainda está
+      // na mesma conversa.
+      if (p.conversationId === conversaAtualRef.current) {
+        setMessage((atual) => (atual.trim() ? `${texto}\n${atual}` : texto));
+      }
+      toast.error(err?.message || "Erro ao enviar mensagem");
+    }
+  }, [sendMutation.mutateAsync]);
+
+  const agrupador = useAgrupadorOficial({
+    conversationId,
+    janelaMs: lerJanelaMs(supportCfg?.meta_compose_group_seconds),
+    campoComTexto: message.trim().length > 0,
+    enviar: enviarPendente,
+  });
+
+  // Template sai fora do compositor: a pendente vai antes, para manter a ordem.
+  useEffect(() => {
+    if (showTemplatePicker) void agrupador.descarregar();
+  }, [showTemplatePicker, agrupador.descarregar]);
   // Novo atendimento no canal Meta: sai template, não texto livre. Numa edição
   // o tipo não muda, então quem manda é o agendamento que está sendo editado.
   const agendadaEmEdicao = editandoAgendadaId ? agendadas.find((a) => a.id === editandoAgendadaId) : null;
@@ -608,6 +654,19 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     requestAnimationFrame(() => textareaRef.current?.focus());
     setTimeout(() => textareaRef.current?.focus(), 100);
 
+    // Modo "alerta" da API Oficial: envia normal, mas avisa quem manda várias
+    // seguidas (3 em 60 s; no máximo 1 aviso a cada 10 min por conversa).
+    if (modoOficial === "alerta") {
+      const antes = alertaRef.current.get(conversationId) ?? { envios: [], ultimoAlertaEm: null };
+      const r = registrarEnvioAlerta(antes, Date.now());
+      alertaRef.current.set(conversationId, { envios: r.envios, ultimoAlertaEm: r.ultimoAlertaEm });
+      if (r.alertar) {
+        toast.warning("Na API oficial cada mensagem é cobrada.", {
+          description: "Use Shift+Enter para quebrar linha e envie tudo junto.",
+        });
+      }
+    }
+
     sendMutation.mutate(
       {
         conversationId,
@@ -637,7 +696,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         },
       }
     );
-  }, [message, mentionsEnabled, activeMentions, onCancelReply, sendMutation, conversationId, replyTo]);
+  }, [message, mentionsEnabled, activeMentions, onCancelReply, sendMutation, conversationId, replyTo, modoOficial]);
 
   const openEveryoneConfirmDialog = useCallback(async () => {
     setEveryoneCount(null);
@@ -782,7 +841,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     novoAtendimento, isGroup, isMeta, templateAgendado, metaWindow?.instanceId,
   ]);
 
-  const handleSend = useCallback(() => {
+  // `origem` só é "enter" quando vem do teclado; o clique no botão passa o evento.
+  const handleSend = useCallback((origem?: unknown) => {
     // Agendar: nada sai agora; a mensagem entra na fila com hora marcada.
     if (isScheduleMode) {
       void handleAgendar();
@@ -819,8 +879,9 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       if (fileInputRef.current) fileInputRef.current.value = "";
       requestAnimationFrame(() => textareaRef.current?.focus());
       setTimeout(() => textareaRef.current?.focus(), 100);
-      // Dispara envio em paralelo em background
-      void sendAttachedFilesAll(filesSnapshot, captionSnapshot);
+      // Dispara envio em paralelo em background — depois da pendente da API
+      // Oficial, se houver, para o texto chegar antes do anexo.
+      void agrupador.descarregar().then(() => sendAttachedFilesAll(filesSnapshot, captionSnapshot));
       return;
     }
 
@@ -838,8 +899,19 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       return;
     }
 
+    // API Oficial, modo "agrupar": o Enter junta o texto na mensagem pendente.
+    // O botão de enviar manda tudo junto na hora.
+    if (agrupa) {
+      agrupador.adicionar(content, replyTo?.message_id || undefined);
+      setMessage("");
+      onCancelReply?.();
+      requestAnimationFrame(() => textareaRef.current?.focus());
+      if (origem !== "enter") void agrupador.descarregar();
+      return;
+    }
+
     performTextSend(false);
-  }, [isScheduleMode, handleAgendar, isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply]);
+  }, [isScheduleMode, handleAgendar, isDraftMode, isInternalNote, isCreatingNote, createNote, attachedFiles, sendAttachedFilesAll, message, isBlocked, mentionEveryone, openEveryoneConfirmDialog, performTextSend, onCancelReply, agrupa, agrupador.adicionar, agrupador.descarregar, replyTo]);
 
   // --- Ações do painel de agendadas ------------------------------------------
   const [acaoAgendada, setAcaoAgendada] = useState<{ tipo: "cancelar" | "enviar"; alvo: ScheduledMessage } | null>(null);
@@ -916,11 +988,12 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
   }, [isScheduleMode, onModoAgendarChange]);
 
 
-  const handleSendMedia = useCallback((params: MediaSendParams) => {
+  const handleSendMedia = useCallback(async (params: MediaSendParams) => {
     if (isBlocked) {
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
+    await agrupador.descarregar();
     sendMutation.mutate(
       { conversationId, content: params.content, messageType: params.messageType, mediaUrl: params.mediaUrl, mediaBase64: params.mediaBase64, mediaMimetype: params.mediaMimetype, fileName: params.fileName, quotedMessageId: replyTo?.message_id || undefined },
       {
@@ -928,7 +1001,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         onError: (err: any) => { toast.error(err.message || "Erro ao enviar mídia"); },
       }
     );
-  }, [conversationId, sendMutation, replyTo, onCancelReply]);
+  }, [conversationId, sendMutation, replyTo, onCancelReply, agrupador.descarregar]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionQuery && filteredMentionParticipants.length > 0) {
@@ -980,7 +1053,13 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
         return;
       }
     }
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    // API Oficial, modo "Enter quebra linha": Enter pula linha (o padrão do
+    // campo) e Ctrl/Cmd+Enter envia.
+    if (e.key === 'Enter' && enterQuebraLinha) {
+      if (e.ctrlKey || e.metaKey) { e.preventDefault(); handleSend(); }
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend("enter"); }
   };
 
   // Paste handler
@@ -1038,7 +1117,7 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
     setMediaPreviewOpen(false);
     onCancelReply?.();
     if (fileInputRef.current) fileInputRef.current.value = "";
-    void sendAttachedFilesAll(filesSnapshot, caption.trim() || undefined);
+    void agrupador.descarregar().then(() => sendAttachedFilesAll(filesSnapshot, caption.trim() || undefined));
     setTimeout(() => textareaRef.current?.focus(), 100);
   };
 
@@ -1104,6 +1183,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
       toast.warning("Você está em pausa. Volte para ATIVO para enviar mensagens.");
       return;
     }
+    // A pendente da API Oficial sai antes da macro, para manter a ordem.
+    await agrupador.descarregar();
     const anexos = activeMacro?.anexos ?? [];
     if (anexos.length > 0) {
       // Sequencial de propósito: a ordem definida no cadastro é o requisito.
@@ -1273,6 +1354,23 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
           message={replyTo}
           onCancel={onCancelReply}
           groupParticipants={isGroup ? groupParticipants : undefined}
+        />
+      )}
+
+      {agrupador.pendente && (
+        <PendenteOficial
+          texto={agrupador.texto}
+          partes={agrupador.pendente.partes.length}
+          segundos={agrupador.segundos}
+          progresso={agrupador.progresso}
+          pausado={agrupador.pausado}
+          onEnviarAgora={() => void agrupador.descarregar()}
+          onEditar={() => {
+            const t = agrupador.retirar();
+            setMessage((atual) => (atual.trim() ? `${t}\n${atual}` : t));
+            requestAnimationFrame(() => textareaRef.current?.focus());
+          }}
+          onCancelar={agrupador.cancelar}
         />
       )}
 
@@ -1664,6 +1762,8 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                   // e empurra o campo para cima.
                   : noCelular
                   ? "Mensagem"
+                  : enterQuebraLinha
+                  ? "Digite uma mensagem... (Ctrl+Enter para enviar)"
                   : "Digite uma mensagem..."
               }
               className={cn(
@@ -1763,6 +1863,10 @@ export const ChatInput = forwardRef<ChatInputHandle, Props>(function ChatInput({
                   : "Enter para agendar, Shift+Enter para nova linha")
               : isInternalNote
               ? "Enter para salvar a nota, Shift+Enter para nova linha"
+              : enterQuebraLinha
+              ? "Ctrl+Enter para enviar, Enter para nova linha"
+              : agrupa
+              ? "Enter junta na mensagem pendente, Shift+Enter para nova linha"
               : "Enter para enviar, Shift+Enter para nova linha"}
           </p>
           {isScheduleMode && (

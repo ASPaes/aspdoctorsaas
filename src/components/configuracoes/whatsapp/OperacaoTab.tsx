@@ -6,6 +6,7 @@ import AttendancePauseReasonsTab from "@/components/configuracoes/AttendancePaus
 import { MacrosManager } from "./MacrosManager";
 import WhatsAppGroupsTab from "./WhatsAppGroupsTab";
 import RiscoChurnSettings from "./RiscoChurnSettings";
+import { WhatsappOficialCustoCard } from "./WhatsappOficialCustoCard";
 
 export default function OperacaoTab() {
   // Hoje qualquer pessoa que abre Configuracoes > Operacao ve Macros.
@@ -23,7 +24,9 @@ export default function OperacaoTab() {
         <TabsTrigger value="grupos">Grupos</TabsTrigger>
         <TabsTrigger value="risco">Risco de churn</TabsTrigger>
       </TabsList>
-      <TabsContent value="atendimento" className="mt-4">
+      <TabsContent value="atendimento" className="mt-4 space-y-6">
+        {/* Só aparece para admin de empresa com número da API Oficial. */}
+        <WhatsappOficialCustoCard />
         <AtendimentoCsatTab />
       </TabsContent>
       <TabsContent value="pausas" className="mt-4">
