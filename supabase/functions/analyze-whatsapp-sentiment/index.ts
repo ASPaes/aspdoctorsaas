@@ -4,7 +4,8 @@ import { getAIConfig, callAI } from "../_shared/ai-client.ts";
 import { notifyEvent } from "../_shared/notify.ts";
 import {
   selecionarMensagens, formatarMensagens, montarPrompt, FERRAMENTA_ANALISE,
-  ehCandidatoChurn, ehAlertaChurn, ehCandidatoIrritacao, ehAlertaIrritacao, ehConversa, ocorrenciasDe, MAX_MENSAGENS,
+  ehCandidatoChurn, ehAlertaChurn, ehCandidatoIrritacao, ehAlertaCancelamentoIndefinido, ehRecorrente, ehConversa, ocorrenciasDe,
+  MAX_MENSAGENS, RECORRENCIA_JANELA_DIAS, RECORRENCIA_PAUSA_DIAS, ALVOS_RECORRENCIA,
 } from "./prompt.ts";
 
 
@@ -273,8 +274,10 @@ serve(async (req) => {
       result = JSON.parse(r1.content);
 
       // === TIER 2: so escala para o modelo premium quando o mini sinaliza
-      // candidato a churn ou irritacao — confirma antes do alerta. Raro => custo desprezivel.
-      const isChurnCandidate = ehCandidatoChurn(result) || ehCandidatoIrritacao(result);
+      // cancelamento ou irritacao — confirma antes de avisar ou de gravar a
+      // ocorrencia (que pesa na nota do cliente e do colaborador). Raro => barato.
+      const isChurnCandidate = ehCandidatoChurn(result) || ehCandidatoIrritacao(result) ||
+        (result?.cancel_target === "indefinido" && typeof result?.churn_evidence === "string" && result.churn_evidence.trim().length > 0);
       const premiumModel = aiConfig.model;
       if (isChurnCandidate && premiumModel && premiumModel !== tier1Model) {
         try {
@@ -315,10 +318,10 @@ serve(async (req) => {
     }
 
     const ehChurn = ehAlertaChurn(result);
-    const ehIrritacao = ehAlertaIrritacao(result);
+    const ehIndefinido = !ehChurn && ehAlertaCancelamentoIndefinido(result);
 
     if (dryRun) {
-      return new Response(JSON.stringify({ success: true, dryRun: true, result, alerta: ehChurn ? "churn" : ehIrritacao ? "irritacao" : null, models: modelsUsed, mensagens: selecionadas.length }), {
+      return new Response(JSON.stringify({ success: true, dryRun: true, result, alerta: ehChurn ? "churn" : ehIndefinido ? "cancelamento_indefinido" : null, ocorrencias: ocorrenciasDe(result), models: modelsUsed, mensagens: selecionadas.length }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -334,9 +337,10 @@ serve(async (req) => {
         summary: result.summary?.substring(0, 100),
         keywords: result.keywords || [],
         // A faixa de "abrir ticket de CS" no chat le esta coluna: so liga com
-        // cancelamento de contrato, nunca com o needs_cs_ticket cru da IA.
-        needs_cs_ticket: ehCandidatoChurn(result) || ehCandidatoIrritacao(result),
-        cs_ticket_reason: ehCandidatoChurn(result) || ehCandidatoIrritacao(result) ? (result.cs_ticket_reason || result.summary)?.substring(0, 200) || null : null,
+        // pedido de cancelamento, nunca com o needs_cs_ticket cru da IA. Irritacao
+        // isolada nao liga — vira ocorrencia e so avisa quando se repete.
+        needs_cs_ticket: ehCandidatoChurn(result) || ehIndefinido,
+        cs_ticket_reason: ehCandidatoChurn(result) || ehIndefinido ? (result.cs_ticket_reason || result.summary)?.substring(0, 200) || null : null,
       }, { onConflict: "conversation_id" })
       .select()
       .single();
@@ -348,9 +352,10 @@ serve(async (req) => {
     // irritacao e ignorada pelo indice unico. Sem atendimento (corrida da
     // abertura) nao grava — a rodada do fechamento pega.
     const ocorrencias = ocorrenciasDe(result);
+    let novasOcorrencias: { tipo: string; alvo: string }[] = [];
     if (att?.id && ocorrencias.length > 0) {
       const motivo = (result.cs_ticket_reason || result.summary || "").toString().substring(0, 300) || null;
-      const { error: ocErr } = await supabase
+      const { data: inseridas, error: ocErr } = await supabase
         .from("atendimento_ocorrencias")
         .upsert(ocorrencias.map((o) => ({
           tenant_id: convData.tenant_id,
@@ -369,17 +374,20 @@ serve(async (req) => {
           confianca: Number(result.confidence) >= 0 && Number(result.confidence) <= 1 ? Number(result.confidence) : null,
           origem,
           modelo: modelsUsed,
-        })), { onConflict: "attendance_id,tipo,alvo", ignoreDuplicates: true });
+        })), { onConflict: "attendance_id,tipo,alvo", ignoreDuplicates: true })
+        .select("tipo, alvo");
       if (ocErr) console.error("[analyze-sentiment] falha ao gravar ocorrencia:", ocErr.message);
+      novasOcorrencias = inseridas ?? [];
     }
 
-    // Alerta. Quem decide e o codigo, com o que a IA classificou (ver prompt.ts):
-    // churn = cancelar o CONTRATO; irritacao = contra o atendimento ou o produto
-    // (essa e de transicao — vira aviso por recorrencia).
-    // Saiu a exigencia de duas analises seguidas positivas: com a analise rodando
-    // a cada 5 mensagens do cliente, ela atrasava o alerta ate o cliente repetir
-    // — e quem confirma agora e o modelo premium (tier2) na mesma chamada.
-    const churnGate = ehChurn || ehIrritacao;
+    // Alerta imediato. Quem decide e o codigo, com o que a IA classificou (ver
+    // prompt.ts): cancelar o CONTRATO, ou pedido de cancelamento sem dizer de
+    // que ("Possivel cancelamento"). Irritacao nao avisa aqui — so pela
+    // recorrencia, mais abaixo.
+    // Sem a exigencia de duas analises seguidas: com a analise a cada 5
+    // mensagens ela atrasava o alerta ate o cliente repetir — quem confirma e o
+    // modelo premium (tier2) na mesma chamada.
+    const churnGate = ehChurn || ehIndefinido;
 
     // Descarte manual: um admin/head pode derrubar o sinal de risco desta
     // conversa (falso positivo). Vale enquanto durar o atendimento em que foi
@@ -413,10 +421,9 @@ serve(async (req) => {
             const contactName = contact.name || contact.phone_number || "Cliente";
             const contactPhone = contact.phone_number || "";
             const reason = (result.cs_ticket_reason || result.summary || "Sinal de churn detectado").toString();
-            const evidencia = ehChurn ? result.churn_evidence : result.irritation_evidence;
-            const alvo = result.irritation_target === "produto" ? "com o sistema" : "com o atendimento";
+            const evidencia = result.churn_evidence;
 
-            const title = ehChurn ? `⚠️ Risco de churn: ${contactName}` : `😠 Cliente insatisfeito ${alvo}: ${contactName}`;
+            const title = ehChurn ? `⚠️ Risco de churn: ${contactName}` : `❓ Possível cancelamento — confira: ${contactName}`;
 
             await notifyEvent(
               supabase,
@@ -436,6 +443,63 @@ serve(async (req) => {
         }
       } catch (alertErr: any) {
         console.error("[churn-alert] unexpected error:", alertErr?.message || alertErr);
+      }
+    }
+
+    // Irritacao recorrente: so quando ESTA analise gravou uma ocorrencia nova
+    // contra o atendimento ou o produto (redeteccao no mesmo atendimento nao
+    // conta). Conta atendimentos do cliente na janela — sem cliente vinculado,
+    // conta pelo contato. Um aviso por cliente a cada RECORRENCIA_PAUSA_DIAS.
+    const novaIrritacao = novasOcorrencias.some((o) => o.tipo === "irritacao" && (ALVOS_RECORRENCIA as readonly string[]).includes(o.alvo));
+    if (novaIrritacao && cfg?.churn_alert_enabled) {
+      try {
+        const porCliente = !!att?.cliente_id;
+        const chave = porCliente ? `recorrencia:cliente:${att.cliente_id}` : `recorrencia:contato:${convData.contact_id}`;
+        const desde = new Date(Date.now() - RECORRENCIA_JANELA_DIAS * 86400000).toISOString();
+        let q = supabase
+          .from("atendimento_ocorrencias")
+          .select("attendance_id, alvo, trecho, detectado_em")
+          .eq("tenant_id", convData.tenant_id)
+          .eq("tipo", "irritacao")
+          .in("alvo", [...ALVOS_RECORRENCIA])
+          .gte("detectado_em", desde)
+          .order("detectado_em", { ascending: false })
+          .limit(50);
+        q = porCliente ? q.eq("cliente_id", att.cliente_id) : q.eq("contact_id", convData.contact_id);
+        const { data: recentes } = await q;
+        const atendimentos = new Set((recentes ?? []).map((r: any) => r.attendance_id));
+
+        if (ehRecorrente(atendimentos.size)) {
+          const pausa = new Date(Date.now() - RECORRENCIA_PAUSA_DIAS * 86400000).toISOString();
+          const { count: jaAvisado } = await supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", convData.tenant_id)
+            .eq("type", "churn_alert")
+            .eq("metadata->>dedupe_key", chave)
+            .gte("created_at", pausa);
+
+          if (!jaAvisado) {
+            const contact: any = (convData as any).whatsapp_contacts || {};
+            const contactName = contact.name || contact.phone_number || "Cliente";
+            const vistos = new Set<string>();
+            const linhas = (recentes ?? []).filter((r: any) => !vistos.has(r.attendance_id) && vistos.add(r.attendance_id)).slice(0, 5)
+              .map((r: any) => `• ${new Date(r.detectado_em).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} (${r.alvo === "produto" ? "sistema" : "atendimento"}): "${String(r.trecho).substring(0, 120)}"`);
+            await notifyEvent(
+              supabase,
+              convData.tenant_id,
+              "churn_alert",
+              chave,
+              `🔁 Insatisfação recorrente: ${contactName}`,
+              `Cliente: ${contactName} (${contact.phone_number || ""})\n${atendimentos.size} atendimentos com o cliente insatisfeito nos últimos ${RECORRENCIA_JANELA_DIAS} dias:\n${linhas.join("\n")}\nAbra o DoctorSaaS para ver a conversa.`,
+              { source: "irritacao_recorrente", conversation_id: conversationId, cliente_id: att?.cliente_id ?? null, contact_id: convData.contact_id, contact_name: contactName, atendimentos: atendimentos.size },
+              `/whatsapp?conversation=${conversationId}`,
+            );
+            console.log(`[churn-alert] recorrencia ${chave}: ${atendimentos.size} atendimentos`);
+          }
+        }
+      } catch (recErr: any) {
+        console.error("[churn-alert] recorrencia falhou:", recErr?.message || recErr);
       }
     }
 

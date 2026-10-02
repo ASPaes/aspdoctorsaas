@@ -93,7 +93,7 @@ ${mensagens}
 - "indefinido": fala em cancelar e o atendimento nao deixa claro o que.
 - "nenhum": nao fala em cancelar nada.
 
-Responda needs_cs_ticket = true SOMENTE se cancel_target = "contrato_servico". Nesse caso churn_evidence e a frase LITERAL (copiada) do cliente que mostra a intencao de cancelar o contrato/servico. Sem frase literal, needs_cs_ticket = false.
+Responda needs_cs_ticket = true SOMENTE se cancel_target = "contrato_servico". Se cancel_target for "contrato_servico" ou "indefinido", churn_evidence e a frase LITERAL (copiada) do cliente que fala em cancelar. Sem frase literal, needs_cs_ticket = false.
 
 3) IRRITACAO — se o cliente demonstra irritacao, impaciencia ou insatisfacao, CONTRA QUEM ela e dirigida:
 - "atendimento": a nossa equipe ou empresa — demora para responder, falta de retorno, promessa nao cumprida, ter que repetir, ser transferido, descaso, "ninguem resolve". Ex.: "ja deu mais de um mes e ninguem me retornou", "voces demoram demais".
@@ -120,7 +120,7 @@ export const FERRAMENTA_ANALISE = {
         irritation_evidence: { type: "string", description: "Citacao literal do cliente que mostra a irritacao" },
         needs_cs_ticket: { type: "boolean" },
         cs_ticket_reason: { type: "string" },
-        churn_evidence: { type: "string", description: "Citacao literal do cliente mostrando intencao de cancelar o contrato/servico" },
+        churn_evidence: { type: "string", description: "Citacao literal do cliente que fala em cancelar (contrato_servico ou indefinido)" },
       },
       required: ["sentiment", "confidence", "summary", "cancel_target", "irritation_target", "needs_cs_ticket"],
     },
@@ -156,17 +156,34 @@ export function ehAlertaChurn(r: any): boolean {
 }
 
 /**
- * TRANSICAO (01/10/2026): ate existir o aviso por recorrencia (3+ irritacoes em
- * 30 dias), a irritacao continua avisando na hora, como o alerta antigo fazia
- * com reclamacao — senao ela some sem registro. Sai quando a recorrencia entrar.
+ * "Gostaria de solicitar o cancelamento", sem dizer de que. Nao e churn
+ * confirmado, mas perder um churn real custa mais que um aviso a conferir
+ * (decisao do Alexandre, 02/10/2026). Aviso proprio: "Possivel cancelamento".
  */
-export function ehAlertaIrritacao(r: any): boolean {
-  return !ehCandidatoChurn(r) && ehCandidatoIrritacao(r) && Number(r?.confidence) >= CONFIANCA_MINIMA_ALERTA;
+export function ehAlertaCancelamentoIndefinido(r: any): boolean {
+  return r?.cancel_target === "indefinido" &&
+    typeof r?.churn_evidence === "string" && r.churn_evidence.trim().length > 0 &&
+    Number(r?.confidence) >= CONFIANCA_MINIMA_ALERTA;
+}
+
+/**
+ * Irritacao so avisa quando se repete: 3+ atendimentos do mesmo cliente com
+ * irritacao contra o atendimento ou o produto em 30 dias. Um aviso por cliente
+ * a cada 7 dias — sem isso a 4a, 5a... ocorrencia avisaria de novo.
+ * Externo nao entra: cliente bravo com a SEFAZ nao e problema nosso.
+ */
+export const RECORRENCIA_MINIMO = 3;
+export const RECORRENCIA_JANELA_DIAS = 30;
+export const RECORRENCIA_PAUSA_DIAS = 7;
+export const ALVOS_RECORRENCIA = ["atendimento", "produto"] as const;
+
+export function ehRecorrente(atendimentosComIrritacao: number): boolean {
+  return atendimentosComIrritacao >= RECORRENCIA_MINIMO;
 }
 
 export interface Ocorrencia {
   tipo: "churn" | "irritacao";
-  alvo: "contrato" | "atendimento" | "produto" | "externo";
+  alvo: "contrato" | "indefinido" | "atendimento" | "produto" | "externo";
   trecho: string;
 }
 
@@ -178,6 +195,7 @@ export interface Ocorrencia {
 export function ocorrenciasDe(r: any): Ocorrencia[] {
   const out: Ocorrencia[] = [];
   if (ehAlertaChurn(r)) out.push({ tipo: "churn", alvo: "contrato", trecho: String(r.churn_evidence).trim() });
+  else if (ehAlertaCancelamentoIndefinido(r)) out.push({ tipo: "churn", alvo: "indefinido", trecho: String(r.churn_evidence).trim() });
   const alvo = r?.irritation_target;
   const evid = typeof r?.irritation_evidence === "string" ? r.irritation_evidence.trim() : "";
   if ((alvo === "atendimento" || alvo === "produto" || alvo === "externo") &&

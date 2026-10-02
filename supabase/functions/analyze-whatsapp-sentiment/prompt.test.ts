@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ehAlertaChurn, ehAlertaIrritacao, ehCandidatoChurn, ocorrenciasDe, formatarMensagens, montarPrompt, selecionarMensagens,
+  ehAlertaChurn, ehAlertaCancelamentoIndefinido, ehCandidatoChurn, ehCandidatoIrritacao, ehRecorrente, ocorrenciasDe, formatarMensagens, montarPrompt, selecionarMensagens,
   MAX_MENSAGENS, MENSAGENS_DO_INICIO, type MensagemAnalise,
 } from "./prompt";
 
@@ -84,28 +84,44 @@ describe("regra do alerta", () => {
   });
 });
 
-describe("irritação (transição: avisa na hora até existir a recorrência)", () => {
+describe("irritação: candidata a ocorrência", () => {
   const irr = { sentiment: "negative", confidence: 0.9, cancel_target: "nenhum", needs_cs_ticket: false };
 
-  it("contra o atendimento ou o produto avisa", () => {
-    expect(ehAlertaIrritacao({ ...irr, irritation_target: "atendimento", irritation_evidence: "já deu mais de um mês e ninguém me retornou" })).toBe(true);
-    expect(ehAlertaIrritacao({ ...irr, irritation_target: "produto", irritation_evidence: "todo dia aparece algo novo" })).toBe(true);
+  it("contra o atendimento ou o produto é candidata", () => {
+    expect(ehCandidatoIrritacao({ ...irr, irritation_target: "atendimento", irritation_evidence: "já deu mais de um mês e ninguém me retornou" })).toBe(true);
+    expect(ehCandidatoIrritacao({ ...irr, irritation_target: "produto", irritation_evidence: "todo dia aparece algo novo" })).toBe(true);
   });
 
-  it("contra fator externo não avisa", () => {
-    expect(ehAlertaIrritacao({ ...irr, irritation_target: "externo", irritation_evidence: "a SEFAZ caiu de novo" })).toBe(false);
+  it("externo, sem frase ou sem tom negativo não é", () => {
+    expect(ehCandidatoIrritacao({ ...irr, irritation_target: "externo", irritation_evidence: "a SEFAZ caiu de novo" })).toBe(false);
+    expect(ehCandidatoIrritacao({ ...irr, irritation_target: "atendimento", irritation_evidence: "" })).toBe(false);
+    expect(ehCandidatoIrritacao({ ...irr, sentiment: "neutral", irritation_target: "atendimento", irritation_evidence: "x" })).toBe(false);
+  });
+});
+
+describe("pedido de cancelamento sem objeto", () => {
+  const ind = { sentiment: "neutral", confidence: 0.92, cancel_target: "indefinido", needs_cs_ticket: false, churn_evidence: "gostaria de solicitar o cancelamento" };
+
+  it("avisa como possível cancelamento e não como churn", () => {
+    expect(ehAlertaCancelamentoIndefinido(ind)).toBe(true);
+    expect(ehAlertaChurn(ind)).toBe(false);
   });
 
-  it("sem frase, sem tom negativo ou com confiança baixa não avisa", () => {
-    expect(ehAlertaIrritacao({ ...irr, irritation_target: "atendimento", irritation_evidence: "" })).toBe(false);
-    expect(ehAlertaIrritacao({ ...irr, sentiment: "neutral", irritation_target: "atendimento", irritation_evidence: "x" })).toBe(false);
-    expect(ehAlertaIrritacao({ ...irr, confidence: 0.6, irritation_target: "atendimento", irritation_evidence: "x" })).toBe(false);
+  it("sem frase ou com confiança baixa não avisa", () => {
+    expect(ehAlertaCancelamentoIndefinido({ ...ind, churn_evidence: "" })).toBe(false);
+    expect(ehAlertaCancelamentoIndefinido({ ...ind, confidence: 0.7 })).toBe(false);
   });
 
-  it("com churn junto, o aviso é o de churn (não sai dois)", () => {
-    const r = { ...irr, cancel_target: "contrato_servico", needs_cs_ticket: true, churn_evidence: "vou cancelar o sistema", irritation_target: "atendimento", irritation_evidence: "vocês demoram" };
-    expect(ehAlertaChurn(r)).toBe(true);
-    expect(ehAlertaIrritacao(r)).toBe(false);
+  it("vira ocorrência de churn com alvo indefinido", () => {
+    expect(ocorrenciasDe(ind)).toEqual([{ tipo: "churn", alvo: "indefinido", trecho: "gostaria de solicitar o cancelamento" }]);
+  });
+});
+
+describe("recorrência", () => {
+  it("avisa a partir de 3 atendimentos", () => {
+    expect(ehRecorrente(2)).toBe(false);
+    expect(ehRecorrente(3)).toBe(true);
+    expect(ehRecorrente(5)).toBe(true);
   });
 });
 
