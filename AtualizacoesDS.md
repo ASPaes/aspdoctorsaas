@@ -17,15 +17,13 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Outubro / 2026
 
-### 02/10
+### 01/10
+
+- 🔧 **O resumo do clima do atendimento não aparece mais cortado no meio da frase** — No cabeçalho do chat, em **Chat › Geral**, ao passar o mouse no selo **Clima**, o resumo da IA parava no meio de uma palavra ("...não permite fixar a jane"), porque só os primeiros 100 caracteres eram guardados. Agora a análise aparece completa, quebrada em linhas dentro da caixa. Os resumos já gravados se completam na próxima vez que a IA analisar a conversa.
 
 - ⬆️ **Para quem é cada e-mail, direto na lista** — Em **E-mails › Caixa de entrada**, a lista ganhou a coluna **Para**, ao lado de **De**: mostra o endereço que recebeu a mensagem e, embaixo, o nome da pessoa ligada àquela caixa. Assim dá para saber de quem é cada e-mail sem precisar abrir um por um. Quando a mensagem foi para várias pessoas, aparece primeiro a caixa que recebeu e um **+N** com os demais, que aparecem inteiros ao passar o mouse. No celular, o cartão do e-mail mostra "para Fulano" logo abaixo do remetente.
 
 - ⬆️ **Conversa do atendimento abre sem sair da Equipe** — Na **Equipe interna**, quando um atendimento é compartilhado num canal (por exemplo, ao pedir ajuda), o botão **Ver conversa** passa a abrir a conversa numa janela por cima do canal, sem levar para a tela do chat. Em atendimento ainda aberto, o novo botão **Ver aqui** faz o mesmo e mostra as mensagens novas sozinho; **Abrir conversa** continua levando ao chat para responder.
-
-### 01/10
-
-- 🔧 **O resumo do clima do atendimento não aparece mais cortado no meio da frase** — No cabeçalho do chat, em **Chat › Geral**, ao passar o mouse no selo **Clima**, o resumo da IA parava no meio de uma palavra ("...não permite fixar a jane"), porque só os primeiros 100 caracteres eram guardados. Agora a análise aparece completa, quebrada em linhas dentro da caixa. Os resumos já gravados se completam na próxima vez que a IA analisar a conversa.
 
 - 🆕 **Por que o custo OEM do cliente mudou** — Em **Configurações › Integrações › OEM › Divergências**, quando o custo da ficha está diferente do que o OEM cobra, a linha do cliente passa a mostrar o que mudou no faturamento do último mês fechado: **Up-Sell**, **Down-Sell** ou **Reajuste Tablet Cloud**. Abrindo a linha, aparece cada módulo que mudou, com o valor de antes e o de agora, se ele já está na ficha ou se é ele que falta, e como foi lançado no DoctorSaaS. Quando as mudanças do mês fecham a diferença no centavo, a tela avisa que ajustar o custo é seguro; quando não fecham, avisa que parte da diferença vem de antes. Os números são os mesmos da planilha de Reajustes do portal da Tablet Cloud, conferidos loja a loja em setembro.
 
