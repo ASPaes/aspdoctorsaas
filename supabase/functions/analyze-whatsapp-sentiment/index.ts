@@ -334,7 +334,10 @@ serve(async (req) => {
         tenant_id: convData.tenant_id,
         sentiment: result.sentiment,
         confidence: result.confidence,
-        summary: result.summary?.substring(0, 100),
+        // O tooltip "Clima ao vivo" mostra este texto inteiro. Cortar em 100
+        // deixava a frase parada no meio da palavra (DEM-0518); 500 e o mesmo
+        // teto que o finalize-attendance usa ao reescrever o resumo no fechamento.
+        summary: result.summary?.substring(0, 500),
         keywords: result.keywords || [],
         // A faixa de "abrir ticket de CS" no chat le esta coluna: so liga com
         // pedido de cancelamento, nunca com o needs_cs_ticket cru da IA. Irritacao
