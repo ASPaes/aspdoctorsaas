@@ -2,6 +2,10 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getAIConfig, callAI } from "../_shared/ai-client.ts";
 import { notifyEvent } from "../_shared/notify.ts";
+import {
+  selecionarMensagens, formatarMensagens, montarPrompt, FERRAMENTA_ANALISE,
+  ehCandidatoChurn, ehAlertaChurn, ehCandidatoIrritacao, ehAlertaIrritacao, ehConversa, MAX_MENSAGENS,
+} from "./prompt.ts";
 
 
 const corsHeaders = {
@@ -98,7 +102,14 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, serviceKey);
-    const { conversationId } = await req.json();
+    // dryRun: so analisa e devolve o resultado, sem gravar nem avisar — para
+    // repassar casos reais pela regra (ex.: os alertas de um periodo). `ate`
+    // reconstroi o momento: le o atendimento que estava aberto naquela hora e
+    // so as mensagens ate ela. Apenas chamada interna (service_role).
+    const body = await req.json();
+    const conversationId = body?.conversationId;
+    const dryRun = isInternalCall && body?.dryRun === true;
+    const ate: string | null = dryRun && typeof body?.ate === "string" ? body.ate : null;
     if (!conversationId) {
       return new Response(JSON.stringify({ success: false, error: "conversationId is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -176,88 +187,52 @@ serve(async (req) => {
     // WINDOW_FALLBACK_HOURS — que e o caso real, uma corrida: o processor dispara
     // a analise ao RECEBER a mensagem e o atendimento so e gravado segundos
     // depois, entao aqui a busca por atendimento aberto volta vazia.
-    const { data: att } = await supabase
+    let attQuery = supabase
       .from("support_attendances")
       .select("opened_at")
-      .eq("conversation_id", conversationId)
-      .is("closed_at", null)
+      .eq("conversation_id", conversationId);
+    attQuery = ate ? attQuery.lte("opened_at", ate) : attQuery.is("closed_at", null);
+    const { data: att } = await attQuery
       .order("opened_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
+    const agoraMs = ate ? new Date(ate).getTime() : Date.now();
     const windowStart =
       att?.opened_at ??
-      new Date(Date.now() - WINDOW_FALLBACK_HOURS * 60 * 60 * 1000).toISOString();
+      new Date(agoraMs - WINDOW_FALLBACK_HOURS * 60 * 60 * 1000).toISOString();
 
-    const { data: messages, error: messagesError } = await supabase
+    // O atendimento INTEIRO, nao as ultimas 20: com 20, imagens e mensagens de
+    // sistema empurravam para fora justamente o comeco, onde o cliente diz do que
+    // se trata (alerta de 30/09: "como eu cancelo um valor que passei no sistema"
+    // ficou de fora e sobrou so "Entao preciso cancelar"). 500 e so a trava da
+    // busca (p90 do atendimento e 46); o teto do prompt e MAX_MENSAGENS, e quem
+    // passa dele perde o meio, nunca o comeco nem o fim (selecionarMensagens).
+    let msgQuery = supabase
       .from("whatsapp_messages")
       .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
-      .gte("timestamp", windowStart)
-      .order("timestamp", { ascending: false })
-      .limit(20);
+      .gte("timestamp", windowStart);
+    if (ate) msgQuery = msgQuery.lte("timestamp", ate);
+    const { data: messages, error: messagesError } = await msgQuery
+      .order("timestamp", { ascending: true })
+      .limit(500);
 
     if (messagesError) throw messagesError;
 
-    const clientMessagesCount = (messages || []).filter((m: any) => !m.is_from_me).length;
-    if (!messages || clientMessagesCount < 3) {
+    const conversa = (messages || []).filter(ehConversa);
+    const clientMessagesCount = conversa.filter((m: any) => !m.is_from_me).length;
+    if (clientMessagesCount < 3) {
       return new Response(
         JSON.stringify({ success: false, error: "insufficient_messages", message: `Minimo 3 mensagens do cliente necessario para analise (encontradas: ${clientMessagesCount}).` }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const orderedMessages = [...messages].reverse();
-    const messagesText = orderedMessages
-      .map((msg: any, index: number) => {
-        const role = msg.is_from_me ? "[Atendente]" : "[Cliente]";
-        const text =
-          msg.message_type === "audio" && msg.audio_transcription
-            ? `[Audio transcrito]: "${msg.audio_transcription}"`
-            : `"${msg.content}"`;
-        return `${index + 1}. ${role} [${new Date(msg.timestamp).toLocaleString("pt-BR")}]: ${text}`;
-      })
-      .join("\n");
-
-
-    const prompt = `Analise o sentimento das ultimas mensagens deste cliente de WhatsApp e avalie se e necessario abrir um ticket de Customer Success (CS).
-
-Mensagens (mais antigas para mais recentes):
-${messagesText}
-
-Criterios de Analise de Sentimento (avalie o CLIENTE, usando as respostas do atendente como contexto):
-- positive: cliente satisfeito, agradecido, elogiando o atendimento ou a empresa
-- neutral: tom profissional, duvidas tecnicas, relato de problemas/erros do sistema SEM insatisfacao com o atendimento ou com a empresa. Relatar um problema tecnico e NORMAL e NAO e negativo — inclusive se o problema ainda nao foi resolvido.
-- negative: insatisfacao dirigida ao ATENDIMENTO ou a EMPRESA: reclamacao de demora ou descaso, frustracao recorrente ("de novo isso", "sempre a mesma coisa"), tom hostil, ameaca de cancelamento/troca.
-
-
-Criterios para abertura de Ticket CS (needs_cs_ticket = true):
-- needs_cs_ticket = true SOMENTE com sinal EXPLICITO do cliente: (a) mencao direta a cancelar, trocar de fornecedor ou encerrar contrato; (b) reclamacao dirigida a EMPRESA ou ao ATENDIMENTO (demora, descaso, "sempre a mesma coisa"); (c) tom hostil/agressivo.
-- Relato de problema tecnico NAO e sinal de churn, mesmo grave, mesmo nao resolvido, mesmo com frustracao pontual ou mencao a "falar com o dono/responsavel".
-- Se needs_cs_ticket=true, preencher churn_evidence com a citacao LITERAL (copiada) da mensagem do cliente que comprova o sinal. Se nao existir frase literal que comprove, retornar needs_cs_ticket=false.`;
-
-    const tools = [
-      {
-        type: "function",
-        function: {
-          name: "analyze_sentiment",
-          description: "Analisa o sentimento das mensagens do cliente",
-          parameters: {
-            type: "object",
-            properties: {
-              sentiment: { type: "string", enum: ["positive", "neutral", "negative"] },
-              confidence: { type: "number" },
-              summary: { type: "string" },
-              keywords: { type: "array", items: { type: "string" } },
-              needs_cs_ticket: { type: "boolean" },
-              cs_ticket_reason: { type: "string" },
-              churn_evidence: { type: "string", description: "Citacao literal da mensagem do cliente que evidencia risco de churn" },
-            },
-            required: ["sentiment", "confidence", "summary", "needs_cs_ticket"],
-          },
-        },
-      },
-    ];
+    const selecionadas = selecionarMensagens(conversa);
+    const omitidas = conversa.length > MAX_MENSAGENS ? conversa.length - selecionadas.length : 0;
+    const prompt = montarPrompt(formatarMensagens(selecionadas, omitidas));
+    const tools = [FERRAMENTA_ANALISE];
 
     // Acumuladores de custo (tier1 + tier2)
     let totalIn = 0, totalOut = 0, totalCost = 0;
@@ -273,8 +248,8 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
       result = JSON.parse(r1.content);
 
       // === TIER 2: so escala para o modelo premium quando o mini sinaliza
-      // candidato a churn — confirma antes de considerar o alerta. Raro => custo desprezivel.
-      const isChurnCandidate = result?.needs_cs_ticket === true && result?.sentiment === "negative";
+      // candidato a churn ou irritacao — confirma antes do alerta. Raro => custo desprezivel.
+      const isChurnCandidate = ehCandidatoChurn(result) || ehCandidatoIrritacao(result);
       const premiumModel = aiConfig.model;
       if (isChurnCandidate && premiumModel && premiumModel !== tier1Model) {
         try {
@@ -314,12 +289,14 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
       throw new Error("Invalid sentiment value");
     }
 
-    // Capturar registro anterior (para cooldown do alerta)
-    const { data: prevAnalysis } = await supabase
-      .from("whatsapp_sentiment_analysis")
-      .select("churn_alerted_at, needs_cs_ticket, sentiment")
-      .eq("conversation_id", conversationId)
-      .maybeSingle();
+    const ehChurn = ehAlertaChurn(result);
+    const ehIrritacao = ehAlertaIrritacao(result);
+
+    if (dryRun) {
+      return new Response(JSON.stringify({ success: true, dryRun: true, result, alerta: ehChurn ? "churn" : ehIrritacao ? "irritacao" : null, models: modelsUsed, mensagens: selecionadas.length }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { data: analysis, error: upsertError } = await supabase
       .from("whatsapp_sentiment_analysis")
@@ -331,21 +308,23 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
         confidence: result.confidence,
         summary: result.summary?.substring(0, 100),
         keywords: result.keywords || [],
-        needs_cs_ticket: result.needs_cs_ticket || false,
-        cs_ticket_reason: result.needs_cs_ticket ? (result.cs_ticket_reason?.substring(0, 200) || null) : null,
+        // A faixa de "abrir ticket de CS" no chat le esta coluna: so liga com
+        // cancelamento de contrato, nunca com o needs_cs_ticket cru da IA.
+        needs_cs_ticket: ehCandidatoChurn(result) || ehCandidatoIrritacao(result),
+        cs_ticket_reason: ehCandidatoChurn(result) || ehCandidatoIrritacao(result) ? (result.cs_ticket_reason || result.summary)?.substring(0, 200) || null : null,
       }, { onConflict: "conversation_id" })
       .select()
       .single();
 
     if (upsertError) throw upsertError;
 
-    // Alerta de churn
-    const churnGate =
-      result.needs_cs_ticket === true &&
-      result.sentiment === "negative" &&
-      Number(result.confidence) >= 0.85 &&
-      typeof result.churn_evidence === "string" && result.churn_evidence.trim().length > 0 &&
-      prevAnalysis?.needs_cs_ticket === true;
+    // Alerta. Quem decide e o codigo, com o que a IA classificou (ver prompt.ts):
+    // churn = cancelar o CONTRATO; irritacao = contra o atendimento ou o produto
+    // (essa e de transicao — vira aviso por recorrencia).
+    // Saiu a exigencia de duas analises seguidas positivas: com a analise rodando
+    // a cada 5 mensagens do cliente, ela atrasava o alerta ate o cliente repetir
+    // — e quem confirma agora e o modelo premium (tier2) na mesma chamada.
+    const churnGate = ehChurn || ehIrritacao;
 
     // Descarte manual: um admin/head pode derrubar o sinal de risco desta
     // conversa (falso positivo). Vale enquanto durar o atendimento em que foi
@@ -379,8 +358,10 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
             const contactName = contact.name || contact.phone_number || "Cliente";
             const contactPhone = contact.phone_number || "";
             const reason = (result.cs_ticket_reason || result.summary || "Sinal de churn detectado").toString();
+            const evidencia = ehChurn ? result.churn_evidence : result.irritation_evidence;
+            const alvo = result.irritation_target === "produto" ? "com o sistema" : "com o atendimento";
 
-            const title = `⚠️ Risco de churn: ${contactName}`;
+            const title = ehChurn ? `⚠️ Risco de churn: ${contactName}` : `😠 Cliente insatisfeito ${alvo}: ${contactName}`;
 
             await notifyEvent(
               supabase,
@@ -388,7 +369,7 @@ Criterios para abertura de Ticket CS (needs_cs_ticket = true):
               "churn_alert",
               conversationId,
               title,
-              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nTrecho: "${(result.churn_evidence || "").substring(0, 200)}"\nAbra o DoctorSaaS para ver a conversa.`,
+              `Cliente: ${contactName} (${contactPhone})\nMotivo: ${reason.substring(0, 400)}\nTrecho: "${(evidencia || "").substring(0, 200)}"\nAbra o DoctorSaaS para ver a conversa.`,
               { source: "churn_alert", conversation_id: conversationId, contact_name: contactName, contact_phone: contactPhone },
               `/whatsapp?conversation=${conversationId}`
             );
