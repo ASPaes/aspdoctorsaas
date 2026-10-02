@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 01/10
 
+- 🔧 **Aviso de risco de churn só quando o cliente quer cancelar o contrato** — O aviso de **Risco de churn** disparava quando o cliente falava em cancelar qualquer coisa, inclusive uma nota fiscal ou uma venda durante o suporte. Agora a IA lê o atendimento inteiro e só avisa quando o pedido é para cancelar o sistema, o contrato ou o serviço. Quando o cliente está irritado com o atendimento ou com o sistema, o aviso chega com outro título: **Cliente insatisfeito**. Irritação com algo de fora, como SEFAZ fora do ar ou banco, não gera aviso.
+
 - ⬆️ **Caixa de entrada vem primeiro em E-mails** — Em **E-mails**, a aba **Recebidos** passou a se chamar **Caixa de entrada** e agora é a primeira, com **Enviados** ao lado. Quem abre a tela pela primeira vez cai direto na Caixa de entrada; quem já usava continua voltando na última aba que abriu.
 
 - ⬆️ **Cada pessoa vê os e-mails das próprias caixas** — Em **E-mails**, as abas **Enviados** e **Recebidos** passam a seguir a conta de e-mail. Conta ligada a uma pessoa (em **Configurações › E-mail**) aparece só para ela e para o gestor do setor ligado. Conta ligada só a um setor aparece para o setor inteiro. Antes, o operador não via os e-mails que chegavam na própria caixa, só as respostas aos e-mails que ele mesmo tinha enviado. Para as contas sem vínculo, **Permissões e perfis** ganhou quatro permissões no lugar de "Ver e-mails de todas as pessoas": **Ver os e-mails que enviei**, **Ver todos os enviados**, **Ver as respostas aos meus e-mails** e **Ver todos os recebidos**. Quem já via tudo continua vendo, e o administrador vê todas as caixas.
