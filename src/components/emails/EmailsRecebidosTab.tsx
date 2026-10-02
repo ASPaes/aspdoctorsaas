@@ -36,7 +36,7 @@ import { estiloDaCaixa } from "./corDaCaixa";
 import { useOpcoesFiltro } from "./useEmailsEnviados";
 import {
   OPCOES_ACAO, POR_PAGINA_RECEBIDOS, ROTULO_ACAO, nomeDoClienteRecebido, useContagemRecebidos, useEmailsRecebidos,
-  useEstadoDaLeitura, useLerAgora, useLixeiraRecebidos, useResolverTriagem,
+  useEstadoDaLeitura, useLerAgora, useLixeiraRecebidos, useNomesDosDestinatarios, useResolverTriagem,
   type EmailRecebido, type FiltrosRecebidos, type TomAcao,
 } from "./useEmailsRecebidos";
 
@@ -55,6 +55,26 @@ const ROTULO_STATUS: Record<string, string> = {
   avulso: "e-mail novo de cliente cadastrado",
   desconhecido: "remetente não identificado",
 };
+
+/**
+ * Destinatário que a lista mostra (DEM-0508). Com vários no Para, vem primeiro o
+ * endereço da caixa que recebeu, depois o primeiro de alguém da empresa; os demais
+ * viram "+N" e aparecem inteiros ao passar o mouse.
+ */
+function destinatarioPrincipal(linha: EmailRecebido, nomes: Map<string, string> | undefined) {
+  const todos = (linha.para ?? []).map((e) => e.trim()).filter(Boolean);
+  if (!todos.length) return null;
+  const chave = (e: string) => e.toLowerCase();
+  const daCaixa = linha.email_accounts?.email ? chave(linha.email_accounts.email) : null;
+  const principal =
+    todos.find((e) => chave(e) === daCaixa) ?? todos.find((e) => nomes?.has(chave(e))) ?? todos[0];
+  return {
+    email: principal,
+    nome: nomes?.get(chave(principal)) ?? null,
+    outros: todos.length - 1,
+    todos: todos.map((e) => (nomes?.get(chave(e)) ? `${nomes.get(chave(e))} <${e}>` : e)).join("\n"),
+  };
+}
 
 const dataHora = (iso: string) => {
   const d = new Date(iso);
@@ -105,6 +125,7 @@ export default function EmailsRecebidosTab() {
   const { data, isLoading } = useEmailsRecebidos(filtros, pagina);
   const { data: contagem } = useContagemRecebidos(filtros.periodo, filtros.lixeira, filtros.arquivadas);
   const { data: caixasLendo = [] } = useEstadoDaLeitura();
+  const { data: nomesDestinatarios } = useNomesDosDestinatarios();
   const lixeira = useLixeiraRecebidos();
   const lerAgora = useLerAgora();
   const arquivar = useArquivarEmails("recebidos");
@@ -464,6 +485,7 @@ export default function EmailsRecebidosTab() {
             const naoLido = distingueLido && !linha.lido_em;
             const temAnexo = Array.isArray(linha.anexos) && linha.anexos.length > 0;
             const corCaixa = estiloDaCaixa(linha.email_accounts);
+            const para = destinatarioPrincipal(linha, nomesDestinatarios);
             return (
               <div
                 key={linha.id}
@@ -488,6 +510,12 @@ export default function EmailsRecebidosTab() {
                   </span>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{quando}</span>
                 </div>
+                {para && (
+                  <p className="truncate text-[11px] text-muted-foreground" title={para.todos}>
+                    para {para.nome ?? para.email}
+                    {para.outros > 0 && ` +${para.outros}`}
+                  </p>
+                )}
                 <p className={cn("mt-1 line-clamp-2 text-sm", naoLido ? "font-bold text-foreground" : "font-normal")}>
                   {linha.assunto || "(sem assunto)"}
                 </p>
@@ -579,6 +607,7 @@ export default function EmailsRecebidosTab() {
                 <TableHead className="w-[100px]">Data e hora</TableHead>
                 <TableHead className="min-w-[260px]">Assunto</TableHead>
                 <TableHead className="w-[190px]">De</TableHead>
+                <TableHead className="w-[190px]">Para</TableHead>
                 <TableHead className="w-[160px]">Cliente</TableHead>
                 <TableHead className="w-[130px]">Setor</TableHead>
                 <TableHead className="w-[120px]">Pasta</TableHead>
@@ -600,6 +629,7 @@ export default function EmailsRecebidosTab() {
                 const naoLido = distingueLido && !linha.lido_em;
                 const lido = distingueLido && !!linha.lido_em;
                 const corCaixa = estiloDaCaixa(linha.email_accounts, selecionados.includes(linha.id));
+                const para = destinatarioPrincipal(linha, nomesDestinatarios);
                 return (
                   <TableRow
                     key={linha.id}
@@ -674,6 +704,22 @@ export default function EmailsRecebidosTab() {
                           <span className={cn("block truncate text-[11px]", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{linha.de_nome}</span>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="max-w-[190px] align-top" title={para?.todos}>
+                      {para ? (
+                        <>
+                          {/* o +N fica fora do corte: endereço longo não pode escondê-lo */}
+                          <span className="flex min-w-0 items-baseline gap-1">
+                            <span className={cn("truncate font-mono text-xs", naoLido && "font-semibold text-foreground")}>{para.email}</span>
+                            {para.outros > 0 && <span className="shrink-0 text-[11px] text-muted-foreground">+{para.outros}</span>}
+                          </span>
+                          {para.nome && (
+                            <span className={cn("block truncate text-[11px]", naoLido ? "text-foreground/70" : "text-muted-foreground")}>{para.nome}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">não informado</span>
+                      )}
                     </TableCell>
                     <TableCell className="max-w-[160px] truncate align-top text-sm">
                       {cliente ?? <span className="text-xs text-muted-foreground">não identificado</span>}

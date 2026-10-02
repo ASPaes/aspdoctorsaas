@@ -19,6 +19,8 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ### 02/10
 
+- ⬆️ **Para quem é cada e-mail, direto na lista** — Em **E-mails › Caixa de entrada**, a lista ganhou a coluna **Para**, ao lado de **De**: mostra o endereço que recebeu a mensagem e, embaixo, o nome da pessoa ligada àquela caixa. Assim dá para saber de quem é cada e-mail sem precisar abrir um por um. Quando a mensagem foi para várias pessoas, aparece primeiro a caixa que recebeu e um **+N** com os demais, que aparecem inteiros ao passar o mouse. No celular, o cartão do e-mail mostra "para Fulano" logo abaixo do remetente.
+
 - ⬆️ **Conversa do atendimento abre sem sair da Equipe** — Na **Equipe interna**, quando um atendimento é compartilhado num canal (por exemplo, ao pedir ajuda), o botão **Ver conversa** passa a abrir a conversa numa janela por cima do canal, sem levar para a tela do chat. Em atendimento ainda aberto, o novo botão **Ver aqui** faz o mesmo e mostra as mensagens novas sozinho; **Abrir conversa** continua levando ao chat para responder.
 
 ### 01/10

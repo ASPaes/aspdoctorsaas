@@ -23,6 +23,8 @@ export interface EmailRecebido {
   corpo_texto: string | null;
   de_email: string;
   de_nome: string | null;
+  /** destinatários (To) do cabeçalho; só o endereço, sem o nome */
+  para: string[] | null;
   status: "vinculado" | "remetente_diferente" | "avulso" | "desconhecido";
   envio_id: string | null;
   cliente_id: string | null;
@@ -131,7 +133,7 @@ export const nomeDoClienteRecebido = (e: EmailRecebido) =>
  * por prevenção.
  */
 const COLUNAS =
-  "id, recebido_em, assunto, corpo_texto, de_email, de_nome, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, arquivado_em, " +
+  "id, recebido_em, assunto, corpo_texto, de_email, de_nome, para, status, envio_id, cliente_id, referencia_id, origem, account_id, deleted_at, arquivado_em, " +
   "acao, acao_detalhe, department_id, ticket_id, lido_em, anexos, anexos_ignorados, email_accounts(email, rotulo, cor, cor_modo), clientes(razao_social, nome_fantasia), " +
   "support_departments(name), support_tickets!email_recebidos_ticket_id_fkey(ticket_code), " +
   "email_envios!email_recebidos_envio_id_fkey(assunto, created_at), pasta_id, email_pastas(nome, cor)";
@@ -221,6 +223,56 @@ export function useContagemRecebidos(periodo: { from: Date; to: Date }, lixeira:
         if (l.acao === "triagem") triagem++;
       }
       return { total: linhas.length, porSetor: Object.fromEntries(porSetor) as Record<string, number>, triagem };
+    },
+  });
+}
+
+/**
+ * Nome de quem é cada endereço da empresa, para a coluna Para (DEM-0508).
+ * Vale primeiro o usuário ligado à conta daquele endereço (email_account_usuarios);
+ * conta compartilhada, com mais de um, mostra os nomes juntos. Sem conta, cai no
+ * cadastro de funcionários pelo e-mail. Endereço de fora fica sem nome.
+ */
+export function useNomesDosDestinatarios() {
+  const { effectiveTenantId: tid } = useTenantFilter();
+
+  return useQuery({
+    queryKey: ["emails_nomes_destinatarios", tid],
+    enabled: !!tid,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const [contas, usuarios, perfis, funcionarios] = await Promise.all([
+        (supabase.from("email_accounts" as any) as any).select("id, email").eq("tenant_id", tid),
+        (supabase.from("email_account_usuarios" as any) as any).select("account_id, user_id").eq("tenant_id", tid),
+        (supabase.from("profiles" as any) as any).select("user_id, funcionario_id").eq("tenant_id", tid),
+        (supabase.from("funcionarios" as any) as any).select("id, nome, email").eq("tenant_id", tid),
+      ]);
+      for (const r of [contas, usuarios, perfis, funcionarios]) if (r.error) throw r.error;
+
+      const nomeDoFuncionario = new Map<string, string>(
+        ((funcionarios.data ?? []) as any[]).map((f) => [f.id, f.nome]),
+      );
+      const nomeDoUsuario = new Map<string, string>();
+      for (const p of (perfis.data ?? []) as any[]) {
+        const nome = p.funcionario_id ? nomeDoFuncionario.get(p.funcionario_id) : null;
+        if (nome) nomeDoUsuario.set(p.user_id, nome);
+      }
+      const usuariosDaConta = new Map<string, string[]>();
+      for (const u of (usuarios.data ?? []) as any[]) {
+        const nome = nomeDoUsuario.get(u.user_id);
+        if (nome) usuariosDaConta.set(u.account_id, [...(usuariosDaConta.get(u.account_id) ?? []), nome]);
+      }
+
+      const nomes = new Map<string, string>();
+      for (const f of (funcionarios.data ?? []) as any[]) {
+        if (f.email) nomes.set(String(f.email).trim().toLowerCase(), f.nome);
+      }
+      // a conta vence o cadastro: é ela que diz de quem é a caixa
+      for (const c of (contas.data ?? []) as any[]) {
+        const donos = usuariosDaConta.get(c.id);
+        if (c.email && donos?.length) nomes.set(String(c.email).trim().toLowerCase(), donos.join(", "));
+      }
+      return nomes;
     },
   });
 }
