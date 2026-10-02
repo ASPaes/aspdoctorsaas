@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PreviaMensagemDialog } from "./PreviaMensagemDialog";
 import { useCancelarEnvioLote, useItensEnvioLote, type EnvioLote, type ItemEnvioLote } from "./useEnvioLote";
+import { useFunil } from "./useEnvioLoteExtras";
 
 const ROTULO: Record<ItemEnvioLote["status"], string> = {
   pending: "Aguardando",
@@ -53,6 +54,7 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
   const cancelar = useCancelarEnvioLote();
   const [confirmar, setConfirmar] = useState(false);
   const [previa, setPrevia] = useState<ItemEnvioLote | null>(null);
+  const [soResponderam, setSoResponderam] = useState(false);
 
   const c = (s: ItemEnvioLote["status"]) => itens.filter((i) => i.status === s).length;
   const total = itens.length || envio.total;
@@ -60,6 +62,9 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
   const pendentes = c("pending");
   const abertas = pendentes + c("sending");
   const sit = situacaoDoEnvio(envio);
+  const { data: funil } = useFunil(envio.id, abertas > 0);
+  const responderam = new Set(funil?.responderam_ids ?? []);
+  const lista = soResponderam ? itens.filter((i) => responderam.has(i.conversation_id)) : itens;
 
   return (
     <div className="flex h-full flex-col">
@@ -69,6 +74,7 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
           <p className="text-xs text-muted-foreground">
             {total} destinatários · criado em {format(new Date(envio.created_at), "dd/MM/yyyy HH:mm")} · intervalo de {envio.intervalo_min_s} a {envio.intervalo_max_s} s
             {envio.media_file_name ? ` · PDF: ${envio.media_file_name}` : ""}
+            {envio.message_type === "template" ? " · template da Meta" : ""}
           </p>
         </div>
         <Badge className={`shrink-0 border-0 ${sit.classe}`}>{sit.rotulo}</Badge>
@@ -86,6 +92,36 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
           <div className="h-full bg-primary transition-all" style={{ width: `${total ? (finalizadas / total) * 100 : 0}%` }} />
         </div>
 
+        {funil && funil.enviadas > 0 && (
+          <div className="mb-4 rounded-lg border border-border p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Resultado</span>
+              <span className="text-xs text-muted-foreground">Entregue e lida vêm do WhatsApp; resposta conta até 7 dias depois.</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {([
+                ["Enviadas", funil.enviadas],
+                ["Entregues", funil.entregues],
+                ["Lidas", funil.lidas],
+                ["Responderam", funil.responderam],
+              ] as [string, number][]).map(([rot, v]) => (
+                <div key={rot} className="rounded-md bg-muted/60 px-3 py-2">
+                  <div className="text-xs text-muted-foreground">{rot}</div>
+                  <div className="text-lg font-bold tabular-nums">
+                    {v}
+                    <span className="ml-1 text-xs font-medium text-muted-foreground">{Math.round((v / funil.enviadas) * 100)}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {funil.responderam > 0 && (
+              <Button variant="outline" size="sm" className="mt-2 h-8" onClick={() => setSoResponderam((v) => !v)}>
+                {soResponderam ? "Mostrar todos" : `Ver só quem respondeu (${funil.responderam})`}
+              </Button>
+            )}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando destinatários...</div>
         ) : (
@@ -100,7 +136,7 @@ export function DetalheEnvioLote({ envio }: { envio: EnvioLote }) {
                 </tr>
               </thead>
               <tbody>
-                {itens.map((i) => (
+                {lista.map((i) => (
                   <tr key={i.id} className="border-t border-border">
                     <td className="px-3 py-2">{i.nome}</td>
                     <td className="px-3 py-2 tabular-nums text-muted-foreground">

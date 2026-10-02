@@ -74,3 +74,18 @@ export function sugerirNomeNaMensagem(opts: {
 export function aplicarNome(texto: string, nome: string): string {
   return texto.split("{nome_cliente}").join(nome || "cliente");
 }
+
+/**
+ * Texto final de um destinatário, igual à fn_bulk_aplicar do banco: variação
+ * {Olá|Oi} sorteada, {nome_cliente} e as colunas ({vencimento}). Coluna que o
+ * destinatário não tem some.
+ */
+export function aplicarTudo(texto: string, nome: string, vars?: Record<string, string> | null, sortear = true): string {
+  let out = texto.replace(/\{([^{}]*\|[^{}]*)\}/g, (_, g: string) => {
+    const opcoes = g.split("|");
+    return sortear ? opcoes[Math.floor(Math.random() * opcoes.length)] : opcoes[0];
+  });
+  out = out.split("{nome_cliente}").join(nome?.trim() || "cliente");
+  for (const [k, v] of Object.entries(vars || {})) out = out.split(`{${k.toLowerCase()}}`).join(v ?? "");
+  return out.replace(/\{[a-z0-9_]{1,40}\}/g, "");
+}

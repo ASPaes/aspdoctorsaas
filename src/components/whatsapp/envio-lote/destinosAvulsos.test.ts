@@ -52,3 +52,16 @@ describe("lerTexto (digitado)", () => {
     expect(r.validos[0]).toEqual({ nome: "Pedro Souza", telefone: "5511988887777" });
   });
 });
+
+describe("colunas extras viram variáveis", () => {
+  it("cabeçalho com vencimento e valor", () => {
+    const r = lerLinhas([["Nome", "Telefone", "Data de Vencimento", "Valor"], ["Joana", "49999112233", "10/10", "R$ 150,00"]]);
+    expect(r.variaveis).toEqual(["data_de_vencimento", "valor"]);
+    expect(r.validos[0].vars).toEqual({ data_de_vencimento: "10/10", valor: "R$ 150,00" });
+  });
+  it("sem cabeçalho não inventa variável", () => {
+    const r = lerLinhas([["Joana", "49999112233", "10/10"]]);
+    expect(r.variaveis).toEqual([]);
+    expect(r.validos[0].vars).toBeUndefined();
+  });
+});

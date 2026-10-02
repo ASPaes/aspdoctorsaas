@@ -27,7 +27,11 @@ export interface EnvioLote {
   created_by: string;
   titulo: string;
   content: string;
-  message_type: "text" | "document";
+  message_type: "text" | "document" | "template";
+  teste?: boolean;
+  template_id?: string | null;
+  list_id?: string | null;
+  recurrence_id?: string | null;
   media_file_name: string | null;
   intervalo_min_s: number;
   intervalo_max_s: number;
@@ -77,6 +81,8 @@ export interface Destino {
   clienteNome: string | null;
   segmentoId: number | null;
   clienteCancelado: boolean;
+  /** Colunas extras da planilha ou do grupo de envio: {vencimento}, {valor}... */
+  vars?: Record<string, string> | null;
 }
 
 /** Quem vê o botão: admin/head (ou super admin) numa empresa com o envio liberado. */
@@ -369,7 +375,7 @@ export function useIdsClientesFiltrados(filtros: FiltrosClientes) {
 /** Item de p_destinos da fn_bulk_send_create: grupo por conversa, pessoa por telefone. */
 export type DestinoRpc =
   | { conversation_id: string; nome: string }
-  | { telefone: string; nome: string; nome_contato?: string; cliente_id?: string | null };
+  | { telefone: string; nome: string; nome_contato?: string; cliente_id?: string | null; vars?: Record<string, string> | null };
 
 export interface NovoEnvio {
   instanceId: string;
@@ -379,6 +385,12 @@ export interface NovoEnvio {
   intervaloMin: number;
   intervaloMax: number;
   inicioEm: Date | null;
+  titulo?: string | null;
+  /** F2: número oficial. Valores podem ter {nome_cliente} e {coluna}. */
+  templateId?: string | null;
+  templateParams?: string[] | Record<string, string> | null;
+  listId?: string | null;
+  teste?: boolean;
 }
 
 export function useCriarEnvioLote() {
@@ -398,7 +410,11 @@ export function useCriarEnvioLote() {
         p_intervalo_min_s: e.intervaloMin,
         p_intervalo_max_s: e.intervaloMax,
         p_inicio_em: e.inicioEm ? e.inicioEm.toISOString() : null,
-        p_titulo: null,
+        p_titulo: e.titulo ?? null,
+        p_template_id: e.templateId ?? null,
+        p_template_params: e.templateParams ?? null,
+        p_list_id: e.listId ?? null,
+        p_teste: e.teste ?? false,
       });
       if (error) throw new Error(error.message);
       return data as {

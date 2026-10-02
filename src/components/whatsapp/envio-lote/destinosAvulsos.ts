@@ -1,17 +1,31 @@
 // Números avulsos do envio em lote: digitados ou importados de planilha.
 //
-// A planilha tem duas colunas, nome e telefone. Aceita com ou sem cabeçalho e
-// nas duas ordens: a coluna do telefone é a que tem mais dígitos.
+// A planilha tem nome e telefone. Aceita com ou sem cabeçalho e nas duas
+// ordens: a coluna do telefone é a que tem mais dígitos. Com cabeçalho, cada
+// coluna a mais vira variável da mensagem: "Vencimento" vira {vencimento}.
 import { isValidBRPhone, normalizeBRPhone } from "@/lib/phoneBR";
 
 export interface Avulso {
   nome: string;
   telefone: string; // normalizado, só dígitos com 55
+  /** Colunas extras da planilha, pela chave da variável. */
+  vars?: Record<string, string>;
 }
 
 export interface ResultadoImportacao {
   validos: Avulso[];
   invalidos: string[];
+  /** Variáveis que a planilha trouxe (chaves de {coluna}). */
+  variaveis: string[];
+}
+
+/** Cabeçalho da planilha → chave da variável: "Data de vencimento" → data_de_vencimento. */
+export function chaveVariavel(cabecalho: string): string {
+  return cabecalho
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    .slice(0, 40);
 }
 
 /**
@@ -48,11 +62,12 @@ export function lerLinhas(linhas: unknown[][]): ResultadoImportacao {
   const uteis = linhas
     .map((l) => (l || []).map((c) => String(c ?? "").trim()))
     .filter((l) => l.some((c) => c !== ""));
-  if (uteis.length === 0) return { validos: [], invalidos: [] };
+  if (uteis.length === 0) return { validos: [], invalidos: [], variaveis: [] };
 
   let colNome = 0;
   let colTel = 1;
   let corpo = uteis;
+  let extras: { col: number; chave: string }[] = [];
 
   const primeira = uteis[0];
   const temCabecalho = primeira.some((c) => CABECALHO.test(c));
@@ -62,6 +77,9 @@ export function lerLinhas(linhas: unknown[][]): ResultadoImportacao {
     if (iTel >= 0) colTel = iTel;
     if (iNome >= 0) colNome = iNome;
     else colNome = colTel === 0 ? 1 : 0;
+    extras = primeira
+      .map((c, col) => ({ col, chave: chaveVariavel(c) }))
+      .filter((x) => x.col !== colTel && x.col !== colNome && x.chave && x.chave !== "nome_cliente");
     corpo = uteis.slice(1);
   } else if (primeira.length === 1 || digitos(primeira[0]) > digitos(primeira[1])) {
     // Sem cabeçalho: a coluna com mais dígitos é o telefone.
@@ -69,7 +87,12 @@ export function lerLinhas(linhas: unknown[][]): ResultadoImportacao {
     colNome = 1;
   }
 
-  return montar(corpo.map((l) => ({ nome: l[colNome] ?? "", telefone: l[colTel] ?? "" })));
+  const r = montar(corpo.map((l) => ({
+    nome: l[colNome] ?? "",
+    telefone: l[colTel] ?? "",
+    vars: extras.length ? Object.fromEntries(extras.map((x) => [x.chave, l[x.col] ?? ""])) : undefined,
+  })));
+  return { ...r, variaveis: extras.map((x) => x.chave) };
 }
 
 /**
@@ -97,7 +120,7 @@ export function lerTexto(texto: string): ResultadoImportacao {
   return montar(itens);
 }
 
-function montar(itens: { nome: string; telefone: string }[]): ResultadoImportacao {
+function montar(itens: { nome: string; telefone: string; vars?: Record<string, string> }[]): ResultadoImportacao {
   const validos: Avulso[] = [];
   const invalidos: string[] = [];
   const vistos = new Set<string>();
@@ -110,7 +133,7 @@ function montar(itens: { nome: string; telefone: string }[]): ResultadoImportaca
     const k = chaveTelefone(tel);
     if (vistos.has(k)) continue;
     vistos.add(k);
-    validos.push({ nome: it.nome.trim(), telefone: tel });
+    validos.push({ nome: it.nome.trim(), telefone: tel, ...(it.vars ? { vars: it.vars } : {}) });
   }
-  return { validos, invalidos };
+  return { validos, invalidos, variaveis: [] };
 }

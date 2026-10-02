@@ -43,3 +43,15 @@ describe("aplicarNome", () => {
     expect(aplicarNome("Oi {nome_cliente}", "")).toBe("Oi cliente");
   });
 });
+
+describe("aplicarTudo", () => {
+  it("troca nome, colunas e apaga coluna que falta", async () => {
+    const { aplicarTudo } = await import("./nomeNaMensagem");
+    expect(aplicarTudo("{Oi|Oi}, {nome_cliente}! Vence {vencimento}. {valor}", "Ana", { vencimento: "10/10" }))
+      .toBe("Oi, Ana! Vence 10/10. ");
+  });
+  it("sem sortear pega a primeira opção", async () => {
+    const { aplicarTudo } = await import("./nomeNaMensagem");
+    expect(aplicarTudo("{Olá|Oi} {nome_cliente}", "", null, false)).toBe("Olá cliente");
+  });
+});
