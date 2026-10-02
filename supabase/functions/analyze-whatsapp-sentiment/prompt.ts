@@ -100,7 +100,7 @@ Responda needs_cs_ticket = true SOMENTE se cancel_target = "contrato_servico". N
 - "produto": o nosso sistema — erro que se repete, instabilidade, falta de recurso, atualizacao que atrapalhou. Ex.: "todo dia aparece um erro novo", "de novo esse problema".
 - "externo": algo fora da nossa empresa — SEFAZ/prefeitura fora do ar, banco, internet, maquininha, contador, cliente dele, o dia dele. Ex.: "a SEFAZ caiu de novo", "meu contador nao manda nada".
 - "nenhum": sem irritacao (duvida, relato calmo de problema, agradecimento).
-Se for "atendimento" ou "produto", irritation_evidence e a frase LITERAL (copiada) do cliente. Relatar um problema com calma NAO e irritacao.`;
+Se nao for "nenhum", irritation_evidence e a frase LITERAL (copiada) do cliente. Relatar um problema com calma NAO e irritacao.`;
 }
 
 export const FERRAMENTA_ANALISE = {
@@ -162,4 +162,27 @@ export function ehAlertaChurn(r: any): boolean {
  */
 export function ehAlertaIrritacao(r: any): boolean {
   return !ehCandidatoChurn(r) && ehCandidatoIrritacao(r) && Number(r?.confidence) >= CONFIANCA_MINIMA_ALERTA;
+}
+
+export interface Ocorrencia {
+  tipo: "churn" | "irritacao";
+  alvo: "contrato" | "atendimento" | "produto" | "externo";
+  trecho: string;
+}
+
+/**
+ * O que fica registrado em `atendimento_ocorrencias` (historico da Visao 360 e
+ * base da recorrencia). Mesma regua de confianca do alerta. Irritacao externa
+ * tambem fica — e historico, so nao conta contra a empresa nem avisa.
+ */
+export function ocorrenciasDe(r: any): Ocorrencia[] {
+  const out: Ocorrencia[] = [];
+  if (ehAlertaChurn(r)) out.push({ tipo: "churn", alvo: "contrato", trecho: String(r.churn_evidence).trim() });
+  const alvo = r?.irritation_target;
+  const evid = typeof r?.irritation_evidence === "string" ? r.irritation_evidence.trim() : "";
+  if ((alvo === "atendimento" || alvo === "produto" || alvo === "externo") &&
+      r?.sentiment === "negative" && evid.length > 0 && Number(r?.confidence) >= CONFIANCA_MINIMA_ALERTA) {
+    out.push({ tipo: "irritacao", alvo, trecho: evid });
+  }
+  return out;
 }

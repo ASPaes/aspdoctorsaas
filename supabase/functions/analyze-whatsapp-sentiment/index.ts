@@ -4,7 +4,7 @@ import { getAIConfig, callAI } from "../_shared/ai-client.ts";
 import { notifyEvent } from "../_shared/notify.ts";
 import {
   selecionarMensagens, formatarMensagens, montarPrompt, FERRAMENTA_ANALISE,
-  ehCandidatoChurn, ehAlertaChurn, ehCandidatoIrritacao, ehAlertaIrritacao, ehConversa, MAX_MENSAGENS,
+  ehCandidatoChurn, ehAlertaChurn, ehCandidatoIrritacao, ehAlertaIrritacao, ehConversa, ocorrenciasDe, MAX_MENSAGENS,
 } from "./prompt.ts";
 
 
@@ -123,6 +123,10 @@ serve(async (req) => {
     }
     const dryRun = body?.dryRun === true;
     const ate: string | null = dryRun && typeof body?.ate === "string" ? body.ate : null;
+    // Analise de um atendimento especifico — e como o finalize-attendance pede a
+    // rodada do fechamento. So chamada interna.
+    const attendanceIdParam: string | null = isInternalCall && typeof body?.attendanceId === "string" ? body.attendanceId : null;
+    const origem: "durante" | "fechamento" = attendanceIdParam && body?.origem === "fechamento" ? "fechamento" : "durante";
     if (!conversationId) {
       return new Response(JSON.stringify({ success: false, error: "conversationId is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -202,9 +206,11 @@ serve(async (req) => {
     // depois, entao aqui a busca por atendimento aberto volta vazia.
     let attQuery = supabase
       .from("support_attendances")
-      .select("opened_at")
+      .select("id, opened_at, closed_at, assigned_to, department_id, cliente_id")
       .eq("conversation_id", conversationId);
-    attQuery = ate ? attQuery.lte("opened_at", ate) : attQuery.is("closed_at", null);
+    attQuery = attendanceIdParam ? attQuery.eq("id", attendanceIdParam)
+      : ate ? attQuery.lte("opened_at", ate)
+      : attQuery.is("closed_at", null);
     const { data: att } = await attQuery
       .order("opened_at", { ascending: false })
       .limit(1)
@@ -226,7 +232,8 @@ serve(async (req) => {
       .select("content, timestamp, audio_transcription, message_type, is_from_me")
       .eq("conversation_id", conversationId)
       .gte("timestamp", windowStart);
-    if (ate) msgQuery = msgQuery.lte("timestamp", ate);
+    const windowEnd = ate ?? (attendanceIdParam ? att?.closed_at : null);
+    if (windowEnd) msgQuery = msgQuery.lte("timestamp", windowEnd);
     const { data: messages, error: messagesError } = await msgQuery
       .order("timestamp", { ascending: true })
       .limit(500);
@@ -335,6 +342,36 @@ serve(async (req) => {
       .single();
 
     if (upsertError) throw upsertError;
+
+    // Ocorrencias (historico da Visao 360 e base da recorrencia). Uma por
+    // (atendimento, tipo, alvo): a rodada seguinte que redetecta a mesma
+    // irritacao e ignorada pelo indice unico. Sem atendimento (corrida da
+    // abertura) nao grava — a rodada do fechamento pega.
+    const ocorrencias = ocorrenciasDe(result);
+    if (att?.id && ocorrencias.length > 0) {
+      const motivo = (result.cs_ticket_reason || result.summary || "").toString().substring(0, 300) || null;
+      const { error: ocErr } = await supabase
+        .from("atendimento_ocorrencias")
+        .upsert(ocorrencias.map((o) => ({
+          tenant_id: convData.tenant_id,
+          conversation_id: conversationId,
+          attendance_id: att.id,
+          cliente_id: att.cliente_id ?? null,
+          contact_id: convData.contact_id ?? null,
+          tipo: o.tipo,
+          alvo: o.alvo,
+          // So irritacao com o ATENDIMENTO e do colaborador; fila sem dono
+          // (assigned_to nulo) fica no setor.
+          responsavel_id: o.alvo === "atendimento" ? (att.assigned_to ?? null) : null,
+          department_id: att.department_id ?? null,
+          trecho: o.trecho.substring(0, 500),
+          motivo,
+          confianca: Number(result.confidence) >= 0 && Number(result.confidence) <= 1 ? Number(result.confidence) : null,
+          origem,
+          modelo: modelsUsed,
+        })), { onConflict: "attendance_id,tipo,alvo", ignoreDuplicates: true });
+      if (ocErr) console.error("[analyze-sentiment] falha ao gravar ocorrencia:", ocErr.message);
+    }
 
     // Alerta. Quem decide e o codigo, com o que a IA classificou (ver prompt.ts):
     // churn = cancelar o CONTRATO; irritacao = contra o atendimento ou o produto

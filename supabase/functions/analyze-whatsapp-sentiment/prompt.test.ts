@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  ehAlertaChurn, ehAlertaIrritacao, ehCandidatoChurn, formatarMensagens, montarPrompt, selecionarMensagens,
+  ehAlertaChurn, ehAlertaIrritacao, ehCandidatoChurn, ocorrenciasDe, formatarMensagens, montarPrompt, selecionarMensagens,
   MAX_MENSAGENS, MENSAGENS_DO_INICIO, type MensagemAnalise,
 } from "./prompt";
 
@@ -106,5 +106,25 @@ describe("irritação (transição: avisa na hora até existir a recorrência)",
     const r = { ...irr, cancel_target: "contrato_servico", needs_cs_ticket: true, churn_evidence: "vou cancelar o sistema", irritation_target: "atendimento", irritation_evidence: "vocês demoram" };
     expect(ehAlertaChurn(r)).toBe(true);
     expect(ehAlertaIrritacao(r)).toBe(false);
+  });
+});
+
+describe("ocorrências registradas", () => {
+  it("churn e irritação no mesmo resultado viram duas", () => {
+    expect(ocorrenciasDe({ sentiment: "negative", confidence: 0.9, cancel_target: "contrato_servico", needs_cs_ticket: true, churn_evidence: " vou cancelar ", irritation_target: "atendimento", irritation_evidence: "vocês demoram" }))
+      .toEqual([{ tipo: "churn", alvo: "contrato", trecho: "vou cancelar" }, { tipo: "irritacao", alvo: "atendimento", trecho: "vocês demoram" }]);
+  });
+
+  it("irritação externa fica no histórico", () => {
+    expect(ocorrenciasDe({ sentiment: "negative", confidence: 0.9, cancel_target: "nenhum", irritation_target: "externo", irritation_evidence: "a SEFAZ caiu" }))
+      .toEqual([{ tipo: "irritacao", alvo: "externo", trecho: "a SEFAZ caiu" }]);
+  });
+
+  it("sem frase, sem tom negativo ou abaixo da confiança, nada", () => {
+    const base = { sentiment: "negative", confidence: 0.9, cancel_target: "nenhum", irritation_target: "atendimento", irritation_evidence: "x" };
+    expect(ocorrenciasDe({ ...base, irritation_evidence: "" })).toEqual([]);
+    expect(ocorrenciasDe({ ...base, sentiment: "neutral" })).toEqual([]);
+    expect(ocorrenciasDe({ ...base, confidence: 0.8 })).toEqual([]);
+    expect(ocorrenciasDe({ ...base, irritation_target: "nenhum" })).toEqual([]);
   });
 });

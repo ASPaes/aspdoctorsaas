@@ -111,6 +111,21 @@ serve(async (req) => {
       );
     }
 
+    // 1.5 Rodada de fechamento da analise de churn/irritacao: le o atendimento
+    // inteiro e grava ocorrencias (Visao 360, recorrencia). Durante o atendimento
+    // ela so roda a cada 5 mensagens do cliente — 38% dos atendimentos tem menos
+    // de 10 mensagens e nunca seriam lidos. Vem ANTES das regras deterministicas:
+    // "ninguem respondeu" sai cedo daqui e e justamente quando o cliente reclama.
+    // Fechamento em lote (sentiment_at ja preenchido) nao entra: nao gasta IA.
+    if (!att.sentiment_at && !att.is_group) {
+      const analise = fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+        body: JSON.stringify({ conversationId: att.conversation_id, attendanceId: att.id, origem: "fechamento" }),
+      }).catch((e) => console.error(`[${FUNCTION_NAME}][${requestId}] analise de fechamento falhou:`, e));
+      if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(analise);
+    }
+
     // 2. Check if KB already exists (dedup)
     const { data: existingKb } = await supabase
       .from("support_kb_articles")
