@@ -1082,8 +1082,12 @@ export function NovoEnvioLote({ mudaRitmo, onCriado, onRecorrenciaCriada }: Prop
               <b className="text-foreground">{n}</b> selecionados
               {grupoUsado && <span className="ml-1 text-xs">(do grupo {grupoUsado.nome}{grupoIntacto ? "" : ", alterado"})</span>}
             </span>
-            <Button variant="outline" size="sm" className="h-8" disabled={n === 0} onClick={() => setSalvarGrupo("selecao")}>
-              <BookmarkPlus className="mr-1 h-3.5 w-3.5" /> Salvar como grupo
+            <Button
+              variant="outline" size="sm" className="h-8" disabled={n === 0}
+              title="Opcional: guarda estes marcados para usar de novo sem escolher um a um. Fica na aba Grupos de envio."
+              onClick={() => setSalvarGrupo("selecao")}
+            >
+              <BookmarkPlus className="mr-1 h-3.5 w-3.5" /> Salvar como grupo <span className="ml-1 font-normal text-muted-foreground">(opcional)</span>
             </Button>
           </div>
         ) : (
