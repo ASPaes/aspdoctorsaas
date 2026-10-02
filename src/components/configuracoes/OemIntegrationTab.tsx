@@ -35,6 +35,10 @@ import {
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import EscolherClienteOemDialog, { type LinhaRecon } from "./EscolherClienteOemDialog";
 import VincularProdutoOemDialog, { type ProdutoOem, type VinculoOem } from "./VincularProdutoOemDialog";
+import OemVariacaoPainel, { SelosVariacao } from "./OemVariacaoPainel";
+import {
+  contarTipos, explicar, janelaMovimentos, type MovimentoDs, type VariacaoOem,
+} from "./oemVariacao";
 
 // ============================================================================
 // Integrações › OEM
@@ -1092,6 +1096,60 @@ export default function OemIntegrationTab() {
     },
     enabled: !!tid && !!conta,
   });
+
+  // POR QUE O CUSTO MUDOU (DEM-0517). O faturamento do último mês fechado
+  // contra o anterior, módulo a módulo, vindo do DoctorOEM. Só na aba de
+  // Divergências, que é onde ele explica a linha de custo: são ~2,5 s e duas
+  // chamadas à Tablet Cloud. O mês fechado não muda, então uma hora de cache
+  // basta (a planilha do portal se refaz uma vez por dia).
+  const variacao = useQuery({
+    queryKey: ["oem-variacao-mensal", tid, conta?.id],
+    enabled: !!tid && !!conta && aba === "pendencias",
+    staleTime: 60 * 60_000,
+    retry: false,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("oem-variacao-mensal", {
+        body: { conta_id: conta!.id },
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.mensagem ?? "Resposta inválida do OEM.");
+      return data as VariacaoOem;
+    },
+  });
+  const variacaoPorFilial = useMemo(
+    () => new Map((variacao.data?.filiais ?? []).map((f) => [String(f.filial), f])),
+    [variacao.data],
+  );
+
+  // Os lançamentos do DS no mesmo período, para dizer ao lado de cada módulo
+  // como ele entrou aqui. É o que mostra o Servidor Legal do CASA DA PONTE
+  // lançado como venda avulsa com custo zero, que é por que a ficha ficou atrás.
+  const { data: movimentosPeriodo = [] } = useQuery({
+    queryKey: ["oem-variacao-movimentos", tid, variacao.data?.competencia],
+    enabled: !!tid && !!variacao.data,
+    staleTime: 5 * 60_000,
+    queryFn: () => {
+      const { de, ate } = janelaMovimentos(variacao.data!);
+      return fetchAllRows<MovimentoDs>(() =>
+        (supabase.from("movimentos_mrr" as any) as any)
+          .select("id, cliente_id, tipo, data_movimento, valor_delta, custo_delta, descricao")
+          .eq("tenant_id", tid)
+          .in("tipo", ["upsell", "cross_sell", "downsell", "venda_avulsa"])
+          .eq("status", "ativo")
+          .gte("data_movimento", de)
+          .lte("data_movimento", ate)
+          .order("data_movimento"),
+      );
+    },
+  });
+  const movimentosPorCliente = useMemo(() => {
+    const m = new Map<string, MovimentoDs[]>();
+    for (const mv of movimentosPeriodo) {
+      const l = m.get(mv.cliente_id);
+      if (l) l.push(mv); else m.set(mv.cliente_id, [mv]);
+    }
+    return m;
+  }, [movimentosPeriodo]);
 
   // O CÓDIGO DA LICENÇA NO PRODUTO ERRADO.
   //
@@ -4880,6 +4938,13 @@ export default function OemIntegrationTab() {
                               ) : null}
                             </div>
                           </div>
+                          {/* O que mudou no OEM no último mês, de relance, sem
+                              abrir a linha. Só para quem tem divergência de
+                              custo: é a ela que a mudança responde. */}
+                          {(() => {
+                            const ic = c.itens.find((i) => i.tipo === "custo" && i.custo);
+                            return ic ? <SelosVariacao contagem={contarTipos(ic.custo!.filiais, variacaoPorFilial)} /> : null;
+                          })()}
                           {graves > 0 && (
                             <Badge variant="destructive" className="shrink-0">
                               {graves} grave{graves > 1 ? "s" : ""}
@@ -4916,7 +4981,8 @@ export default function OemIntegrationTab() {
                       {aberto && (
                         <div className="divide-y border-t bg-muted/20">
                           {c.itens.map((i) => (
-                            <div key={i.chave} className="flex items-start gap-3 py-2.5 pl-10 pr-3 text-sm">
+                            <Fragment key={i.chave}>
+                            <div className="flex items-start gap-3 py-2.5 pl-10 pr-3 text-sm">
                               <AlertTriangle
                                 className={`h-4 w-4 shrink-0 mt-0.5 ${i.grave ? "text-destructive" : "text-amber-500"}`}
                               />
@@ -4962,6 +5028,24 @@ export default function OemIntegrationTab() {
                                 {acoesDaDivergencia(i, c.id)}
                               </div>
                             </div>
+                            {/* Por que o custo mudou (DEM-0517): as mudanças do
+                                mês no faturamento do OEM, qual delas falta na
+                                ficha e como cada uma foi lançada no DS. */}
+                            {i.tipo === "custo" && i.custo && (
+                              <OemVariacaoPainel
+                                explicacao={variacao.data
+                                  ? explicar(i.custo.filiais, i.custo.diferenca, variacaoPorFilial, movimentosPorCliente.get(c.id) ?? [])
+                                  : null}
+                                competencia={variacao.data?.competencia ?? null}
+                                diferenca={i.custo.diferenca}
+                                custoDs={i.custo.custo_ds}
+                                custoOem={i.custo.custo_oem}
+                                filiais={i.custo.filiais}
+                                carregando={variacao.isLoading}
+                                erro={variacao.error ? (variacao.error as Error).message : null}
+                              />
+                            )}
+                            </Fragment>
                           ))}
 
                           {/* O vínculo que alguém escolheu à mão. Fica aqui pelo

@@ -243,6 +243,12 @@ verify_jwt = true
 [functions.oem-licenca-estado]
 verify_jwt = true
 
+# Por que o custo de cada filial mudou no último mês fechado (DEM-0517).
+# Ponte para o DoctorOEM, só leitura. Chamada pelo navegador com o token da
+# pessoa, e é ele que diz o tenant: verify_jwt = true.
+[functions.oem-variacao-mensal]
+verify_jwt = true
+
 # Apaga do Storage a mídia de chat vencida (documento/vídeo/imagem; áudio nunca).
 # Chamada pelo pg_cron, que manda a anon key no Authorization — a mesma receita
 # do check-csat-timeout. `true` de propósito: sem JWT válido do projeto ninguém
