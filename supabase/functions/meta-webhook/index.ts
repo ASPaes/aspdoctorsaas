@@ -136,8 +136,37 @@ async function downloadAndUploadMetaMedia(
   }
 }
 
+// === Pricing da Meta (custo por mensagem) ===
+// O objeto `pricing` vem no `sent` e em um de `delivered`/`read` — ate 2x por mensagem.
+// A PK (tenant_id, message_id) + ignoreDuplicates guarda so a primeira. E a unica fonte
+// real de quanto a Meta cobra: `billable` + `type` (regular / free_customer_service /
+// free_entry_point). Falha aqui nunca pode quebrar o status nem mudar o 200 do webhook.
+async function savePricing(supabase: any, tenantId: string, instanceId: string, messageId: string, status: any): Promise<void> {
+  try {
+    const p = status.pricing;
+    if (!p || typeof p !== 'object') return;
+    const billedAt = status.timestamp
+      ? new Date(parseInt(status.timestamp, 10) * 1000).toISOString()
+      : new Date().toISOString();
+    const { error } = await supabase.from('whatsapp_message_pricing').upsert({
+      tenant_id: tenantId,
+      message_id: messageId,
+      instance_id: instanceId,
+      billable: p.billable === true,
+      pricing_model: p.pricing_model ?? null,
+      category: p.category ?? null,
+      pricing_type: p.type ?? null,
+      pricing_raw: p,
+      billed_at: billedAt,
+    }, { onConflict: 'tenant_id,message_id', ignoreDuplicates: true });
+    if (error) console.error(`${LOG} pricing insert falhou ${messageId}: ${error.message}`);
+  } catch (e) {
+    console.error(`${LOG} pricing exception ${messageId}:`, (e as any)?.message);
+  }
+}
+
 // === Process status updates ===
-async function processStatus(supabase: any, tenantId: string, status: any): Promise<void> {
+async function processStatus(supabase: any, tenantId: string, instanceId: string, status: any): Promise<void> {
   const { id: messageId, status: statusValue } = status;
   if (!messageId || !statusValue) return;
   // Quem decide o status é a escada — o `failed` da Meta entra como `error` e só o
@@ -145,6 +174,8 @@ async function processStatus(supabase: any, tenantId: string, status: any): Prom
   const r = await applyDeliveryStatus(supabase, {
     tenantId, messageId, providerStatus: String(statusValue),
   });
+
+  await savePricing(supabase, tenantId, instanceId, messageId, status);
 
   // A Meta é a ÚNICA que diz o motivo da falha. Continua sendo gravado, agora só em
   // metadata — nunca mais junto com o status.
@@ -380,7 +411,7 @@ Deno.serve(async (req) => {
 
       // === Processar status ===
       for (const status of value.statuses || []) {
-        await processStatus(supabase, instance.tenant_id, status);
+        await processStatus(supabase, instance.tenant_id, instance.id, status);
       }
     }
   }
