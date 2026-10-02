@@ -18,7 +18,8 @@ export interface AllowedDepartment {
 /**
  * Returns the departments the current user is allowed to see:
  * - quem tem `atend.todos_setores`: all active departments in the tenant
- * - os demais: only the single department from funcionarios.department_id
+ * - os demais: o setor do cadastro (funcionarios.department_id) e os outros
+ *   setores que ele enxerga (DEM-0438, `support_departments.visible_department_ids`)
  *
  * A permissão nasceu semeada com o que valia antes (admin e gestor ligados,
  * operador desligado), então ligar este portão não muda o acesso de ninguém.
@@ -61,15 +62,33 @@ export function useAllowedDepartments() {
       const deptId = func?.department_id;
       if (!deptId) return [];
 
-      const { data, error } = await supabase
+      // DEM-0438: o setor pode enxergar outros (`visible_department_ids`). O RLS
+      // lê a mesma coluna via `user_visible_department_ids()`; aqui só montamos
+      // o seletor. O próprio setor vem primeiro, porque é onde o chat abre.
+      const { data: own, error } = await (supabase
         .from("support_departments")
-        .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id")
+        .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id, visible_department_ids" as any)
         .eq("id", deptId)
         .eq("is_active", true)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (error) throw error;
-      return data ? [data as AllowedDepartment] : [];
+      if (!own) return [];
+
+      const { visible_department_ids, ...ownDept } = own as AllowedDepartment & { visible_department_ids: string[] | null };
+      const extraIds = (visible_department_ids ?? []).filter((id) => id !== deptId);
+      if (extraIds.length === 0) return [ownDept];
+
+      const { data: extras, error: extrasError } = await supabase
+        .from("support_departments")
+        .select("id, name, slug, description, is_active, is_default_fallback, default_instance_id, tenant_id")
+        .in("id", extraIds)
+        .eq("tenant_id", tid!)
+        .eq("is_active", true)
+        .neq("ura_action", "auto_reply")
+        .order("name");
+      if (extrasError) throw extrasError;
+      return [ownDept, ...((extras ?? []) as AllowedDepartment[])];
     },
   });
 }

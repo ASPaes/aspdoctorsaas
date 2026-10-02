@@ -20,8 +20,10 @@ export function DepartmentSelector() {
 
   if (isLoading || departments.length === 0) return null;
 
-  // Non-admin: show read-only label (cannot change department)
-  if (!canSeeAllDepartments) {
+  // Sem a permissão e com um setor só: rótulo fixo. Com mais de um (DEM-0438,
+  // o setor enxerga outros), vira seletor — mas sem "Todos": a fila e o alerta
+  // de fila trabalham sempre sobre UM setor.
+  if (!canSeeAllDepartments && departments.length === 1) {
     const dept = departments.find((d) => d.id === selectedDepartmentId) ?? departments[0];
     return (
       <Tooltip>
@@ -50,7 +52,7 @@ export function DepartmentSelector() {
           <SelectValue placeholder="Todos os setores" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Todos os setores</SelectItem>
+          {canSeeAllDepartments && <SelectItem value="all">Todos os setores</SelectItem>}
           {departments.map((d) => (
             <SelectItem key={d.id} value={d.id}>
               {d.name}

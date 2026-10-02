@@ -60,9 +60,12 @@ export function QueueIndicator({ conversationId, assignedTo, onTransferClick, as
   const isClosedOrNone = !isActiveAttendance; // encerrado, inativo ou sem atendimento
 
   // Department guard: user can only claim if conversation belongs to their department
-  const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  // DEM-0438: vale qualquer setor que a pessoa enxerga, não só o do cadastro —
+  // é isso que deixa o N2 puxar o cliente parado na fila do N1.
+  const { departments: setoresVisiveis, canSeeAllDepartments } = useDepartmentFilter();
   const convDeptId = attendance?.department_id;
-  const isInUserDepartment = canSeeAllDepartments || !convDeptId || convDeptId === userDepartmentId;
+  const isInUserDepartment =
+    canSeeAllDepartments || !convDeptId || setoresVisiveis.some((d) => d.id === convDeptId);
 
   // antes: sem restrição — qualquer operador assumia/puxava da fila e transferia.
   // O portão entra em série com as regras atuais (presença, setor, bloqueio).

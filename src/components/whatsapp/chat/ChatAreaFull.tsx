@@ -166,9 +166,11 @@ export function ChatAreaFull({ conversation, onClose, onNavigateToConversation, 
     ehGrupo: (conversation as any)?.is_group === true,
   });
 
-  const { userDepartmentId, canSeeAllDepartments } = useDepartmentFilter();
+  // DEM-0438: qualquer setor que a pessoa enxerga, como no QueueIndicator.
+  const { departments: setoresVisiveis, canSeeAllDepartments } = useDepartmentFilter();
   const setorDoAtendimento = atendimentoDaConversa?.department_id;
-  const souDoSetor = canSeeAllDepartments || !setorDoAtendimento || setorDoAtendimento === userDepartmentId;
+  const souDoSetor =
+    canSeeAllDepartments || !setorDoAtendimento || setoresVisiveis.some((d) => d.id === setorDoAtendimento);
 
   const claimAtendimento = useAtendimentoClaim({
     conversationId: conversation?.id ?? "",

@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ExternalLink, Building2, MessageSquareText, Clock, HardDrive, Moon } from "lucide-react";
+import { ExternalLink, Building2, MessageSquareText, Clock, HardDrive, Moon, Eye } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,7 +49,7 @@ export default function SetoresInstanciasTab() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("support_departments")
-        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled, media_retention_enabled, media_retention_days, is_default_fallback, off_hours_release_to_queue")
+        .select("id, name, is_active, default_instance_id, requires_ticket_on_close, usa_tickets, welcome_message, auto_close_inactivity_minutes, inactivity_warning_before_minutes, agent_alert_minutes, agent_alert_enabled, agent_no_response_close_minutes, agent_no_response_close_enabled, media_retention_enabled, media_retention_days, is_default_fallback, off_hours_release_to_queue, ura_action, visible_department_ids" as any)
         .eq("tenant_id", tid!)
         .eq("is_active", true)
         .order("name");
@@ -286,6 +286,26 @@ export default function SetoresInstanciasTab() {
     onError: (err: any) => toast.error(err.message),
   });
 
+  // DEM-0438: outros setores que os membros deste enxergam no chat. O RLS lê a
+  // mesma coluna (user_visible_department_ids), então é aqui que o acesso muda.
+  const visibleIds: string[] = selectedDept?.visible_department_ids ?? [];
+  const toggleVisibleDept = useMutation({
+    mutationFn: async ({ deptId, visible }: { deptId: string; visible: boolean }) => {
+      if (!selectedId) return;
+      const next = visible ? visibleIds.filter((id) => id !== deptId) : [...visibleIds, deptId];
+      const { error } = await supabase
+        .from("support_departments")
+        .update({ visible_department_ids: next } as any)
+        .eq("id", selectedId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["support_departments_wa"] });
+      queryClient.invalidateQueries({ queryKey: ["allowed_departments"] });
+    },
+    onError: (err: any) => toast.error(err.message),
+  });
+
   const saveRetentionEnabled = useMutation({
     mutationFn: async (value: boolean) => {
       if (!selectedId) return;
@@ -435,6 +455,44 @@ export default function SetoresInstanciasTab() {
                     </Select>
                   </div>
                 )}
+
+                {(() => {
+                  // Setor de autoatendimento da URA não recebe atendimento: não tem fila para ver.
+                  const outros = departments.filter(
+                    (d: any) => d.id !== selectedId && d.ura_action !== "auto_reply"
+                  );
+                  if (outros.length === 0) return null;
+                  return (
+                    <div className="space-y-2 pt-4 border-t">
+                      <div className="flex items-center gap-2">
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        <Label>Também enxerga o chat de</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Quem é deste setor passa a ver a fila, os chats em andamento e os encerrados dos setores
+                        marcados, e pode assumir quem está esperando. Serve para socorrer outra equipe no pico ou na
+                        falta de agente. Nada marcado: vê só o próprio setor.
+                      </p>
+                      <div className="space-y-2">
+                        {outros.map((d: any) => {
+                          const isVisible = visibleIds.includes(d.id);
+                          return (
+                            <div key={d.id} className="flex items-center gap-2">
+                              <Checkbox
+                                checked={isVisible}
+                                disabled={toggleVisibleDept.isPending}
+                                onCheckedChange={() =>
+                                  toggleVisibleDept.mutate({ deptId: d.id, visible: isVisible })
+                                }
+                              />
+                              <span className="text-sm">{d.name}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="pt-4 border-t">
                   <h4 className="text-sm font-medium">Cliente sem responder (bola com o cliente)</h4>

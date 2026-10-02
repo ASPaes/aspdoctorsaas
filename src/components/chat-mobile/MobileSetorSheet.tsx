@@ -46,7 +46,9 @@ export function MobileSetorSheet({ compacto }: Props = {}) {
     compacto ? "h-7 max-w-[45%] px-2.5 text-[11px]" : "h-8 max-w-[60%] px-3 text-xs"
   );
 
-  if (!canSeeAllDepartments) {
+  // Sem a permissão e com um setor só: chip fixo. Com mais de um (DEM-0438),
+  // abre a folha, mas sem "Todos os setores".
+  if (!canSeeAllDepartments && departments.length === 1) {
     return (
       <span className={cn(classeChip, "text-muted-foreground")}>
         <Building2 className="h-3.5 w-3.5 shrink-0" />
@@ -74,17 +76,19 @@ export function MobileSetorSheet({ compacto }: Props = {}) {
         </SheetHeader>
 
         <div className="max-h-[55vh] overflow-y-auto">
-          <button
-            type="button"
-            onClick={() => { setSelectedDepartmentId(null); setOpen(false); }}
-            className={cn(
-              "flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px]",
-              !selectedDepartmentId && "bg-primary/10 font-medium"
-            )}
-          >
-            <span className="flex-1 truncate">Todos os setores</span>
-            {!selectedDepartmentId && <Check className="h-4 w-4 shrink-0 text-primary" />}
-          </button>
+          {canSeeAllDepartments && (
+            <button
+              type="button"
+              onClick={() => { setSelectedDepartmentId(null); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center gap-3 px-5 py-3.5 text-left text-[15px]",
+                !selectedDepartmentId && "bg-primary/10 font-medium"
+              )}
+            >
+              <span className="flex-1 truncate">Todos os setores</span>
+              {!selectedDepartmentId && <Check className="h-4 w-4 shrink-0 text-primary" />}
+            </button>
+          )}
 
           {departments.map((d) => (
             <button
