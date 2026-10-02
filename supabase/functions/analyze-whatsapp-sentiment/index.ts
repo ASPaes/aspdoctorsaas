@@ -108,7 +108,14 @@ serve(async (req) => {
     // so as mensagens ate ela. Apenas chamada interna (service_role).
     const body = await req.json();
     const conversationId = body?.conversationId;
-    const dryRun = isInternalCall && body?.dryRun === true;
+    // Pedido de teste de quem nao e interno e recusado, nunca rebaixado para
+    // analise real: rebaixar gravaria e poderia mandar alerta de verdade.
+    if (body?.dryRun === true && !isInternalCall) {
+      return new Response(JSON.stringify({ success: false, error: "dry_run_internal_only" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const dryRun = body?.dryRun === true;
     const ate: string | null = dryRun && typeof body?.ate === "string" ? body.ate : null;
     if (!conversationId) {
       return new Response(JSON.stringify({ success: false, error: "conversationId is required" }), {
