@@ -88,8 +88,13 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const token = authHeader.replace("Bearer ", "");
     const isInternalCall = token === serviceKey;
+    // Token de avaliacao: so libera o dryRun (conferido abaixo), nunca analise
+    // real. Existe para repassar casos reais pela regra sem a chave de servico.
+    // Sem o secret ANALYZE_DRYRUN_TOKEN configurado, nao vale nada.
+    const evalToken = Deno.env.get("ANALYZE_DRYRUN_TOKEN") ?? "";
+    const isEvalCall = evalToken.length >= 32 && req.headers.get("x-dryrun-token") === evalToken;
 
-    if (!isInternalCall) {
+    if (!isInternalCall && !isEvalCall) {
       const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
         global: { headers: { Authorization: authHeader } },
       });
@@ -109,8 +114,9 @@ serve(async (req) => {
     const body = await req.json();
     const conversationId = body?.conversationId;
     // Pedido de teste de quem nao e interno e recusado, nunca rebaixado para
-    // analise real: rebaixar gravaria e poderia mandar alerta de verdade.
-    if (body?.dryRun === true && !isInternalCall) {
+    // analise real: rebaixar gravaria e poderia mandar alerta de verdade. E o
+    // token de avaliacao sem dryRun tambem: ele nao autentica analise real.
+    if ((body?.dryRun === true && !isInternalCall && !isEvalCall) || (isEvalCall && body?.dryRun !== true)) {
       return new Response(JSON.stringify({ success: false, error: "dry_run_internal_only" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
