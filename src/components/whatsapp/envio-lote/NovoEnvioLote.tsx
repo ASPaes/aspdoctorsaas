@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addSeconds, format } from "date-fns";
 import {
-  CalendarClock, Check, CheckCheck, Clock, FileSpreadsheet, FileText, Info, Loader2, Paperclip, Plus, Search, Send, Shuffle, Trash2, X,
+  CalendarClock, Check, CheckCheck, ChevronDown, ChevronUp, Clock, Filter, FileSpreadsheet, FileText, Info, Loader2, Paperclip, Plus, Search, Send, Shuffle, Trash2, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,12 @@ import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppIns
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
 import { dentroDoHorario, proximoHorarioUtil } from "@/lib/businessHours";
 import { formatBRPhone } from "@/lib/phoneBR";
+import { contarFiltrosAvancados, FILTROS_CLIENTES_VAZIOS, type FiltrosClientes } from "@/lib/filtrosClientes";
+import { FiltrosAvancadosClientesCampos } from "@/components/clientes/FiltrosAvancadosClientes";
 import { aplicarNome, sugerirNomeNaMensagem } from "./nomeNaMensagem";
 import { chaveTelefone, lerLinhas, lerTexto, type Avulso } from "./destinosAvulsos";
 import {
-  RITMO_PADRAO, subirPdfDoLote, useCriarEnvioLote, useDestinosLote,
+  RITMO_PADRAO, subirPdfDoLote, useCriarEnvioLote, useDestinosLote, useIdsClientesFiltrados,
   type Destino, type DestinoRpc, type OrigemDestino,
 } from "./useEnvioLote";
 
@@ -112,8 +114,9 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
   const [origem, setOrigem] = useState<OrigemDestino>("clientes");
   const [soSelecionados, setSoSelecionados] = useState(false);
   const [busca, setBusca] = useState("");
-  const [segmento, setSegmento] = useState<string>("todos");
-  const [situacao, setSituacao] = useState<"ativos" | "cancelados" | "todos">("ativos");
+  // Mesmos filtros da tela de Clientes (fonte única em src/lib/filtrosClientes.ts).
+  const [filtrosCli, setFiltrosCli] = useState<FiltrosClientes>(FILTROS_CLIENTES_VAZIOS);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
   // Chave → destino. Guardar o destino (e não só a chave) é o que deixa a aba
   // "selecionados" listar gente de abas diferentes e os avulsos.
   const [marcados, setMarcados] = useState<Map<string, Destino>>(new Map());
@@ -141,7 +144,10 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
     }
   }, [ativas, instanceId]);
 
-  const { grupos, contatos, clientes, segmentos, carregandoGrupos, carregandoPessoas } = useDestinosLote(instanceId);
+  const { grupos, contatos, clientes, carregandoGrupos, carregandoPessoas } = useDestinosLote(instanceId);
+  const filtroCli = useIdsClientesFiltrados(filtrosCli);
+  const qtdFiltrosCli = contarFiltrosAvancados(filtrosCli);
+  const situacao = filtrosCli.status;
 
   // Trocar de número só tira os GRUPOS marcados: grupo de um número não recebe
   // pelo outro. Pessoas continuam: a conversa é achada ou criada no número novo.
@@ -156,7 +162,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
     () => ({ grupos, contatos, clientes, avulso: avulsos }),
     [grupos, contatos, clientes, avulsos],
   );
-  const carregando = origem === "grupos" ? carregandoGrupos : origem === "avulso" ? false : carregandoPessoas;
+  const carregando = origem === "grupos" ? carregandoGrupos : origem === "avulso" ? false : carregandoPessoas || (origem === "clientes" && filtroCli.carregando);
 
   const selecionados = useMemo(() => [...marcados.values()], [marcados]);
   const n = selecionados.length;
@@ -174,12 +180,12 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
         if (!casa) return false;
       }
       if (soSelecionados || origem !== "clientes") return true;
-      if (segmento !== "todos" && String(d.segmentoId) !== segmento) return false;
+      if (filtroCli.ids && (!d.clienteId || !filtroCli.ids.has(d.clienteId))) return false;
       if (situacao === "ativos" && d.clienteCancelado) return false;
       if (situacao === "cancelados" && !d.clienteCancelado) return false;
       return true;
     });
-  }, [porOrigem, origem, busca, segmento, situacao, soSelecionados, selecionados]);
+  }, [porOrigem, origem, busca, situacao, filtroCli.ids, soSelecionados, selecionados]);
 
   const podeMarcar = (d: Destino) => !!(d.conversationId || d.telefone);
   const marcaveis = visiveis.filter(podeMarcar);
@@ -374,7 +380,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
                 <>
                   <div className="space-y-1.5">
                     <Label className="block text-xs">Situação</Label>
-                    <Select value={situacao} onValueChange={(v) => setSituacao(v as any)}>
+                    <Select value={filtrosCli.status} onValueChange={(v) => setFiltrosCli((f) => ({ ...f, status: v }))}>
                       <SelectTrigger className="h-9 w-36"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ativos">Ativos</SelectItem>
@@ -383,18 +389,15 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
                       </SelectContent>
                     </Select>
                   </div>
-                  {segmentos.length > 0 && (
-                    <div className="space-y-1.5">
-                      <Label className="block text-xs">Segmento</Label>
-                      <Select value={segmento} onValueChange={setSegmento}>
-                        <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">Todos</SelectItem>
-                          {segmentos.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div className="space-y-1.5">
+                    <Label className="block text-xs">Filtros</Label>
+                    <Button variant="outline" className="h-9" onClick={() => setFiltrosAbertos((v) => !v)}>
+                      <Filter className="mr-1.5 h-4 w-4" />
+                      Filtros avançados
+                      {qtdFiltrosCli > 0 && <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[10px] font-semibold tabular-nums text-primary-foreground">{qtdFiltrosCli}</span>}
+                      {filtrosAbertos ? <ChevronUp className="ml-1 h-4 w-4" /> : <ChevronDown className="ml-1 h-4 w-4" />}
+                    </Button>
+                  </div>
                 </>
               )}
               <div className="min-w-[180px] flex-1 space-y-1.5">
@@ -405,6 +408,24 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
                 </div>
               </div>
             </div>
+
+            {!soSelecionados && origem === "clientes" && filtrosAbertos && (
+              <div className="space-y-3 rounded-lg border border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>Os mesmos filtros da tela de Clientes. "Selecionar todos" marca só quem passou no filtro.</span>
+                  {qtdFiltrosCli > 0 && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setFiltrosCli((f) => ({ ...FILTROS_CLIENTES_VAZIOS, status: f.status }))}>
+                      Limpar filtros
+                    </Button>
+                  )}
+                </div>
+                <FiltrosAvancadosClientesCampos
+                  idPrefixo="lote"
+                  filtros={filtrosCli}
+                  onChange={(k, v) => setFiltrosCli((f) => ({ ...f, [k]: v, ...(k === "estadoId" ? { cidadeId: "" } : {}) }))}
+                />
+              </div>
+            )}
 
             {!soSelecionados && origem === "avulso" && (
               <div className="grid gap-3 rounded-lg border border-border p-3 lg:grid-cols-[1fr_auto]">

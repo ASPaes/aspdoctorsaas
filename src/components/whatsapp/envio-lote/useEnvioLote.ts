@@ -10,6 +10,12 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { sugerirNomeNaMensagem } from "./nomeNaMensagem";
 import { chaveTelefone, telefoneValido } from "./destinosAvulsos";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  aplicarFiltrosClientes, contarFiltrosAvancados, passaFiltrosCalculados, temFiltroDeProduto,
+  type FiltrosClientes,
+} from "@/lib/filtrosClientes";
+import { useIdsMatriz, useIdsPorProduto } from "@/components/clientes/FiltrosAvancadosClientes";
 
 /** Ritmo padrão: um intervalo sorteado entre 5 e 30 s entre uma mensagem e a próxima. */
 export const RITMO_PADRAO = { min: 5, max: 30 };
@@ -317,6 +323,46 @@ export function useDestinosLote(instanceId: string | null) {
     segmentos: pessoas.data?.segmentos ?? [],
     carregandoGrupos: grupos.isLoading,
     carregandoPessoas: pessoas.isLoading,
+  };
+}
+
+/**
+ * Ids dos clientes que passam nos Filtros Avançados (os mesmos da tela de
+ * Clientes, src/lib/filtrosClientes.ts). `null` = nenhum filtro ligado, a aba
+ * mostra todos. A situação (ativo/cancelado) a tela já filtra sozinha.
+ */
+export function useIdsClientesFiltrados(filtros: FiltrosClientes) {
+  const { effectiveTenantId: tid } = useTenantFilter();
+  const f = useDebouncedValue(filtros, 400);
+  const ligado = contarFiltrosAvancados(f) > 0;
+  const { data: idsMatriz } = useIdsMatriz(tid, ligado && f.somenteMatrizes);
+  const { data: idsPorProduto } = useIdsPorProduto(f, tid);
+  const esperando = (f.somenteMatrizes && !idsMatriz) || (temFiltroDeProduto(f) && !idsPorProduto);
+
+  const q = useQuery<Set<string>>({
+    queryKey: ["envio-lote", "clientes-filtrados", tid, f, idsMatriz?.size, idsPorProduto?.size],
+    enabled: !!tid && ligado && !esperando,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const linhas = await fetchAllRows<any>(() =>
+        aplicarFiltrosClientes(
+          (supabase.from("vw_clientes_financeiro" as any) as any)
+            .select("id, mensalidade, custo_operacao, imposto_percentual, custo_fixo_percentual")
+            .eq("tenant_id", tid)
+            .order("id"),
+          { ...f, status: "todos" },
+        ),
+      );
+      return new Set(
+        linhas.filter((r) => passaFiltrosCalculados(r, f, { idsMatriz, idsPorProduto })).map((r) => r.id as string),
+      );
+    },
+  });
+
+  return {
+    ids: ligado ? q.data ?? null : null,
+    ligado,
+    carregando: ligado && (esperando || q.isLoading || filtros !== f),
   };
 }
 

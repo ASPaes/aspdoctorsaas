@@ -12,6 +12,8 @@ import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { maskCNPJ, maskCPF } from "@/lib/masks";
 import { fetchAllRows } from "@/lib/supabasePaginate";
+import { aplicarFiltrosClientes, calcularLucroReal, calcularMargemBruta, lerNumeroFiltro } from "@/lib/filtrosClientes";
+import { FiltrosAvancadosClientesCampos, useIdsMatriz, useIdsPorProduto } from "@/components/clientes/FiltrosAvancadosClientes";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,20 +52,6 @@ import { toast } from "sonner";
 
 type SortField = "codigo_sequencial" | "razao_social" | "cnpj" | "produto_id" | "mensalidade" | "data_cadastro" | "qtde_contratos_ativos" | "cancelado";
 type SortDir = "asc" | "desc";
-
-function RangeInput({ label, min, max, onMinChange, onMaxChange, prefix }: {
-  label: string; min: string; max: string; onMinChange: (v: string) => void; onMaxChange: (v: string) => void; prefix?: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <div className="flex gap-1">
-        <Input type="text" inputMode="decimal" placeholder={prefix ? `${prefix} Min` : "Min"} value={min} onChange={(e) => onMinChange(e.target.value)} className="h-8 text-xs" />
-        <Input type="text" inputMode="decimal" placeholder={prefix ? `${prefix} Max` : "Max"} value={max} onChange={(e) => onMaxChange(e.target.value)} className="h-8 text-xs" />
-      </div>
-    </div>
-  );
-}
 
 export default function Clientes() {
   const navigate = useNavigate();
@@ -192,67 +180,12 @@ export default function Clientes() {
   const lookups = useLookups(estadoIdNumeric);
 
   // Fetch IDs of clients that are matrizes (have at least one filial)
-  const { data: matrizIdsSet } = useQuery({
-    queryKey: ["matriz_ids", tid],
-    queryFn: async () => {
-      const pageSize = 1000;
-      const ids = new Set<string>();
-      for (let offset = 0; ; offset += pageSize) {
-        let q = tf(supabase
-          .from("clientes")
-          .select("matriz_id")
-          .not("matriz_id", "is", null)) as any;
-        q = q.range(offset, offset + pageSize - 1);
-        const { data, error } = await q;
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-        for (const row of data) {
-          if (row.matriz_id) ids.add(row.matriz_id);
-        }
-        if (data.length < pageSize) break;
-      }
-      return ids;
-    },
-  });
+  const { data: matrizIdsSet } = useIdsMatriz(tid);
 
   // Pre-fetch client IDs from cliente_produtos for fornecedor/produto/modulo filters
   const hasProductStructureFilters = !!(fornecedorId || produtoId || moduloIds.length > 0);
 
-  const { data: productFilterClientIds } = useQuery({
-    queryKey: ["product_filter_client_ids", fornecedorId, produtoId, moduloIds, tid],
-    queryFn: async () => {
-      let moduleFilterCpIds: Set<string> | null = null;
-      if (moduloIds.length > 0) {
-        const cpmRows = await fetchAllRows<any>(() => {
-          return (supabase.from("cliente_produto_modulos" as any) as any)
-            .select("cliente_produto_id")
-            .in("modulo_id", moduloIds)
-            .eq("ativo", true);
-        });
-        moduleFilterCpIds = new Set((cpmRows || []).map((r: any) => r.cliente_produto_id));
-      }
-
-      const cpRows = await fetchAllRows<any>(() => {
-        let q = (supabase.from("cliente_produtos" as any) as any)
-          .select("id, cliente_id")
-          .eq("ativo", true);
-        if (tid) q = q.eq("tenant_id", tid);
-        if (fornecedorId === "__null__") q = q.is("fornecedor_id", null);
-        else if (fornecedorId) q = q.eq("fornecedor_id", Number(fornecedorId));
-        if (produtoId === "__null__") q = q.is("produto_id", null);
-        else if (produtoId) q = q.eq("produto_id", Number(produtoId));
-        return q;
-      });
-
-      let filteredCpRows = cpRows || [];
-      if (moduleFilterCpIds) {
-        filteredCpRows = filteredCpRows.filter((r: any) => moduleFilterCpIds!.has(r.id));
-      }
-      return new Set(filteredCpRows.map((r: any) => r.cliente_id));
-    },
-    enabled: hasProductStructureFilters,
-    staleTime: 30_000,
-  });
+  const { data: productFilterClientIds } = useIdsPorProduto({ fornecedorId, produtoId, moduloIds }, tid);
 
   // Build query key from all filters
   const filterKey = useMemo(() => ({
@@ -267,15 +200,7 @@ export default function Clientes() {
     estadoId, cidadeId, motivoCancelamentoId,
     mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, sortField, sortDir, tid]);
 
-  const parseFilterNumber = useCallback((value: string): number | null => {
-    const raw = value.trim();
-    if (!raw) return null;
-    let normalized = raw;
-    if (normalized.includes(",") && normalized.includes(".")) normalized = normalized.replace(/\./g, "").replace(",", ".");
-    else if (normalized.includes(",")) normalized = normalized.replace(",", ".");
-    const num = Number(normalized);
-    return Number.isFinite(num) ? num : null;
-  }, []);
+  const parseFilterNumber = lerNumeroFiltro;
 
   const valueFilters = useMemo(() => ({
     mensalidadeMin: parseFilterNumber(mensalidadeMin),
@@ -302,84 +227,21 @@ export default function Clientes() {
     return Boolean(hasDateFilter || hasValueFilter || somenteMatrizes || hasProductStructureFilters);
   }, [periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, valueFilters, somenteMatrizes, hasProductStructureFilters]);
 
-  const round2 = useCallback((n: number) => Math.round((n + Number.EPSILON) * 100) / 100, []);
+  const computeLucroReal = calcularLucroReal;
+  const computeMargemBruta = calcularMargemBruta;
 
-  const computeLucroReal = useCallback((row: any) => {
-    const mensalidade = Number(row.mensalidade ?? 0);
-    if (!(mensalidade > 0)) return 0;
-    const custo = Number(row.custo_operacao ?? 0);
-    const imposto = Number(row.imposto_percentual ?? 0);
-    const fixo = Number(row.custo_fixo_percentual ?? 0);
-    return round2((mensalidade - custo) - round2(mensalidade * imposto) - round2(mensalidade * fixo));
-  }, [round2]);
-
-  const computeMargemBruta = useCallback((row: any) => {
-    const mensalidade = Number(row.mensalidade ?? 0);
-    if (!(mensalidade > 0)) return 0;
-    const custo = Number(row.custo_operacao ?? 0);
-    return round2(((mensalidade - custo) / mensalidade) * 100);
-  }, [round2]);
-
-  const applyCommonFiltersOnClientes = useCallback((query: any, options?: { forNovosNoMes?: boolean }) => {
-    let q = query;
-    const forNovosNoMes = options?.forNovosNoMes === true;
-
-    if (forNovosNoMes) {
-      const now = new Date();
-      const firstDay = format(new Date(now.getFullYear(), now.getMonth(), 1), "yyyy-MM-dd");
-      const lastDay = format(new Date(now.getFullYear(), now.getMonth() + 1, 0), "yyyy-MM-dd");
-      q = q.gte("data_venda_efetiva", firstDay)
-        .lte("data_venda_efetiva", lastDay);
-    } else {
-      if (status === "ativos") q = q.eq("cancelado", false);
-      else if (status === "cancelados") q = q.eq("cancelado", true);
-    }
-
-    if (apenasSetupIncompleto) q = q.eq("setup_completo", false);
-
-
-    if (debouncedSearch) {
-      q = q.or(buildSearchOr(debouncedSearch));
-    }
-
-    if (unidadeBaseQuick === "__null__") q = q.is("unidade_base_id", null);
-    else if (unidadeBaseQuick) q = q.eq("unidade_base_id", Number(unidadeBaseQuick));
-
-    if (recorrenciaAdv === "__null__") q = q.is("recorrencia", null);
-    else if (recorrenciaAdv) q = q.eq("recorrencia", recorrenciaAdv as any);
-
-    const applyLookupFilter = (field: string, val: string) => {
-      if (val === "__null__") q = q.is(field, null);
-      else if (val) q = q.eq(field, Number(val));
-    };
-    applyLookupFilter("modelo_contrato_id", modeloContratoId);
-    applyLookupFilter("origem_venda_id", origemVendaId);
-    applyLookupFilter("estado_id", estadoId);
-    applyLookupFilter("cidade_id", cidadeId);
-    applyLookupFilter("motivo_cancelamento_id", motivoCancelamentoId);
-    applyLookupFilter("area_atuacao_id", areaAtuacaoId);
-    applyLookupFilter("segmento_id", segmentoId);
-    applyLookupFilter("funcionario_id", funcionarioId);
-
-    const applyDateRange = (field: string, range: DateRange) => {
-      if (range.from) q = q.gte(field, format(range.from, "yyyy-MM-dd"));
-      if (range.to) q = q.lte(field, format(range.to, "yyyy-MM-dd"));
-    };
-    applyDateRange("data_cadastro", periodoCadastro);
-    applyDateRange("data_cancelamento", periodoCancelamento);
-    applyDateRange("data_venda_efetiva", periodoVenda);
-    applyDateRange("data_ativacao", periodoAtivacao);
-
-    if (valueFilters.mensalidadeMin !== null) q = q.gte("mensalidade", valueFilters.mensalidadeMin);
-    if (valueFilters.mensalidadeMax !== null) q = q.lte("mensalidade", valueFilters.mensalidadeMax);
-
-    return q;
-  }, [
-    areaAtuacaoId, cidadeId, debouncedSearch, estadoId, funcionarioId,
-    modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
-    periodoCancelamento, periodoVenda, recorrenciaAdv, segmentoId, status,
-    unidadeBaseQuick, valueFilters, apenasSetupIncompleto,
-  ]);
+  // Regra dos filtros em src/lib/filtrosClientes.ts (a mesma do Envio em lote).
+  const applyCommonFiltersOnClientes = useCallback(
+    (query: any, options?: { forNovosNoMes?: boolean }) =>
+      aplicarFiltrosClientes(query, { ...filters, busca: debouncedSearch }, options),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      areaAtuacaoId, cidadeId, debouncedSearch, estadoId, funcionarioId,
+      modeloContratoId, motivoCancelamentoId, origemVendaId, periodoAtivacao, periodoCadastro,
+      periodoCancelamento, periodoVenda, recorrenciaAdv, segmentoId, status,
+      unidadeBaseQuick, mensalidadeMin, mensalidadeMax, apenasSetupIncompleto,
+    ],
+  );
 
   const fetchClientesFilteredRows = useCallback(async (options?: { forNovosNoMes?: boolean }) => {
     const selectFields = [
@@ -589,13 +451,6 @@ export default function Clientes() {
     return m;
   }, [lookups.unidadesBase.data]);
 
-  // Módulos filtrados pelo produto selecionado (se houver)
-  const filteredModulos = useMemo(() => {
-    const all = lookups.produtoModulos.data || [];
-    if (!produtoId) return all;
-    return all.filter((m) => String(m.produto_id) === produtoId);
-  }, [lookups.produtoModulos.data, produtoId]);
-
   // Ticket Médio — calculado sobre TODA a base filtrada (não só a página atual),
   // dividido por todos os clientes (incluindo MRR=0), mesma fórmula do Dashboard:
   //   ticket_medio = SUM(mensalidade + deltas_ativos) / COUNT(clientes)
@@ -736,10 +591,6 @@ export default function Clientes() {
 
     return badges;
   }, [unidadeBaseQuick, somenteMatrizes, apenasSetupIncompleto, recorrenciaAdv, modeloContratoId, produtoId, moduloIds, origemVendaId, areaAtuacaoId, segmentoId, funcionarioId, fornecedorId, estadoId, cidadeId, motivoCancelamentoId, periodoCadastro, periodoCancelamento, periodoVenda, periodoAtivacao, mensalidadeMin, mensalidadeMax, lucroMin, lucroMax, margemMin, margemMax, lookups, updateFilter]);
-
-  // Helper for Select value/onChange with __all__ pattern
-  const selVal = (v: string) => v || "__all__";
-  const selChange = (key: keyof typeof filters) => (v: string) => updateFilter(key as any, v === "__all__" ? "" : v);
 
   // Handle row click with Cmd+Click support
   const handleRowClick = useCallback((e: React.MouseEvent, clienteId: string) => {
@@ -961,222 +812,8 @@ export default function Clientes() {
         )}
 
         <CollapsibleContent className="mt-2">
-          <div className="rounded-lg border bg-card p-4 space-y-4">
-            {/* Row 1 - Date ranges */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <DateRangePicker label="Período de Cadastro" value={periodoCadastro} onChange={(v) => updateFilter("periodoCadastro", v)} />
-              <DateRangePicker label="Período de Cancelamento" value={periodoCancelamento} onChange={(v) => updateFilter("periodoCancelamento", v)} />
-              <DateRangePicker label="Período da Venda" value={periodoVenda} onChange={(v) => updateFilter("periodoVenda", v)} />
-              <DateRangePicker label="Período de Ativação" value={periodoAtivacao} onChange={(v) => updateFilter("periodoAtivacao", v)} />
-            </div>
-
-            {/* Row 2 - Lookups */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Recorrência</label>
-                <Select value={selVal(recorrenciaAdv)} onValueChange={selChange("recorrenciaAdv")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    <SelectItem value="mensal">Mensal</SelectItem>
-                    <SelectItem value="semestral">Semestral</SelectItem>
-                    <SelectItem value="anual">Anual</SelectItem>
-                    <SelectItem value="semanal">Semanal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Modelo de Contrato</label>
-                <Select value={selVal(modeloContratoId)} onValueChange={selChange("modeloContratoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.modelosContrato.data?.map((v) => <SelectItem key={v.id} value={String(v.id)}>{v.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Produto</label>
-                <Select value={selVal(produtoId)} onValueChange={selChange("produtoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.produtos.data?.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Origem da Venda</label>
-                <Select value={selVal(origemVendaId)} onValueChange={selChange("origemVendaId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.origensVenda.data?.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row 3 - More lookups */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Área de Atuação</label>
-                <Select value={selVal(areaAtuacaoId)} onValueChange={selChange("areaAtuacaoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.areasAtuacao.data?.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Segmento</label>
-                <Select value={selVal(segmentoId)} onValueChange={selChange("segmentoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.segmentos.data?.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Funcionário</label>
-                <Select value={selVal(funcionarioId)} onValueChange={selChange("funcionarioId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.funcionarios.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Fornecedor</label>
-                <Select value={selVal(fornecedorId)} onValueChange={selChange("fornecedorId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.fornecedores.data?.map((f) => <SelectItem key={f.id} value={String(f.id)}>{f.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row 4 - Estado/Cidade/Motivo/Mensalidade */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Estado</label>
-                <Select value={selVal(estadoId)} onValueChange={selChange("estadoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.estados.data?.map((e) => <SelectItem key={e.id} value={String(e.id)}>{e.sigla} - {e.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Cidade</label>
-                <Select value={selVal(cidadeId)} onValueChange={selChange("cidadeId")} disabled={!estadoIdNumeric}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={estadoIdNumeric ? undefined : "Selecione estado"} /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todas</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.cidades.data?.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Motivo Cancelamento</label>
-                <Select value={selVal(motivoCancelamentoId)} onValueChange={selChange("motivoCancelamentoId")}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Todos</SelectItem>
-                    <SelectItem value="__null__">Nulo</SelectItem>
-                    {lookups.motivosCancelamento.data?.map((m) => <SelectItem key={m.id} value={String(m.id)}>{m.descricao}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <RangeInput label="Mensalidade R$" min={mensalidadeMin} max={mensalidadeMax} onMinChange={(v) => updateFilter("mensalidadeMin", v)} onMaxChange={(v) => updateFilter("mensalidadeMax", v)} prefix="R$" />
-            </div>
-
-            {/* Row 5 - Numeric ranges */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <RangeInput label="Lucro Real R$" min={lucroMin} max={lucroMax} onMinChange={(v) => updateFilter("lucroMin", v)} onMaxChange={(v) => updateFilter("lucroMax", v)} prefix="R$" />
-              <RangeInput label="Margem %" min={margemMin} max={margemMax} onMinChange={(v) => updateFilter("margemMin", v)} onMaxChange={(v) => updateFilter("margemMax", v)} prefix="%" />
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Módulos</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 w-full justify-between text-xs font-normal">
-                      <span className="truncate">
-                        {moduloIds.length > 0
-                          ? `${moduloIds.length} módulo(s) selecionado(s)`
-                          : "Selecionar módulos..."}
-                      </span>
-                      <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[260px] p-0" align="start">
-                    <Command>
-                      <CommandInput placeholder="Buscar módulo..." className="h-8" />
-                      <CommandList>
-                        <CommandEmpty>Nenhum módulo encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {filteredModulos.map((mod) => {
-                            const isSelected = moduloIds.includes(mod.id);
-                            return (
-                              <CommandItem
-                                key={mod.id}
-                                value={mod.nome}
-                                onSelect={() => {
-                                  const next = isSelected
-                                    ? moduloIds.filter((id) => id !== mod.id)
-                                    : [...moduloIds, mod.id];
-                                  updateFilter("moduloIds", next);
-                                }}
-                              >
-                                <Check className={cn("mr-2 h-4 w-4", isSelected ? "opacity-100" : "opacity-0")} />
-                                {mod.nome}
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex flex-col gap-2 pt-5">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="somente-matrizes"
-                    checked={somenteMatrizes}
-                    onCheckedChange={(v) => updateFilter("somenteMatrizes", !!v)}
-                  />
-                  <label htmlFor="somente-matrizes" className="text-sm cursor-pointer select-none whitespace-nowrap">
-                    Somente Matrizes
-                  </label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="apenas-setup-incompleto"
-                    checked={apenasSetupIncompleto}
-                    onCheckedChange={(v) => updateFilter("apenasSetupIncompleto", !!v)}
-                  />
-                  <label htmlFor="apenas-setup-incompleto" className="text-sm cursor-pointer select-none whitespace-nowrap">
-                    Apenas setup incompleto
-                  </label>
-                </div>
-              </div>
-            </div>
+          <div className="rounded-lg border bg-card p-4">
+            <FiltrosAvancadosClientesCampos filtros={filters} onChange={(k, v) => updateFilter(k as any, v as any)} />
           </div>
         </CollapsibleContent>
       </Collapsible>
