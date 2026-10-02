@@ -235,9 +235,14 @@ serve(async (req) => {
 
     const conversa = (messages || []).filter(ehConversa);
     const clientMessagesCount = conversa.filter((m: any) => !m.is_from_me).length;
-    if (clientMessagesCount < 3) {
+    // Basta 1 mensagem do cliente. O minimo era 3, mas contava a mensagem de
+    // sistema "Atendimento aberto" (gravada com is_from_me=false) — tirando ela,
+    // "Quero fazer o cancelamento do sistema" dito em 2 mensagens nem era lido.
+    // A analise periodica so dispara na 5a mensagem; quem chega aqui com menos
+    // e o disparo por palavra-chave, que e justamente o pedido direto.
+    if (clientMessagesCount < 1) {
       return new Response(
-        JSON.stringify({ success: false, error: "insufficient_messages", message: `Minimo 3 mensagens do cliente necessario para analise (encontradas: ${clientMessagesCount}).` }),
+        JSON.stringify({ success: false, error: "insufficient_messages", message: "Nenhuma mensagem do cliente no atendimento." }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
