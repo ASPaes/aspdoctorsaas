@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { fetchAllRows } from "@/lib/supabasePaginate";
 import { sugerirNomeNaMensagem } from "./nomeNaMensagem";
+import { chaveTelefone, telefoneValido } from "./destinosAvulsos";
 
 /** Ritmo padrão: um intervalo sorteado entre 5 e 30 s entre uma mensagem e a próxima. */
 export const RITMO_PADRAO = { min: 5, max: 30 };
@@ -52,17 +53,24 @@ export interface ItemEnvioLote {
   sent_message_id: string | null;
 }
 
-export type OrigemDestino = "grupos" | "contatos" | "clientes";
+export type OrigemDestino = "grupos" | "contatos" | "clientes" | "avulso";
 
 export interface Destino {
-  conversationId: string;
-  contactId: string;
+  /** Chave da seleção: "conv:<id>" para grupo, "tel:<telefone sem o 9>" para pessoa. */
+  chave: string;
+  tipo: OrigemDestino;
+  /** Só grupo: grupo só recebe do número que está dentro dele. */
+  conversationId: string | null;
+  /** Pessoa: normalizado (55 + DDD + número). A RPC acha ou cria a conversa. */
+  telefone: string | null;
+  contactId: string | null;
   nomeContato: string;
   ehGrupo: boolean;
   nomeSugerido: string;
   clienteId: string | null;
   clienteNome: string | null;
   segmentoId: number | null;
+  clienteCancelado: boolean;
 }
 
 /** Quem vê o botão: admin/head (ou super admin) numa empresa com o envio liberado. */
@@ -150,95 +158,177 @@ export function useItensEnvioLote(envioId: string | null) {
 }
 
 /**
- * Conversas que podem receber pelo número escolhido. Grupo só recebe do número
- * que está dentro dele, então a lista é sempre a das conversas daquele número
- * (a RPC confere de novo).
+ * Quem pode receber o lote.
+ *
+ * - Grupos: as conversas de grupo do número escolhido. Grupo só recebe do
+ *   número que está dentro dele, então esta é a única lista que muda com o número.
+ * - Contatos e Clientes: o tenant inteiro, por telefone. Não importa por qual
+ *   número a pessoa conversou antes: a RPC acha a conversa no número escolhido
+ *   ou cria uma (fechada, sem dono).
  */
 export function useDestinosLote(instanceId: string | null) {
   const { effectiveTenantId: tid } = useTenantFilter();
-  return useQuery<{ destinos: Destino[]; segmentos: { id: number; nome: string }[] }>({
-    queryKey: ["envio-lote", "destinos", tid, instanceId],
+
+  const pessoas = useQuery<{ contatos: Destino[]; clientes: Destino[]; segmentos: { id: number; nome: string }[] }>({
+    queryKey: ["envio-lote", "pessoas", tid],
+    enabled: !!tid,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const [contatos, clientes, tenantRes] = await Promise.all([
+        fetchAllRows<any>(() =>
+          (supabase.from("whatsapp_contacts") as any)
+            .select("id, name, phone_number, cliente_id, nome_na_mensagem")
+            .eq("tenant_id", tid)
+            .eq("is_group", false)
+            .eq("is_active", true)
+            .order("id"),
+        ),
+        fetchAllRows<any>(() =>
+          (supabase.from("clientes") as any)
+            .select("id, nome_fantasia, razao_social, segmento_id, cancelado, telefone_whatsapp, telefone_whatsapp_contato, contato_nome")
+            .eq("tenant_id", tid)
+            .order("id"),
+        ),
+        (supabase.from("tenants" as any) as any).select("nome").eq("id", tid).maybeSingle(),
+      ]);
+      const nomeEmpresa = (tenantRes as any)?.data?.nome ?? null;
+
+      const cliPorId = new Map<string, any>(clientes.map((c) => [c.id, c]));
+      const nomeCliente = (c: any) => (c?.nome_fantasia || c?.razao_social || "").trim() || null;
+
+      // Contato: só telefone de verdade. LID (14-15 dígitos) não é número.
+      const listaContatos: Destino[] = [];
+      const contatosPorCliente = new Map<string, Destino[]>();
+      const vistos = new Set<string>();
+      for (const ct of contatos) {
+        const tel = String(ct.phone_number || "").replace(/\D/g, "");
+        if (tel.length < 10 || tel.length > 13) continue;
+        const chave = "tel:" + chaveTelefone(tel);
+        if (vistos.has(chave)) continue;
+        vistos.add(chave);
+        const cli = ct.cliente_id ? cliPorId.get(ct.cliente_id) : null;
+        const d: Destino = {
+          chave,
+          tipo: "contatos",
+          conversationId: null,
+          telefone: tel,
+          contactId: ct.id,
+          nomeContato: ct.name && ct.name !== ct.phone_number ? ct.name : "Sem nome",
+          ehGrupo: false,
+          nomeSugerido: sugerirNomeNaMensagem({ nomeContato: ct.name !== ct.phone_number ? ct.name : "", ehGrupo: false, nomeEmpresa, nomeGuardado: ct.nome_na_mensagem }),
+          clienteId: cli?.id ?? null,
+          clienteNome: nomeCliente(cli),
+          segmentoId: cli?.segmento_id ?? null,
+          clienteCancelado: cli?.cancelado === true,
+        };
+        listaContatos.push(d);
+        if (cli) contatosPorCliente.set(cli.id, [...(contatosPorCliente.get(cli.id) || []), d]);
+      }
+
+      // Cliente: os contatos de WhatsApp ligados a ele; sem nenhum, o WhatsApp
+      // do cadastro. Sem telefone nenhum, aparece desabilitado para a conferência.
+      const listaClientes: Destino[] = [];
+      for (const c of clientes) {
+        const ligados = contatosPorCliente.get(c.id);
+        if (ligados?.length) {
+          ligados.forEach((d) => listaClientes.push({ ...d, tipo: "clientes" }));
+          continue;
+        }
+        const tel = telefoneValido(c.telefone_whatsapp || "") || telefoneValido(c.telefone_whatsapp_contato || "");
+        const nome = nomeCliente(c) || "Sem nome";
+        listaClientes.push({
+          chave: tel ? "tel:" + chaveTelefone(tel) : "sem-tel:" + c.id,
+          tipo: "clientes",
+          conversationId: null,
+          telefone: tel,
+          contactId: null,
+          nomeContato: (c.contato_nome || "").trim() || nome,
+          ehGrupo: false,
+          nomeSugerido: sugerirNomeNaMensagem({ nomeContato: (c.contato_nome || "").trim() || nome, ehGrupo: false, nomeEmpresa }),
+          clienteId: c.id,
+          clienteNome: nome,
+          segmentoId: c.segmento_id ?? null,
+          clienteCancelado: c.cancelado === true,
+        });
+      }
+
+      let segmentos: { id: number; nome: string }[] = [];
+      const usados = [...new Set(clientes.map((c) => c.segmento_id).filter((s) => s != null))];
+      if (usados.length) {
+        const { data } = await (supabase.from("segmentos") as any).select("id, nome").in("id", usados).order("nome");
+        segmentos = data || [];
+      }
+
+      const porNome = (a: Destino, b: Destino) =>
+        (a.clienteNome || a.nomeContato).localeCompare(b.clienteNome || b.nomeContato, "pt-BR");
+      listaContatos.sort((a, b) => a.nomeContato.localeCompare(b.nomeContato, "pt-BR"));
+      listaClientes.sort(porNome);
+      return { contatos: listaContatos, clientes: listaClientes, segmentos };
+    },
+  });
+
+  const grupos = useQuery<Destino[]>({
+    queryKey: ["envio-lote", "grupos", tid, instanceId],
     enabled: !!tid && !!instanceId,
     staleTime: 60 * 1000,
     queryFn: async () => {
       const [convs, tenantRes] = await Promise.all([
         fetchAllRows<any>(() =>
           (supabase.from("whatsapp_conversations") as any)
-            .select("id, instance_id, current_instance_id, is_group, whatsapp_contacts!inner(id, name, is_active, cliente_id, nome_na_mensagem)")
+            .select("id, instance_id, current_instance_id, whatsapp_contacts!inner(id, name, is_active, nome_na_mensagem)")
             .eq("tenant_id", tid)
+            .eq("is_group", true)
             .order("last_message_at", { ascending: false, nullsFirst: false }),
         ),
         (supabase.from("tenants" as any) as any).select("nome").eq("id", tid).maybeSingle(),
       ]);
       const nomeEmpresa = (tenantRes as any)?.data?.nome ?? null;
-
-      const doNumero = convs.filter(
-        (c) =>
-          (c.instance_id === instanceId || c.current_instance_id === instanceId) &&
-          c.whatsapp_contacts?.is_active !== false,
-      );
-
-      // Uma conversa por contato: a mais recente (a lista já vem nessa ordem).
       const vistos = new Set<string>();
-      const unicas = doNumero.filter((c) => {
-        const k = c.whatsapp_contacts.id;
-        if (vistos.has(k)) return false;
-        vistos.add(k);
-        return true;
-      });
-
-      const clienteIds = [...new Set(unicas.map((c) => c.whatsapp_contacts.cliente_id).filter(Boolean))] as string[];
-      const clientes = new Map<string, { nome: string; segmento_id: number | null }>();
-      for (let i = 0; i < clienteIds.length; i += 200) {
-        const { data } = await (supabase.from("clientes") as any)
-          .select("id, nome_fantasia, razao_social, segmento_id")
-          .eq("tenant_id", tid)
-          .in("id", clienteIds.slice(i, i + 200));
-        for (const c of data || []) {
-          clientes.set(c.id, { nome: c.nome_fantasia || c.razao_social || "", segmento_id: c.segmento_id ?? null });
-        }
-      }
-
-      let segmentos: { id: number; nome: string }[] = [];
-      if (clientes.size > 0) {
-        const usados = [...new Set([...clientes.values()].map((c) => c.segmento_id).filter((s) => s != null))];
-        if (usados.length) {
-          const { data } = await (supabase.from("segmentos") as any).select("id, nome").in("id", usados).order("nome");
-          segmentos = data || [];
-        }
-      }
-
-      const destinos: Destino[] = unicas.map((c) => {
+      const lista: Destino[] = [];
+      for (const c of convs) {
         const ct = c.whatsapp_contacts;
-        const cli = ct.cliente_id ? clientes.get(ct.cliente_id) : undefined;
-        const ehGrupo = c.is_group === true;
-        return {
+        if (c.instance_id !== instanceId && c.current_instance_id !== instanceId) continue;
+        if (ct?.is_active === false || vistos.has(ct.id)) continue;
+        vistos.add(ct.id);
+        lista.push({
+          chave: "conv:" + c.id,
+          tipo: "grupos",
           conversationId: c.id,
+          telefone: null,
           contactId: ct.id,
           nomeContato: ct.name || "Sem nome",
-          ehGrupo,
-          nomeSugerido: sugerirNomeNaMensagem({
-            nomeContato: ct.name,
-            ehGrupo,
-            nomeEmpresa,
-            nomeGuardado: ct.nome_na_mensagem,
-          }),
-          clienteId: ct.cliente_id ?? null,
-          clienteNome: cli?.nome || null,
-          segmentoId: cli?.segmento_id ?? null,
-        };
-      });
-
-      destinos.sort((a, b) => a.nomeContato.localeCompare(b.nomeContato, "pt-BR"));
-      return { destinos, segmentos };
+          ehGrupo: true,
+          nomeSugerido: sugerirNomeNaMensagem({ nomeContato: ct.name, ehGrupo: true, nomeEmpresa, nomeGuardado: ct.nome_na_mensagem }),
+          clienteId: null,
+          clienteNome: null,
+          segmentoId: null,
+          clienteCancelado: false,
+        });
+      }
+      lista.sort((a, b) => a.nomeContato.localeCompare(b.nomeContato, "pt-BR"));
+      return lista;
     },
   });
+
+  return {
+    grupos: grupos.data ?? [],
+    contatos: pessoas.data?.contatos ?? [],
+    clientes: pessoas.data?.clientes ?? [],
+    segmentos: pessoas.data?.segmentos ?? [],
+    carregandoGrupos: grupos.isLoading,
+    carregandoPessoas: pessoas.isLoading,
+  };
 }
+
+/** Item de p_destinos da fn_bulk_send_create: grupo por conversa, pessoa por telefone. */
+export type DestinoRpc =
+  | { conversation_id: string; nome: string }
+  | { telefone: string; nome: string; nome_contato?: string; cliente_id?: string | null };
 
 export interface NovoEnvio {
   instanceId: string;
   conteudo: string;
-  destinos: { conversation_id: string; nome: string }[];
+  destinos: DestinoRpc[];
   anexo: { storagePath: string; mime: string; nome: string; tamanho: number } | null;
   intervaloMin: number;
   intervaloMax: number;
@@ -265,7 +355,10 @@ export function useCriarEnvioLote() {
         p_titulo: null,
       });
       if (error) throw new Error(error.message);
-      return data as { bulk_send_id: string; total: number; inicio_em: string; fim_previsto_em: string };
+      return data as {
+        bulk_send_id: string; total: number; inicio_em: string; fim_previsto_em: string;
+        ignorados?: { telefone: string; nome: string | null; motivo: string }[];
+      };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["envio-lote"] });

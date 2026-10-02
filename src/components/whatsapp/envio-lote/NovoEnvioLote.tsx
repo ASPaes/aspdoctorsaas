@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addSeconds, format } from "date-fns";
-import { CalendarClock, Check, Clock, FileText, Info, Loader2, Paperclip, Search, Send, X } from "lucide-react";
+import {
+  CalendarClock, Check, CheckCheck, Clock, FileSpreadsheet, FileText, Info, Loader2, Paperclip, Plus, Search, Send, Shuffle, Trash2, X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,10 +14,12 @@ import { useTenantFilter } from "@/contexts/TenantFilterContext";
 import { useWhatsAppInstances } from "@/components/whatsapp/hooks/useWhatsAppInstances";
 import { useBusinessHoursConfig } from "@/components/whatsapp/hooks/useBusinessHoursConfig";
 import { dentroDoHorario, proximoHorarioUtil } from "@/lib/businessHours";
-import { aplicarNome } from "./nomeNaMensagem";
+import { formatBRPhone } from "@/lib/phoneBR";
+import { aplicarNome, sugerirNomeNaMensagem } from "./nomeNaMensagem";
+import { chaveTelefone, lerLinhas, lerTexto, type Avulso } from "./destinosAvulsos";
 import {
   RITMO_PADRAO, subirPdfDoLote, useCriarEnvioLote, useDestinosLote,
-  type Destino, type OrigemDestino,
+  type Destino, type DestinoRpc, type OrigemDestino,
 } from "./useEnvioLote";
 
 const RITMOS = [
@@ -25,6 +29,14 @@ const RITMOS = [
   { id: "custom", rotulo: "Personalizado", min: 0, max: 0 },
 ] as const;
 
+// O motor nunca solta duas mensagens de lote com menos que isso entre elas
+// (PISO_LOTE_MS em dispatch-scheduled-messages).
+const PISO_S = 3;
+const MAX_DESTINOS = 500;
+// Lista com milhares de linhas (cada uma com um campo de texto) trava a tela.
+// Acima disso, mostra o começo e pede para buscar; "marcar todos" vale para todos.
+const LIMITE_LINHAS = 300;
+
 const PDF_MAX = 16 * 1024 * 1024;
 
 // "Começar agora" = daqui a 1 minuto. O motor olha a fila 1x por minuto e pega
@@ -32,11 +44,56 @@ const PDF_MAX = 16 * 1024 * 1024;
 // para o tique seguinte e sair colada na segunda (visto no teste de 30/09: 3 s).
 const FOLGA_INICIO_MS = 60 * 1000;
 
+const ABAS: { id: OrigemDestino; rotulo: string }[] = [
+  { id: "grupos", rotulo: "Grupos" },
+  { id: "contatos", rotulo: "Contatos" },
+  { id: "clientes", rotulo: "Clientes" },
+  { id: "avulso", rotulo: "Avulso" },
+];
+
 function duracaoTexto(seg: number) {
   const m = Math.round(seg / 60);
   if (m < 1) return "menos de 1 min";
   if (m < 60) return `${m} min`;
   return `${Math.floor(m / 60)} h ${m % 60} min`;
+}
+
+/** Exemplo de como os intervalos saem sorteados, para a tela explicar o ritmo. */
+function sortearExemplo(min: number, max: number, qtd = 6): number[] {
+  const out = [0];
+  for (let i = 1; i < qtd; i++) out.push(Math.max(PISO_S, Math.round(min + Math.random() * (max - min))));
+  return out;
+}
+
+function telefoneTela(d: Destino) {
+  if (d.ehGrupo) return "Grupo";
+  if (!d.telefone) return "Sem telefone";
+  return d.telefone.startsWith("55") ? formatBRPhone(d.telefone) : `+${d.telefone}`;
+}
+
+function avulsoParaDestino(a: Avulso): Destino {
+  const nome = a.nome || "";
+  return {
+    chave: "tel:" + chaveTelefone(a.telefone),
+    tipo: "avulso",
+    conversationId: null,
+    telefone: a.telefone,
+    contactId: null,
+    nomeContato: nome || "Sem nome",
+    ehGrupo: false,
+    nomeSugerido: sugerirNomeNaMensagem({ nomeContato: nome, ehGrupo: false }),
+    clienteId: null,
+    clienteNome: null,
+    segmentoId: null,
+    clienteCancelado: false,
+  };
+}
+
+/** CSV com ; , ou TAB. O Excel brasileiro salva com ;. */
+function linhasDoCsv(texto: string): string[][] {
+  const linhas = texto.replace(/^\s+/, "").split(/\r?\n/).filter((l) => l.trim());
+  const sep = [";", "\t", ","].find((s) => linhas[0]?.includes(s)) ?? ";";
+  return linhas.map((l) => l.split(sep).map((c) => c.replace(/^"|"$/g, "").trim()));
 }
 
 interface Props {
@@ -52,23 +109,30 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
 
   const [passo, setPasso] = useState<1 | 2 | 3>(1);
   const [instanceId, setInstanceId] = useState<string | null>(null);
-  const [origem, setOrigem] = useState<OrigemDestino>("grupos");
+  const [origem, setOrigem] = useState<OrigemDestino>("clientes");
+  const [soSelecionados, setSoSelecionados] = useState(false);
   const [busca, setBusca] = useState("");
   const [segmento, setSegmento] = useState<string>("todos");
-  const [marcados, setMarcados] = useState<Set<string>>(new Set());
+  const [situacao, setSituacao] = useState<"ativos" | "cancelados" | "todos">("ativos");
+  // Chave → destino. Guardar o destino (e não só a chave) é o que deixa a aba
+  // "selecionados" listar gente de abas diferentes e os avulsos.
+  const [marcados, setMarcados] = useState<Map<string, Destino>>(new Map());
   const [nomes, setNomes] = useState<Record<string, string>>({});
+  const [avulsos, setAvulsos] = useState<Destino[]>([]);
+  const [textoAvulso, setTextoAvulso] = useState("");
+  const [recusados, setRecusados] = useState<string[]>([]);
   const [mensagem, setMensagem] = useState("Olá, {nome_cliente}!\n\n");
   const [pdf, setPdf] = useState<File | null>(null);
   const [ritmoId, setRitmoId] = useState<(typeof RITMOS)[number]["id"]>("padrao");
-  const [custom, setCustom] = useState({ min: 5, max: 30 });
+  const [custom, setCustom] = useState({ min: 0, max: 30 });
   const [quando, setQuando] = useState<"agora" | "agendar">("agora");
   const [agendarPara, setAgendarPara] = useState("");
   const [confirmo, setConfirmo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const textoRef = useRef<HTMLTextAreaElement>(null);
 
-  // Número da API oficial da Meta fica de fora: ela não entrega em grupo e só
-  // aceita texto livre para quem escreveu nas últimas 24 h.
+  // Número da API oficial da Meta fica de fora por enquanto: ela só aceita
+  // template aprovado fora da janela de 24 h (próxima fase).
   const ativas = instances.filter((i: any) => i.is_active !== false && i.provider_type !== "meta_cloud");
   useEffect(() => {
     if (!instanceId && ativas.length) {
@@ -77,47 +141,101 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
     }
   }, [ativas, instanceId]);
 
-  const { data, isLoading: carregandoDestinos } = useDestinosLote(instanceId);
-  const destinos = data?.destinos ?? [];
-  const segmentos = data?.segmentos ?? [];
+  const { grupos, contatos, clientes, segmentos, carregandoGrupos, carregandoPessoas } = useDestinosLote(instanceId);
 
-  // Trocar de número zera a seleção: grupo de um número não recebe pelo outro.
-  useEffect(() => { setMarcados(new Set()); setNomes({}); }, [instanceId]);
-
-  const porOrigem = useMemo(() => ({
-    grupos: destinos.filter((d) => d.ehGrupo),
-    contatos: destinos.filter((d) => !d.ehGrupo),
-    clientes: destinos.filter((d) => d.clienteId),
-  }), [destinos]);
-
-  // Número sem grupo nenhum abre direto na primeira aba que tem gente.
+  // Trocar de número só tira os GRUPOS marcados: grupo de um número não recebe
+  // pelo outro. Pessoas continuam: a conversa é achada ou criada no número novo.
   useEffect(() => {
-    if (carregandoDestinos || porOrigem[origem].length > 0) return;
-    const primeira = (["grupos", "contatos", "clientes"] as OrigemDestino[]).find((o) => porOrigem[o].length > 0);
-    if (primeira) setOrigem(primeira);
-  }, [porOrigem, origem, carregandoDestinos]);
+    setMarcados((m) => {
+      if (![...m.values()].some((d) => d.ehGrupo)) return m;
+      return new Map([...m].filter(([, d]) => !d.ehGrupo));
+    });
+  }, [instanceId]);
+
+  const porOrigem: Record<OrigemDestino, Destino[]> = useMemo(
+    () => ({ grupos, contatos, clientes, avulso: avulsos }),
+    [grupos, contatos, clientes, avulsos],
+  );
+  const carregando = origem === "grupos" ? carregandoGrupos : origem === "avulso" ? false : carregandoPessoas;
+
+  const selecionados = useMemo(() => [...marcados.values()], [marcados]);
+  const n = selecionados.length;
 
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
-    return porOrigem[origem].filter((d) =>
-      (!q || d.nomeContato.toLowerCase().includes(q) || (d.clienteNome || "").toLowerCase().includes(q)) &&
-      (origem !== "clientes" || segmento === "todos" || String(d.segmentoId) === segmento),
-    );
-  }, [porOrigem, origem, busca, segmento]);
+    const qDig = q.replace(/\D/g, "");
+    const base = soSelecionados ? selecionados : porOrigem[origem];
+    return base.filter((d) => {
+      if (q) {
+        const casa =
+          d.nomeContato.toLowerCase().includes(q) ||
+          (d.clienteNome || "").toLowerCase().includes(q) ||
+          (qDig.length >= 3 && (d.telefone || "").includes(qDig));
+        if (!casa) return false;
+      }
+      if (soSelecionados || origem !== "clientes") return true;
+      if (segmento !== "todos" && String(d.segmentoId) !== segmento) return false;
+      if (situacao === "ativos" && d.clienteCancelado) return false;
+      if (situacao === "cancelados" && !d.clienteCancelado) return false;
+      return true;
+    });
+  }, [porOrigem, origem, busca, segmento, situacao, soSelecionados, selecionados]);
 
-  const nomeDe = (d: Destino) => nomes[d.conversationId] ?? d.nomeSugerido;
-  const selecionados = destinos.filter((d) => marcados.has(d.conversationId));
-  const n = selecionados.length;
-  const todosVisiveis = visiveis.length > 0 && visiveis.every((d) => marcados.has(d.conversationId));
+  const podeMarcar = (d: Destino) => !!(d.conversationId || d.telefone);
+  const marcaveis = visiveis.filter(podeMarcar);
+  const todosVisiveis = marcaveis.length > 0 && marcaveis.every((d) => marcados.has(d.chave));
+
+  const alternar = (lista: Destino[], marcar: boolean) => {
+    setMarcados((m) => {
+      const novo = new Map(m);
+      lista.forEach((d) => (marcar ? novo.set(d.chave, d) : novo.delete(d.chave)));
+      return novo;
+    });
+  };
+
+  const nomeDe = (d: Destino) => nomes[d.chave] ?? d.nomeSugerido;
+
+  const adicionarAvulsos = (lista: Avulso[], invalidos: string[]) => {
+    const novos = lista.map(avulsoParaDestino);
+    setAvulsos((atual) => {
+      const ja = new Set(atual.map((d) => d.chave));
+      return [...atual, ...novos.filter((d) => !ja.has(d.chave))];
+    });
+    alternar(novos, true);
+    setRecusados(invalidos);
+    if (novos.length) toast.success(`${novos.length} número(s) adicionado(s) e marcado(s).`);
+    if (invalidos.length) toast.warning(`${invalidos.length} linha(s) com telefone inválido ficaram de fora.`);
+    if (!novos.length && !invalidos.length) toast.error("Nenhum número encontrado.");
+  };
+
+  const importarArquivo = async (arquivo: File) => {
+    try {
+      let linhas: unknown[][];
+      if (/\.csv$|\.txt$/i.test(arquivo.name)) {
+        linhas = linhasDoCsv(await arquivo.text());
+      } else {
+        const XLSX = await import("xlsx");
+        const wb = XLSX.read(await arquivo.arrayBuffer(), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        linhas = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, raw: false }) as unknown[][];
+      }
+      const r = lerLinhas(linhas);
+      adicionarAvulsos(r.validos, r.invalidos);
+    } catch {
+      toast.error("Não consegui ler o arquivo. Use Excel (.xlsx) ou CSV com as colunas nome e telefone.");
+    }
+  };
 
   const ritmo = ritmoId === "custom" ? custom : RITMOS.find((r) => r.id === ritmoId)!;
-  const ritmoValido = ritmo.min >= 2 && ritmo.max <= 600 && ritmo.min <= ritmo.max;
-  const duracaoSeg = Math.max(0, n - 1) * ((ritmo.min + ritmo.max) / 2);
+  const ritmoValido = ritmo.min >= 0 && ritmo.max >= 1 && ritmo.max <= 600 && ritmo.min <= ritmo.max;
+  const mediaS = Math.max(PISO_S, (ritmo.min + ritmo.max) / 2);
+  const duracaoSeg = Math.max(0, n - 1) * mediaS;
   const inicio = quando === "agendar" && agendarPara ? new Date(agendarPara) : new Date(Date.now() + FOLGA_INICIO_MS);
   const fim = addSeconds(inicio, duracaoSeg);
   const foraDoHorario = horario && (!dentroDoHorario(inicio, horario) || !dentroDoHorario(fim, horario));
   const proximoUtil = foraDoHorario ? proximoHorarioUtil(new Date(), horario) : null;
-  const porMinuto = 60 / ((ritmo.min + ritmo.max) / 2);
+  const porMinuto = 60 / mediaS;
+  const exemploRitmo = useMemo(() => sortearExemplo(ritmo.min, ritmo.max), [ritmo.min, ritmo.max]);
 
   const textoFinal = mensagem.trim();
   const passa = pdf ? textoFinal.length <= 1000 : textoFinal.length > 0 && textoFinal.length <= 4000;
@@ -139,16 +257,32 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
     setEnviando(true);
     try {
       const anexo = pdf ? await subirPdfDoLote(tid, pdf) : null;
+      const destinos: DestinoRpc[] = selecionados.map((d) =>
+        d.ehGrupo && d.conversationId
+          ? { conversation_id: d.conversationId, nome: nomeDe(d).trim() }
+          : {
+              telefone: d.telefone!,
+              nome: nomeDe(d).trim(),
+              nome_contato: d.nomeContato !== "Sem nome" ? d.nomeContato : undefined,
+              cliente_id: d.clienteId,
+            },
+      );
       const r = await criar.mutateAsync({
         instanceId,
         conteudo: textoFinal,
-        destinos: selecionados.map((d) => ({ conversation_id: d.conversationId, nome: nomeDe(d).trim() })),
+        destinos,
         anexo,
         intervaloMin: ritmo.min,
         intervaloMax: ritmo.max,
         inicioEm: quando === "agendar" && agendarPara ? new Date(agendarPara) : new Date(Date.now() + FOLGA_INICIO_MS),
       });
       toast.success(`Envio criado para ${r.total} destinatários.`);
+      if (r.ignorados?.length) {
+        toast.warning(
+          `${r.ignorados.length} ficaram de fora: ${r.ignorados.slice(0, 3).map((i) => `${i.nome || i.telefone} (${i.motivo})`).join(", ")}${r.ignorados.length > 3 ? "..." : ""}`,
+          { duration: 10000 },
+        );
+      }
       onCriado(r.bulk_send_id);
     } catch (e: any) {
       toast.error(e?.message || "Não foi possível criar o envio.");
@@ -161,6 +295,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
   const instancia = ativas.find((i: any) => i.id === instanceId) as any;
 
   const passos = ["Destinatários", "Mensagem", "Revisar"];
+  const qtdGrupos = selecionados.filter((d) => d.ehGrupo).length;
 
   return (
     <div className="flex h-full flex-col">
@@ -169,7 +304,8 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
         <div className="flex gap-1">
           {passos.map((p, i) => {
             const k = (i + 1) as 1 | 2 | 3;
-            const liberado = k === 1 || (k === 2 && n > 0) || (k === 3 && n > 0 && passa);
+            const okDest = n > 0 && n <= MAX_DESTINOS;
+            const liberado = k === 1 || (k === 2 && okDest) || (k === 3 && okDest && passa);
             return (
               <button
                 key={p}
@@ -207,60 +343,144 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label className="block text-xs">Destinatários</Label>
-                <div className="inline-flex rounded-lg bg-muted p-1">
-                  {(["grupos", "contatos", "clientes"] as OrigemDestino[]).map((o) => (
+                <div className="inline-flex flex-wrap rounded-lg bg-muted p-1">
+                  {ABAS.map((o) => (
                     <button
-                      key={o}
+                      key={o.id}
                       type="button"
-                      onClick={() => { setOrigem(o); setBusca(""); }}
-                      disabled={porOrigem[o].length === 0}
-                      title={o === "clientes" && porOrigem.clientes.length === 0 ? "Nenhum contato deste número está vinculado a cliente cadastrado" : undefined}
-                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold capitalize ${origem === o ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"} disabled:cursor-not-allowed disabled:opacity-50`}
+                      onClick={() => { setOrigem(o.id); setSoSelecionados(false); setBusca(""); }}
+                      className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold ${!soSelecionados && origem === o.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"}`}
                     >
-                      {o}
-                      <span className="rounded-full bg-border px-1.5 text-[10px] tabular-nums text-foreground">{porOrigem[o].length}</span>
+                      {o.rotulo}
+                      <span className="rounded-full bg-border px-1.5 text-[10px] tabular-nums text-foreground">{porOrigem[o.id].length}</span>
                     </button>
                   ))}
                 </div>
               </div>
-              {origem === "clientes" && segmentos.length > 0 && (
-                <div className="space-y-1.5">
-                  <Label className="block text-xs">Segmento</Label>
-                  <Select value={segmento} onValueChange={setSegmento}>
-                    <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="todos">Todos</SelectItem>
-                      {segmentos.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-1.5">
+                <Label className="block text-xs">Conferir</Label>
+                <button
+                  type="button"
+                  onClick={() => { setSoSelecionados((v) => !v); setBusca(""); }}
+                  disabled={n === 0 && !soSelecionados}
+                  className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors disabled:opacity-50 ${soSelecionados ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:bg-muted"}`}
+                >
+                  <CheckCheck className="h-3.5 w-3.5" />
+                  {soSelecionados ? "Voltar para a lista" : "Ver só os selecionados"}
+                  <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${soSelecionados ? "bg-primary-foreground/20" : "bg-primary/15 text-primary"}`}>{n}</span>
+                </button>
+              </div>
+              {!soSelecionados && origem === "clientes" && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="block text-xs">Situação</Label>
+                    <Select value={situacao} onValueChange={(v) => setSituacao(v as any)}>
+                      <SelectTrigger className="h-9 w-36"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ativos">Ativos</SelectItem>
+                        <SelectItem value="cancelados">Cancelados</SelectItem>
+                        <SelectItem value="todos">Todos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {segmentos.length > 0 && (
+                    <div className="space-y-1.5">
+                      <Label className="block text-xs">Segmento</Label>
+                      <Select value={segmento} onValueChange={setSegmento}>
+                        <SelectTrigger className="h-9 w-48"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">Todos</SelectItem>
+                          {segmentos.map((s) => <SelectItem key={s.id} value={String(s.id)}>{s.nome}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
               )}
               <div className="min-w-[180px] flex-1 space-y-1.5">
                 <Label className="block text-xs" htmlFor="lote-busca">Buscar</Label>
                 <div className="relative">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="lote-busca" className="h-9 pl-8" placeholder="Nome do grupo, contato ou cliente" value={busca} onChange={(e) => setBusca(e.target.value)} />
+                  <Input id="lote-busca" className="h-9 pl-8" placeholder="Nome, cliente ou telefone" value={busca} onChange={(e) => setBusca(e.target.value)} />
                 </div>
               </div>
             </div>
 
+            {!soSelecionados && origem === "avulso" && (
+              <div className="grid gap-3 rounded-lg border border-border p-3 lg:grid-cols-[1fr_auto]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="lote-avulso" className="text-xs">Digite ou cole os números, um por linha. O nome é opcional, antes do número.</Label>
+                  <Textarea
+                    id="lote-avulso"
+                    rows={3}
+                    value={textoAvulso}
+                    onChange={(e) => setTextoAvulso(e.target.value)}
+                    placeholder={"49 99911-2233\nMaria; 48 99123-4567"}
+                  />
+                  <Button
+                    size="sm"
+                    disabled={!textoAvulso.trim()}
+                    onClick={() => { const r = lerTexto(textoAvulso); adicionarAvulsos(r.validos, r.invalidos); if (r.validos.length) setTextoAvulso(""); }}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar
+                  </Button>
+                </div>
+                <div className="flex flex-col justify-between gap-2 rounded-lg bg-muted/50 p-3 lg:w-72">
+                  <div className="text-xs">
+                    <div className="mb-1 flex items-center gap-1.5 font-semibold"><FileSpreadsheet className="h-4 w-4 text-emerald-600" /> Importar Excel ou CSV</div>
+                    A planilha precisa ter <b>só duas colunas: nome e telefone</b>. Com ou sem cabeçalho; telefone com ou sem DDD 55.
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <label className="cursor-pointer">
+                      Escolher arquivo
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv,.txt"
+                        className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) importarArquivo(f); }}
+                      />
+                    </label>
+                  </Button>
+                </div>
+                {recusados.length > 0 && (
+                  <div className="text-xs text-amber-700 dark:text-amber-400 lg:col-span-2">
+                    Ficaram de fora por telefone inválido: {recusados.slice(0, 8).join(" · ")}{recusados.length > 8 ? ` e mais ${recusados.length - 8}` : ""}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-start gap-2 rounded-lg bg-sky-500/10 px-3 py-2 text-xs">
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-600" />
               <span>
-                <b>Nome na mensagem</b> é o que entra no lugar de <code className="font-mono">{"{nome_cliente}"}</code>.
-                {origem === "grupos" ? " Já vem sem o nome da sua empresa e sem o \"x\"." : " Contato usa o primeiro nome."} Dá para editar, e o sistema lembra na próxima vez.
+                <b>Nome na mensagem</b> é o que entra no lugar de <code className="font-mono">{"{nome_cliente}"}</code>. Dá para editar, e o sistema lembra na próxima vez.
+                {" "}Contatos, clientes e avulsos recebem por <b>qualquer número</b> que você escolher; grupos, só pelo número que está dentro do grupo.
               </span>
             </div>
 
-            <div className="max-h-[calc(100vh-24rem)] min-h-[200px] overflow-auto rounded-lg border border-border">
+            {n > MAX_DESTINOS && (
+              <div className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-700 dark:text-red-400">
+                São {n} selecionados. O limite é {MAX_DESTINOS} por envio: divida em dois envios.
+              </div>
+            )}
+
+            <div className="max-h-[calc(100vh-26rem)] min-h-[200px] overflow-auto rounded-lg border border-border">
               {ativas.length === 0 ? (
                 <div className="p-4 text-sm text-muted-foreground">
-                  Nenhum número disponível para envio em lote. Números da API oficial da Meta não entram: ela não entrega em grupo e só aceita texto livre para quem escreveu nas últimas 24 horas.
+                  Nenhum número disponível para envio em lote.
                 </div>
-              ) : carregandoDestinos ? (
-                <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando conversas deste número...</div>
+              ) : carregando && !soSelecionados ? (
+                <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando...</div>
               ) : visiveis.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">Nenhuma conversa encontrada neste número.</div>
+                <div className="p-4 text-sm text-muted-foreground">
+                  {soSelecionados
+                    ? "Nenhum destinatário selecionado ainda."
+                    : origem === "avulso"
+                      ? "Digite os números acima ou importe uma planilha."
+                      : origem === "grupos"
+                        ? "Nenhum grupo neste número."
+                        : "Nada encontrado."}
+                </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-muted text-left text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -268,48 +488,81 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
                       <th className="w-10 px-3 py-2">
                         <Checkbox
                           checked={todosVisiveis}
-                          onCheckedChange={(v) => {
-                            const novo = new Set(marcados);
-                            visiveis.forEach((d) => (v ? novo.add(d.conversationId) : novo.delete(d.conversationId)));
-                            setMarcados(novo);
-                          }}
+                          onCheckedChange={(v) => alternar(marcaveis, !!v)}
                           aria-label="Selecionar todos"
                         />
                       </th>
-                      <th className="px-3 py-2 font-semibold">{origem === "grupos" ? "Grupo" : origem === "clientes" ? "Contato · cliente" : "Contato"}</th>
+                      <th className="px-3 py-2 font-semibold">{soSelecionados ? "Destinatário" : origem === "grupos" ? "Grupo" : origem === "clientes" ? "Cliente · contato" : "Contato"}</th>
+                      <th className="px-3 py-2 font-semibold">Telefone</th>
                       <th className="px-3 py-2 font-semibold">Nome na mensagem</th>
+                      {(soSelecionados || origem === "avulso") && <th className="w-10 px-2 py-2" />}
                     </tr>
                   </thead>
                   <tbody>
-                    {visiveis.map((d) => (
-                      <tr key={d.conversationId} className="border-t border-border">
-                        <td className="px-3 py-1.5">
-                          <Checkbox
-                            checked={marcados.has(d.conversationId)}
-                            onCheckedChange={(v) => {
-                              const novo = new Set(marcados);
-                              v ? novo.add(d.conversationId) : novo.delete(d.conversationId);
-                              setMarcados(novo);
-                            }}
-                            aria-label={`Selecionar ${d.nomeContato}`}
-                          />
-                        </td>
-                        <td className="px-3 py-1.5">
-                          {d.nomeContato}
-                          {origem === "clientes" && d.clienteNome && <span className="ml-1 text-xs text-muted-foreground">· {d.clienteNome}</span>}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <Input
-                            className="h-8"
-                            value={nomeDe(d)}
-                            onChange={(e) => setNomes((m) => ({ ...m, [d.conversationId]: e.target.value }))}
-                            aria-label={`Nome na mensagem para ${d.nomeContato}`}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {visiveis.slice(0, LIMITE_LINHAS).map((d) => {
+                      const ok = podeMarcar(d);
+                      return (
+                        <tr key={d.tipo + d.chave + (d.clienteId ?? "")} className={`border-t border-border ${ok ? "" : "opacity-50"}`}>
+                          <td className="px-3 py-1.5">
+                            <Checkbox
+                              checked={marcados.has(d.chave)}
+                              disabled={!ok}
+                              onCheckedChange={(v) => alternar([d], !!v)}
+                              aria-label={`Selecionar ${d.nomeContato}`}
+                            />
+                          </td>
+                          <td className="px-3 py-1.5">
+                            {d.clienteNome && (soSelecionados || origem === "clientes") ? (
+                              <>
+                                {d.clienteNome}
+                                {d.nomeContato !== d.clienteNome && <span className="ml-1 text-xs text-muted-foreground">· {d.nomeContato}</span>}
+                              </>
+                            ) : (
+                              <>
+                                {d.nomeContato}
+                                {d.clienteNome && <span className="ml-1 text-xs text-muted-foreground">· {d.clienteNome}</span>}
+                              </>
+                            )}
+                            {d.clienteCancelado && <span className="ml-1.5 rounded bg-red-500/10 px-1 text-[10px] font-semibold text-red-600">cancelado</span>}
+                            {soSelecionados && <span className="ml-1.5 rounded bg-muted px-1 text-[10px] text-muted-foreground">{ABAS.find((a) => a.id === d.tipo)?.rotulo}</span>}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-muted-foreground">{telefoneTela(d)}</td>
+                          <td className="px-3 py-1.5">
+                            <Input
+                              className="h-8"
+                              value={nomeDe(d)}
+                              placeholder="cliente"
+                              disabled={!ok}
+                              onChange={(e) => setNomes((m) => ({ ...m, [d.chave]: e.target.value }))}
+                              aria-label={`Nome na mensagem para ${d.nomeContato}`}
+                            />
+                          </td>
+                          {(soSelecionados || origem === "avulso") && (
+                            <td className="px-2 py-1.5">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                title={soSelecionados ? "Tirar da seleção" : "Remover número"}
+                                onClick={() => {
+                                  alternar([d], false);
+                                  if (!soSelecionados) setAvulsos((l) => l.filter((x) => x.chave !== d.chave));
+                                }}
+                              >
+                                {soSelecionados ? <X className="h-3.5 w-3.5" /> : <Trash2 className="h-3.5 w-3.5" />}
+                              </Button>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
+              )}
+              {visiveis.length > LIMITE_LINHAS && (
+                <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
+                  Mostrando {LIMITE_LINHAS} de {visiveis.length}. Use a busca para achar os outros. "Selecionar todos" marca os {marcaveis.length}.
+                </div>
               )}
             </div>
           </div>
@@ -389,17 +642,24 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
         {passo === 3 && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-              <Resumo k="Destinatários" v={String(n)} s={`${selecionados.filter((d) => d.ehGrupo).length} grupos · ${selecionados.filter((d) => !d.ehGrupo).length} contatos`} />
+              <Resumo k="Destinatários" v={String(n)} s={`${qtdGrupos} grupos · ${n - qtdGrupos} pessoas`} />
               <Resumo k="Número" v={instancia?.display_name || instancia?.instance_name || ""} s={instancia?.status === "connected" ? "conectado" : "desconectado"} pequeno />
               <Resumo k="Anexo" v={pdf ? "1 PDF" : "Sem anexo"} s={pdf ? pdf.name : "só texto"} pequeno />
               <Resumo k="Duração estimada" v={duracaoTexto(duracaoSeg)} s={`de ${format(inicio, "dd/MM HH:mm")} até ~${format(fim, "HH:mm")}`} />
             </div>
 
             <div className="rounded-lg border border-border p-3.5">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm font-semibold">Ritmo: uma mensagem a cada {ritmo.min} a {ritmo.max} segundos, em ordem sorteada</span>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <Shuffle className="h-4 w-4 text-primary" /> Envio aleatório: uma por vez, de {ritmo.min} a {ritmo.max} segundos entre uma e outra
+                </span>
                 <span className="text-xs text-muted-foreground tabular-nums">cerca de {porMinuto.toFixed(1).replace(".", ",")} por minuto</span>
               </div>
+              <p className="mb-3 text-xs text-muted-foreground">
+                A ordem dos destinatários é sorteada e, a cada mensagem, o sistema sorteia quantos segundos esperar dentro dessa faixa.
+                Nunca passa de {ritmo.max} s. Exemplo: {exemploRitmo.map((s, i) => (i === 0 ? "1ª agora" : `+${s} s`)).join(", ")}...
+                {ritmo.min < PISO_S && ` Por segurança do número, nunca saem duas com menos de ${PISO_S} s entre elas.`}
+              </p>
               {mudaRitmo ? (
                 <div className="flex flex-wrap items-end gap-3">
                   <Select value={ritmoId} onValueChange={(v) => setRitmoId(v as any)}>
@@ -412,14 +672,14 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
                   </Select>
                   {ritmoId === "custom" && (
                     <div className="flex items-center gap-2 text-sm">
-                      de <Input type="number" className="h-9 w-20" min={2} max={600} value={custom.min} onChange={(e) => setCustom((c) => ({ ...c, min: Number(e.target.value) }))} aria-label="Intervalo mínimo em segundos" />
-                      a <Input type="number" className="h-9 w-20" min={2} max={600} value={custom.max} onChange={(e) => setCustom((c) => ({ ...c, max: Number(e.target.value) }))} aria-label="Intervalo máximo em segundos" />
+                      de <Input type="number" className="h-9 w-20" min={0} max={600} value={custom.min} onChange={(e) => setCustom((c) => ({ ...c, min: Number(e.target.value) }))} aria-label="Intervalo mínimo em segundos" />
+                      a <Input type="number" className="h-9 w-20" min={1} max={600} value={custom.max} onChange={(e) => setCustom((c) => ({ ...c, max: Number(e.target.value) }))} aria-label="Intervalo máximo em segundos" />
                       segundos
                     </div>
                   )}
-                  {!ritmoValido && <span className="text-xs text-red-600">Use de 2 a 600 segundos, o menor antes do maior.</span>}
-                  {ritmoValido && ritmo.min < 5 && (
-                    <span className="text-xs text-amber-600">Abaixo de 5 s o risco de o WhatsApp bloquear o número aumenta.</span>
+                  {!ritmoValido && <span className="text-xs text-red-600">Use de 0 a 600 segundos, o menor antes do maior.</span>}
+                  {ritmoValido && ritmo.max < 10 && (
+                    <span className="text-xs text-amber-600">Intervalos curtos aumentam o risco de o WhatsApp bloquear o número.</span>
                   )}
                 </div>
               ) : (
@@ -468,7 +728,7 @@ export function NovoEnvioLote({ mudaRitmo, onCriado }: Props) {
         ) : (
           <Button variant="outline" onClick={() => { setPasso((passo - 1) as 1 | 2); setConfirmo(false); }}>Voltar</Button>
         )}
-        {passo === 1 && <Button disabled={n === 0} onClick={() => setPasso(2)}>Continuar</Button>}
+        {passo === 1 && <Button disabled={n === 0 || n > MAX_DESTINOS} onClick={() => { setSoSelecionados(false); setPasso(2); }}>Continuar</Button>}
         {passo === 2 && <Button disabled={!passa} onClick={() => setPasso(3)}>Revisar</Button>}
         {passo === 3 && (
           <Button
