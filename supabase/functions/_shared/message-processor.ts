@@ -1979,13 +1979,20 @@ export async function ensureAttendanceForBilling(supabase: any, conversationId: 
 
 // ─── Auto triggers ────────────────────────────────────────────────────────────
 
+// Analise periodica: a cada AUTO_SENTIMENT_THRESHOLD mensagens do cliente NO
+// ATENDIMENTO ABERTO (~10 trocadas; a mediana do atendimento e 14).
+// Antes contava "desde a ultima analise" por whatsapp_sentiment_analysis.created_at,
+// mas o upsert nunca atualiza created_at: a referencia era a 1a analise da
+// conversa (meses atras) e, passado o limiar uma vez, TODA mensagem do cliente
+// disparava. 136 mil chamadas em 30 dias para 14 mil atendimentos (01/10/2026).
+// Sem estado: dispara quando a contagem cai num multiplo do limiar. Duas
+// mensagens quase simultaneas podem pular um multiplo — a seguinte pega.
 async function triggerAutoSentiment(supabase: any, conversationId: string, supabaseUrl: string): Promise<void> {
   try {
-    const { data: last } = await supabase.from('whatsapp_sentiment_analysis').select('created_at').eq('conversation_id', conversationId).maybeSingle();
-    let q = supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false);
-    if (last?.created_at) q = q.gt('timestamp', last.created_at);
-    const { count } = await q;
-    if (count && count >= AUTO_SENTIMENT_THRESHOLD) fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
+    const { data: att } = await supabase.from('support_attendances').select('opened_at').eq('conversation_id', conversationId).is('closed_at', null).order('opened_at', { ascending: false }).limit(1).maybeSingle();
+    if (!att?.opened_at) return;
+    const { count } = await supabase.from('whatsapp_messages').select('id', { count: 'exact', head: true }).eq('conversation_id', conversationId).eq('is_from_me', false).not('message_type', 'in', '(system,reaction,revoked)').gte('timestamp', att.opened_at);
+    if (count && count % AUTO_SENTIMENT_THRESHOLD === 0) fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }, body: JSON.stringify({ conversationId }) }).catch(() => {});
   } catch { }
 }
 
@@ -1995,17 +2002,17 @@ async function checkChurnKeywords(
   conversationId: string,
   content: string,
   supabaseUrl: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
-    if (!content || !content.trim()) return;
+    if (!content || !content.trim()) return false;
     const { data: cfg } = await supabase
       .from('configuracoes')
       .select('churn_alert_enabled, churn_alert_keywords')
       .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (!cfg?.churn_alert_enabled) return;
+    if (!cfg?.churn_alert_enabled) return false;
     const keywords: string[] = Array.isArray(cfg.churn_alert_keywords) ? cfg.churn_alert_keywords : [];
-    if (keywords.length === 0) return;
+    if (keywords.length === 0) return false;
 
     const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const nContent = normalize(content);
@@ -2013,7 +2020,7 @@ async function checkChurnKeywords(
       const nkw = normalize(String(kw || '').trim());
       return nkw.length > 0 && nContent.includes(nkw);
     });
-    if (!hit) return;
+    if (!hit) return false;
 
     console.log(`[churn-alert] keyword match on conversation ${conversationId} tenant ${tenantId}`);
     fetch(`${supabaseUrl}/functions/v1/analyze-whatsapp-sentiment`, {
@@ -2024,8 +2031,10 @@ async function checkChurnKeywords(
       },
       body: JSON.stringify({ conversationId }),
     }).catch(() => {});
+    return true;
   } catch (err) {
     console.error('[churn-alert] checkChurnKeywords error:', err);
+    return false;
   }
 }
 
@@ -2494,9 +2503,13 @@ export async function processInboundMessage(supabase: any, msg: NormalizedInboun
     }
   }
 
-  triggerAutoSentiment(supabase, conversationId, supabaseUrl);
+  // Palavra-chave de churn analisa na hora; se ela ja disparou, a periodica nao
+  // dispara outra igual no mesmo segundo (eram duas analises por mensagem).
+  (async () => {
+    const porPalavra = content ? await checkChurnKeywords(supabase, tenantId, conversationId, content, supabaseUrl) : false;
+    if (!porPalavra) await triggerAutoSentiment(supabase, conversationId, supabaseUrl);
+  })();
   triggerAutoCategorization(supabase, conversationId, supabaseUrl);
-  if (content) checkChurnKeywords(supabase, tenantId, conversationId, content, supabaseUrl);
 
   const csatHandled = await handleCsatResponse(supabase, ctx, conversationId, tenantId, content);
   if (csatHandled) return;
