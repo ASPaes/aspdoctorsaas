@@ -13,7 +13,11 @@ set -euo pipefail
 
 EMAIL="${1:?uso: conferir-login.sh <email-do-usuario-de-teste>}"
 TENANT_TESTE="d0000000-0000-0000-0000-00000000dead"
-DB="$(docker ps --format '{{.Names}}' | grep -m1 '^supabase_db_' || true)"
+# O container do DoctorSaaS, e não "o primeiro supabase_db_*": com outro projeto
+# Supabase rodando na mesma máquina, head -1 escolhia o banco errado (medido em
+# 01/10/2026 com o projeto "Sistema" de pé — o seed teria escrito nele).
+PROJ="$(grep -m1 '^project_id' "$(dirname "$0")/../../supabase/config.toml" 2>/dev/null | cut -d'"' -f2)"
+DB="$(docker ps --format '{{.Names}}' | grep -x "supabase_db_${PROJ:-x}" || true)"
 
 if [ -z "$DB" ]; then
   echo "BLOQUEADO: o banco local não está rodando (docker ps sem supabase_db_*)." >&2

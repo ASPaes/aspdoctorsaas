@@ -46,15 +46,28 @@ die() { echo "ERRO: $*" >&2; exit 2; }
 
 command -v docker >/dev/null || die "Docker não encontrado."
 docker info >/dev/null 2>&1 || die "Docker não está rodando."
-DB=$(docker ps --format '{{.Names}}' | grep "supabase_db_" | head -1)
+# O container do DoctorSaaS, e não "o primeiro supabase_db_*": com outro projeto
+# Supabase rodando na mesma máquina, head -1 escolhia o banco errado (medido em
+# 01/10/2026 com o projeto "Sistema" de pé — o seed teria escrito nele).
+PROJ="$(grep -m1 '^project_id' "$(dirname "$0")/../supabase/config.toml" 2>/dev/null | cut -d'"' -f2)"
+DB=$(docker ps --format '{{.Names}}' | grep -x "supabase_db_${PROJ:-x}" || true)
 [ -n "$DB" ] || die "container do banco local não encontrado. Rode ./scripts/setup-local-db.sh."
 
 psql_local() { MSYS_NO_PATHCONV=1 docker exec -i "$DB" psql -U postgres -d postgres "$@"; }
 
 # Trava de produção. pg_cron está instalado em produção e não no local; se um dia
 # alguém apontar este container para outro lugar, o script para aqui.
+#
+# Refinado em 01/10/2026: o local passou a ter a extensão instalada (algum refresh
+# a trouxe) com ZERO jobs, e a trava antiga bloqueava o seed sem motivo. O que
+# denuncia produção não é a extensão, são os jobs: lá são mais de 60. Extensão
+# sem job agendado não dispara nada — segue com aviso.
 CRON=$(psql_local -tAc "select count(*) from pg_extension where extname='pg_cron';" | tr -d '[:space:]')
-[ "$CRON" = "0" ] || die "este banco tem pg_cron instalado — cheira a PRODUÇÃO. Abortado sem escrever nada."
+if [ "$CRON" != "0" ]; then
+  JOBS=$(psql_local -tAc "select count(*) from cron.job;" | tr -d '[:space:]')
+  [ "$JOBS" = "0" ] || die "este banco tem pg_cron com $JOBS job(s) agendado(s) — cheira a PRODUÇÃO. Abortado sem escrever nada."
+  echo "aviso: pg_cron instalado neste banco local, mas sem nenhum job agendado."
+fi
 
 echo "Semeando em $DB ..."
 

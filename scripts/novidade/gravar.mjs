@@ -313,7 +313,11 @@ await context.close();
 await browser.close();
 const bruto = await video.path();
 // Corta o login do começo. O ffmpeg vem junto com o playwright-core (só VP8/webm).
-const ffmpeg = [path.join(process.env.LOCALAPPDATA ?? "", "ms-playwright", "ffmpeg-1011", "ffmpeg-win64.exe"), process.env.FFMPEG_PATH]
+const ffmpeg = [
+  path.join(process.env.LOCALAPPDATA ?? "", "ms-playwright", "ffmpeg-1011", "ffmpeg-win64.exe"),
+  path.join(os.homedir(), "Library", "Caches", "ms-playwright", "ffmpeg-1011", "ffmpeg-mac"), // macOS
+  process.env.FFMPEG_PATH,
+]
   .filter(Boolean).find((f) => fs.existsSync(f));
 if (ffmpeg) {
   execSync(`"${ffmpeg}" -hide_banner -loglevel error -y -ss ${cortarEm.toFixed(2)} -i "${bruto}" -c:v libvpx -b:v 700k -an "${path.join(saida, "video.webm")}"`);
