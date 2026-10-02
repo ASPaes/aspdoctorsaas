@@ -17,7 +17,21 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Outubro / 2026
 
+### 02/10
+
+- 🆕 **Grupos de envio no Envio em lote** — Em **Atendimento › Chat › Envio em lote**, os destinatários ganharam a aba **Grupos de envio**. Marque as pessoas como sempre e, se quiser, clique em **Salvar como grupo (opcional)** no rodapé: da próxima vez, um clique em **Marcar** seleciona o grupo inteiro, e dá para tirar ou incluir alguém só naquele envio. No lápis do grupo, você renomeia, tira pessoas ou junta quem estiver marcado. Na aba **Clientes**, com filtros ligados, dá para salvar um **grupo automático**: ele guarda o filtro, e a cada envio entra quem passar nele naquele dia (cliente novo entra, cancelado sai).
+
+- 🆕 **Envio recorrente e mensagens prontas** — No passo **Revisar** do envio em lote, a opção **Repetir sempre** manda a mesma mensagem para o mesmo grupo todo dia X do mês (ou no último dia), em dias da semana escolhidos ou todo dia útil, no horário marcado. Se a data cair em fim de semana ou feriado (os da tela de Feriados), você escolhe se vai para o próximo dia útil, para o anterior ou se sai assim mesmo. A aba **Recorrentes** mostra o próximo envio, o último e o motivo se algum não saiu, e permite pausar, mudar a regra, editar o texto e apagar. No passo **Mensagem**, dá para salvar o texto (com o PDF) como **mensagem pronta** e reaproveitar em outros envios.
+
+- ⬆️ **Envio em lote pelo número oficial da Meta** — Os números da API Oficial passam a aparecer no envio em lote. Com um deles escolhido, a mensagem sai por um **template aprovado**: escolha o template e preencha as variáveis, que aceitam o nome de cada cliente e as colunas da planilha. Grupos do WhatsApp ficam de fora, porque a Meta não envia para grupo.
+
+- 🆕 **Quem pede para sair não recebe mais envio em lote** — Quando o cliente responde **SAIR**, **PARAR**, **STOP** ou **DESCADASTRAR** a um envio em lote, ele entra sozinho na aba **Não recebem** e fica de fora dos próximos envios, inclusive os recorrentes. O atendimento normal pelo chat continua, e nada é respondido automaticamente. Na mesma aba dá para incluir alguém à mão ou devolver quem saiu.
+
+- ⬆️ **Envio em lote: teste, resultado e proteção do número** — No passo **Revisar**, **Enviar um teste antes** manda a mensagem para o seu WhatsApp exatamente como o primeiro destinatário vai receber. Em cada envio, o quadro **Resultado** mostra quantas foram entregues, lidas e respondidas, com o filtro **Ver só quem respondeu**. A planilha do **Avulso** aceita colunas a mais, que viram variáveis da mensagem (a coluna "Vencimento" vira {vencimento}), e o texto aceita variação como {Olá|Oi}, para cada pessoa receber uma das opções. Para proteger o número, o administrador define no escudo ao lado das abas um **limite de mensagens por dia** em cada número, e no **Revisar** dá para **dividir o envio entre números**.
+
 ### 01/10
+
+- ⬆️ **Envio em lote: todos os clientes, telefone, números avulsos e conferência** — Em **Atendimento › Chat › Envio em lote**, clientes e contatos passam a aparecer todos, seja qual for o número escolhido; antes, trocar de número mudava a lista. A tabela ganhou a coluna **Telefone**, a aba **Clientes** ganhou os mesmos **Filtros avançados** da tela de Clientes, e a nova aba **Avulso** aceita números digitados ou uma planilha Excel/CSV com nome e telefone. O botão **Ver só os selecionados** junta o que foi marcado em todas as abas para conferir antes de enviar. No **Revisar**, a tela explica o envio aleatório: a ordem é sorteada e cada mensagem espera um tempo sorteado dentro da faixa escolhida, que o administrador pode ajustar de 0 a 600 segundos.
 
 - 🔧 **O resumo do clima do atendimento não aparece mais cortado no meio da frase** — No cabeçalho do chat, em **Chat › Geral**, ao passar o mouse no selo **Clima**, o resumo da IA parava no meio de uma palavra ("...não permite fixar a jane"), porque só os primeiros 100 caracteres eram guardados. Agora a análise aparece completa, quebrada em linhas dentro da caixa. Os resumos já gravados se completam na próxima vez que a IA analisar a conversa.
 
