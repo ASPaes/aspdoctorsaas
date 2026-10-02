@@ -9,6 +9,8 @@ import type { Cartao, Pessoa, Ref } from "./tipos";
 
 // o mesmo diálogo do módulo de Tickets (como na Visão 360): abre ali mesmo, sem sair do chat
 const SupportTicketDetailDialog = lazyWithReload(() => import("@/components/tickets/SupportTicketDetailDialog"));
+// idem para a conversa do atendimento (DEM-0515)
+const AtendimentoConversaDialog = lazyWithReload(() => import("./AtendimentoConversaDialog"));
 
 const moeda = (v: number | null | undefined) =>
   v == null ? null : Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -109,7 +111,7 @@ function CartaoCliente({ c, onAbrir }: { c: Cartao; onAbrir: () => void }) {
   );
 }
 
-function CartaoAtendimento({ c, mapa, eu, onAbrir }: { c: Cartao; mapa: Map<string, Pessoa>; eu: string; onAbrir: () => void }) {
+function CartaoAtendimento({ c, mapa, eu, onAbrir, onVer }: { c: Cartao; mapa: Map<string, Pessoa>; eu: string; onAbrir: () => void; onVer: () => void }) {
   const d = c.dados;
   const st = STATUS_ATENDIMENTO[d.status] ?? { rotulo: d.status, cls: "bg-muted text-muted-foreground" };
   const aberto = d.status === "waiting" || d.status === "in_progress";
@@ -119,7 +121,13 @@ function CartaoAtendimento({ c, mapa, eu, onAbrir }: { c: Cartao; mapa: Map<stri
     ? minutosDesde(d.ultima_do_cliente) : null;
   return (
     <Moldura icone={Headset} cor="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-      acoes={<button type="button" className={aberto ? botaoPri : botao} onClick={onAbrir}>{aberto ? "Abrir conversa" : "Ver conversa"}</button>}>
+      acoes={aberto ? (
+        <>
+          {/* responder só se faz na tela do chat; olhar, dá daqui mesmo */}
+          <button type="button" className={botaoPri} onClick={onAbrir}>Abrir conversa</button>
+          <button type="button" className={botao} onClick={onVer}>Ver aqui</button>
+        </>
+      ) : <button type="button" className={botao} onClick={onVer}>Ver conversa</button>}>
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
         <span className="font-semibold">Atendimento{d.grupo ? " em grupo" : ""}</span>
         {d.codigo && <span className="font-mono text-muted-foreground">{d.codigo}</span>}
@@ -159,6 +167,7 @@ export function EquipeCartoes({ refs, mapa, eu }: { refs: Ref[]; mapa: Map<strin
   const navigate = useNavigate();
   const { lista, porChave, isLoading } = useCartoes(refs);
   const [ticket, setTicket] = useState<string | null>(null);
+  const [atendimento, setAtendimento] = useState<string | null>(null);
   if (lista.length === 0) return null;
   return (
     <>
@@ -171,11 +180,17 @@ export function EquipeCartoes({ refs, mapa, eu }: { refs: Ref[]; mapa: Map<strin
         }
         if (c.tipo === "ticket") return <CartaoTicket key={c.id} c={c} mapa={mapa} onAbrir={() => setTicket(c.id)} />;
         if (c.tipo === "cliente") return <CartaoCliente key={c.id} c={c} onAbrir={() => navigate(`/clientes/${c.id}`)} />;
-        return <CartaoAtendimento key={c.id} c={c} mapa={mapa} eu={eu} onAbrir={() => navigate(`/whatsapp?conversation=${c.dados.conversa_id}`)} />;
+        return <CartaoAtendimento key={c.id} c={c} mapa={mapa} eu={eu}
+          onAbrir={() => navigate(`/whatsapp?conversation=${c.dados.conversa_id}`)} onVer={() => setAtendimento(c.id)} />;
       })}
       {ticket && (
         <Suspense fallback={null}>
           <SupportTicketDetailDialog ticketId={ticket} open={!!ticket} onOpenChange={(o) => { if (!o) setTicket(null); }} />
+        </Suspense>
+      )}
+      {atendimento && (
+        <Suspense fallback={null}>
+          <AtendimentoConversaDialog attendanceId={atendimento} onClose={() => setAtendimento(null)} />
         </Suspense>
       )}
     </>

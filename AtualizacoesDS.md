@@ -17,6 +17,10 @@ Só entra o que o usuário percebe — refatoração, teste, migration e ajuste 
 
 ## Outubro / 2026
 
+### 02/10
+
+- ⬆️ **Conversa do atendimento abre sem sair da Equipe** — Na **Equipe interna**, quando um atendimento é compartilhado num canal (por exemplo, ao pedir ajuda), o botão **Ver conversa** passa a abrir a conversa numa janela por cima do canal, sem levar para a tela do chat. Em atendimento ainda aberto, o novo botão **Ver aqui** faz o mesmo e mostra as mensagens novas sozinho; **Abrir conversa** continua levando ao chat para responder.
+
 ### 01/10
 
 - ⬆️ **Som próprio para a Equipe interna** — Em **Preferências do Usuário › Toque por tipo de aviso**, a Equipe interna ganhou duas linhas: **mensagem direta** e **grupo e canal**. Cada uma tem toque próprio, diferente do som de mensagem de cliente, e por isso dá para saber pelo ouvido se é um colega, e se a mensagem é só para você. Dá para trocar o toque, ouvir antes, repetir até abrir a conversa ou escolher **Sem som**. Antes, mensagem da equipe tocava igual a mensagem de cliente.

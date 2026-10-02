@@ -32,6 +32,8 @@ interface Props {
   /** Par medido (bloco do cliente → primeira resposta do agente). Quando vem,
    *  o histórico destaca as duas pontas e abre rolado até elas, em vez do topo. */
   destaque?: { de: string; ate: string } | null;
+  /** Atendimento ainda aberto: recarrega sozinho e abre rolado no fim, onde chega o novo. */
+  aoVivo?: boolean;
 }
 
 function formatDateLabel(iso: string): string {
@@ -63,10 +65,12 @@ export function AttendanceChatHistoryModal({
   closedAt,
   csatRespondedAt,
   destaque,
+  aoVivo = false,
 }: Props) {
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const focoRef = useRef<HTMLDivElement>(null);
+  const fimRef = useRef<HTMLDivElement>(null);
   const deMs = destaque ? new Date(destaque.de).getTime() : null;
   const ateMs = destaque ? new Date(destaque.ate).getTime() : null;
 
@@ -88,6 +92,8 @@ export function AttendanceChatHistoryModal({
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["attendance_chat_history", conversationId, openedAt, closedAt, csatRespondedAt, nextAttendanceStart],
     enabled: !!conversationId && open,
+    refetchInterval: aoVivo ? 15_000 : false,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       let q = (supabase.from("whatsapp_messages" as any) as any)
         .select(
@@ -126,10 +132,12 @@ export function AttendanceChatHistoryModal({
     if (!open) return;
     if (focoRef.current) {
       focoRef.current.scrollIntoView({ block: "center" });
+    } else if (aoVivo && fimRef.current) {
+      fimRef.current.scrollIntoView({ block: "end" });
     } else if (scrollRef.current) {
       scrollRef.current.scrollTop = 0;
     }
-  }, [open, messages.length, primeiroFocoId]);
+  }, [open, messages.length, primeiroFocoId, aoVivo]);
 
   const items = useMemo(() => {
     const result: Array<
@@ -344,6 +352,7 @@ export function AttendanceChatHistoryModal({
                 </div>
               );
             })}
+            <div ref={fimRef} />
           </div>
         )}
       </div>
