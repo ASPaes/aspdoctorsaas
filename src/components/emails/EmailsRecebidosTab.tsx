@@ -606,12 +606,12 @@ export default function EmailsRecebidosTab() {
                 )}
                 <TableHead className="w-[100px]">Data e hora</TableHead>
                 <TableHead className="min-w-[260px]">Assunto</TableHead>
-                <TableHead className="w-[190px]">De</TableHead>
-                <TableHead className="w-[190px]">Para</TableHead>
-                <TableHead className="w-[160px]">Cliente</TableHead>
-                <TableHead className="w-[130px]">Setor</TableHead>
-                <TableHead className="w-[120px]">Pasta</TableHead>
-                <TableHead className="w-[190px]">O que aconteceu</TableHead>
+                <TableHead className="w-[170px]">De</TableHead>
+                <TableHead className="w-[170px]">Para</TableHead>
+                <TableHead className="w-[140px]">Cliente</TableHead>
+                <TableHead className="w-[110px]">Setor</TableHead>
+                <TableHead className="w-[110px]">Pasta</TableHead>
+                <TableHead className="w-[190px] min-w-[190px]">O que aconteceu</TableHead>
                 <TableHead className="w-[118px] text-right">Abrir</TableHead>
               </TableRow>
             </TableHeader>
@@ -687,13 +687,13 @@ export default function EmailsRecebidosTab() {
                       </span>
                       <AnexosDoEmail linha={linha} />
                       {linha.corpo_texto && (
-                        <span className="mt-0.5 block max-w-[420px] truncate text-[11.5px] text-muted-foreground">
+                        <span className="mt-0.5 block max-w-[290px] truncate text-[11.5px] text-muted-foreground">
                           {linha.corpo_texto.replace(/\s+/g, " ").slice(0, 140)}
                         </span>
                       )}
                       {naTriagem && podeTriar && <CaixaTriagem linha={linha} setores={setores} />}
                     </TableCell>
-                    <TableCell className="max-w-[190px] align-top">
+                    <TableCell className="max-w-[170px] align-top">
                       <div
                         className={cn(corCaixa.email && "-mx-2 -my-1 rounded-md px-2 py-1")}
                         style={corCaixa.email}
@@ -705,7 +705,7 @@ export default function EmailsRecebidosTab() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[190px] align-top" title={para?.todos}>
+                    <TableCell className="max-w-[170px] align-top" title={para?.todos}>
                       {para ? (
                         <>
                           {/* o +N fica fora do corte: endereço longo não pode escondê-lo */}
@@ -721,13 +721,13 @@ export default function EmailsRecebidosTab() {
                         <span className="text-xs text-muted-foreground">não informado</span>
                       )}
                     </TableCell>
-                    <TableCell className="max-w-[160px] truncate align-top text-sm">
+                    <TableCell className="max-w-[140px] truncate align-top text-sm">
                       {cliente ?? <span className="text-xs text-muted-foreground">não identificado</span>}
                     </TableCell>
-                    <TableCell className="max-w-[130px] truncate align-top text-sm">
+                    <TableCell className="max-w-[110px] truncate align-top text-sm">
                       {linha.support_departments?.name ?? <span className="text-xs text-muted-foreground">sem setor</span>}
                     </TableCell>
-                    <TableCell className="max-w-[120px] truncate align-top">
+                    <TableCell className="max-w-[110px] truncate align-top">
                       {linha.email_pastas ? (
                         <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px]">
                           <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: linha.email_pastas.cor }} aria-hidden />
