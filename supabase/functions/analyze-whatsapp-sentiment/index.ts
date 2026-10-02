@@ -471,7 +471,7 @@ serve(async (req) => {
 
         if (ehRecorrente(atendimentos.size)) {
           const pausa = new Date(Date.now() - RECORRENCIA_PAUSA_DIAS * 86400000).toISOString();
-          const { count: jaAvisado } = await supabase
+          const { count: jaAvisado, error: pausaErr } = await supabase
             .from("notifications")
             .select("id", { count: "exact", head: true })
             .eq("tenant_id", convData.tenant_id)
@@ -479,7 +479,9 @@ serve(async (req) => {
             .eq("metadata->>dedupe_key", chave)
             .gte("created_at", pausa);
 
-          if (!jaAvisado) {
+          // Na duvida, nao avisa: sem conseguir ler a pausa, avisaria a cada ocorrencia.
+          if (pausaErr) console.error("[churn-alert] recorrencia: falha ao ler pausa:", pausaErr.message);
+          if (!pausaErr && !jaAvisado) {
             const contact: any = (convData as any).whatsapp_contacts || {};
             const contactName = contact.name || contact.phone_number || "Cliente";
             const vistos = new Set<string>();
